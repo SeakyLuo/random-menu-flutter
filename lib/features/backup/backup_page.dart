@@ -85,17 +85,12 @@ class _BackupPageState extends State<BackupPage> {
   Widget build(BuildContext context) => PopScope(
     canPop: !_busy,
     child: Scaffold(
-      appBar: AppBar(title: const Text('数据备份')),
+      appBar: AppBar(titleSpacing: 0, title: const Text('资料导入与备份')),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
           const Text(
-            '把喜欢的味道好好保存',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            '菜谱、餐厅、用餐记录和照片保存在这台设备上。导出一份完整备份，换设备时也能带走。',
+            '导入菜谱、餐厅、用餐记录和照片，或导出一份完整备份。',
             style: TextStyle(height: 1.6),
           ),
           const SizedBox(height: 28),

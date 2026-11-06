@@ -1,73 +1,77 @@
-import '../../ui/menu_icon.dart';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
-import '../../core/models.dart';
+import '../../ui/library_widgets.dart';
+import '../../ui/menu_icon.dart';
 import '../../ui/widgets.dart';
-import 'recipe_detail_page.dart';
 import 'recipe_editor.dart';
-import 'recipe_photos.dart';
-import 'recipe_search.dart';
-import 'recipe_tags_page.dart';
-import 'recipe_history_sheet.dart';
+import 'recipe_grid.dart';
+import 'recipe_search_page.dart';
 
 class RecipesPage extends StatefulWidget {
   const RecipesPage({super.key});
   @override
-  State<RecipesPage> createState() => _RecipesPageState();
+  State<RecipesPage> createState() => RecipesPageState();
 }
 
-class _RecipesPageState extends State<RecipesPage> {
-  final _search = TextEditingController();
-  String? _tag;
-  bool _favorites = false;
-  RecipeSearchField _field = RecipeSearchField.all;
+class RecipesPageState extends State<RecipesPage>
+    with TickerProviderStateMixin {
+  TabController? _tabs;
+  List<String> _tags = [];
+  final _scrolls = <String?, ScrollController>{};
+
+  void scrollToTop() {
+    final tag = _tabs!.index == 0 ? null : _tags[_tabs!.index - 1];
+    final controller = _scrolls[tag];
+    if (controller != null) scrollMenuToTop(context, controller);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final counts = <String, int>{};
+    for (final recipe in MenuScope.of(context).data.recipes) {
+      for (final tag in recipe.tags.toSet()) {
+        counts.update(tag, (v) => v + 1, ifAbsent: () => 1);
+      }
+    }
+    final tags = counts.keys.toList();
+    final positions = {for (var i = 0; i < tags.length; i++) tags[i]: i};
+    tags.sort((a, b) {
+      final count = counts[b]!.compareTo(counts[a]!);
+      return count != 0 ? count : positions[a]!.compareTo(positions[b]!);
+    });
+    if (_tabs == null || tags.join('\u0000') != _tags.join('\u0000')) {
+      final selected = _tabs == null || _tabs!.index == 0
+          ? null
+          : _tags[_tabs!.index - 1];
+      _tabs?.dispose();
+      _tags = tags;
+      _tabs = TabController(
+        length: tags.length + 1,
+        vsync: this,
+        initialIndex: selected == null ? 0 : tags.indexOf(selected) + 1,
+      );
+    }
+  }
+
   @override
   void dispose() {
-    _search.dispose();
+    _tabs?.dispose();
+    for (final controller in _scrolls.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
-  void _clearFilters() => setState(() {
-    _search.clear();
-    _tag = null;
-    _favorites = false;
-    _field = RecipeSearchField.all;
-  });
+  Widget _categoryTab(String label) =>
+      Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(label));
 
-  Future<void> _rememberSearch() async {
-    final query = _search.text.trim();
-    if (query.isEmpty) return;
-    final store = MenuScope.of(context);
-    await performAction(
-      context,
-      () => store.update((data) {
-        data.recipeSearchHistory.remove(query);
-        data.recipeSearchHistory.insert(0, query);
-      }),
-    );
-  }
-
-  Future<void> _history() async {
-    final query = await showRecipeSearchHistory(context);
-    if (query == null || !mounted) return;
-    setState(() {
-      _search.text = query;
-      _field = RecipeSearchField.all;
-    });
-  }
-
-  Future<void> _resumeDraft() async {
-    final store = MenuScope.of(context);
-    final draft = store.data.recipeDraft!;
-    final sourceId = store.data.recipeDraftSourceId;
-    if (sourceId != null && !store.data.recipes.any((r) => r.id == sourceId)) {
-      showToast(context, '原菜谱已删除，草稿将保存为新菜谱');
-    }
-    await editRecipe(context, recipe: draft, fromDraft: true);
+  Future<void> _resume() async {
+    final data = MenuScope.of(context).data;
+    await editRecipe(context, recipe: data.recipeDraft!, fromDraft: true);
   }
 
   Future<void> _deleteDraft() async {
-    final store = MenuScope.of(context);
     if (!await confirmAction(
       context,
       title: '删除未完成的草稿？',
@@ -78,9 +82,9 @@ class _RecipesPageState extends State<RecipesPage> {
     if (!mounted) return;
     await performAction(
       context,
-      () => store.update((data) {
-        data.recipeDraft = null;
-        data.recipeDraftSourceId = null;
+      () => MenuScope.of(context).update((d) {
+        d.recipeDraft = null;
+        d.recipeDraftSourceId = null;
       }),
       success: '草稿已删除',
     );
@@ -89,60 +93,31 @@ class _RecipesPageState extends State<RecipesPage> {
   @override
   Widget build(BuildContext context) {
     final data = MenuScope.of(context).data;
-    final recipes = data.recipes;
-    final tags = orderedRecipeTags(data);
-    final query = _search.text.trim();
-    final scores = {
-      if (query.isNotEmpty)
-        for (final recipe in recipes)
-          recipe.id: recipeSearchScore(recipe, query, _field),
-    };
-    final shown = recipes
-        .where(
-          (r) =>
-              (!_favorites || r.favorite) &&
-              (_tag == null || r.tags.contains(_tag)) &&
-              (query.isEmpty || scores[r.id]! > 0),
-        )
-        .toList();
-    if (query.isNotEmpty) {
-      shown.sort((a, b) => scores[b.id]!.compareTo(scores[a.id]!));
-    }
+    final sorted = [...data.recipes]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return MenuPage(
       title: '菜谱',
-      subtitle: '收好拿手菜，让每顿饭都有灵感',
+      compactHeader: true,
       actions: [
-        IconButton.filledTonal(
-          tooltip: '添加菜谱',
-          onPressed: () => editRecipe(context),
-          icon: const MenuIcon(Icons.add),
+        PageActionButton(
+          icon: Icons.search,
+          label: '搜索菜谱',
+          size: 40,
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(builder: (_) => const RecipeSearchPage()),
+          ),
         ),
-        PopupMenuButton<String>(
-          icon: const MenuIcon(Icons.more_horiz),
-          tooltip: '菜谱管理',
-          onSelected: (_) async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute<void>(builder: (_) => const RecipeTagsPage()),
-            );
-            if (!context.mounted) return;
-            if (_tag != null &&
-                !MenuScope.of(context).data.recipeTags.contains(_tag)) {
-              setState(() => _tag = null);
-            }
-          },
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'tags', child: Text('标签管理')),
-          ],
-        ),
+        PageAddButton(label: '添加菜谱', onPressed: () => editRecipe(context)),
       ],
       child: Column(
         children: [
           if (data.recipeDraft != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-              child: Card(
-                margin: EdgeInsets.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
                 child: ListTile(
                   title: const Text('未完成的菜谱'),
                   subtitle: Text(
@@ -152,149 +127,95 @@ class _RecipesPageState extends State<RecipesPage> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  onTap: _resumeDraft,
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextButton(
-                        onPressed: _resumeDraft,
-                        child: const Text('继续编辑'),
-                      ),
-                      IconButton(
-                        tooltip: '删除草稿',
-                        onPressed: _deleteDraft,
-                        icon: const MenuIcon(Icons.delete_outline),
-                      ),
+                  onTap: _resume,
+                  trailing: PopupMenuButton<String>(
+                    tooltip: '草稿操作',
+                    icon: const MenuIcon(Icons.more_horiz),
+                    onSelected: (v) =>
+                        v == 'resume' ? _resume() : _deleteDraft(),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'resume', child: Text('继续编辑')),
+                      PopupMenuItem(value: 'delete', child: Text('删除草稿')),
                     ],
                   ),
                 ),
               ),
             ),
-          Expanded(
-            child: recipes.isEmpty
-                ? EmptyState(
-                    icon: Icons.menu_book_outlined,
-                    title: '从第一道拿手菜开始',
-                    message: '记下做法、照片和标签，慢慢攒成自己的菜谱库。',
-                    actionLabel: '添加菜谱',
-                    onAction: () => editRecipe(context),
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: TextField(
-                          controller: _search,
-                          onChanged: (_) => setState(() {}),
-                          textInputAction: TextInputAction.search,
-                          onSubmitted: (_) => _rememberSearch(),
-                          decoration: InputDecoration(
-                            hintText: '搜索菜名、标签或备注',
-                            prefixIcon: const MenuIcon(Icons.search),
-                            suffixIcon: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_search.text.isNotEmpty)
-                                  IconButton(
-                                    tooltip: '清除搜索',
-                                    onPressed: () => setState(_search.clear),
-                                    icon: const MenuIcon(Icons.close),
-                                  ),
-                                IconButton(
-                                  tooltip: '搜索历史',
-                                  onPressed: _history,
-                                  icon: const MenuIcon(Icons.history),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (query.isNotEmpty)
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
-                          child: Row(
-                            spacing: 8,
-                            children: [
-                              for (final field in RecipeSearchField.values)
-                                ChoiceChip(
-                                  label: Text(switch (field) {
-                                    RecipeSearchField.all => '全部范围',
-                                    RecipeSearchField.name => '菜名',
-                                    RecipeSearchField.tags => '标签',
-                                    RecipeSearchField.note => '备注',
-                                  }),
-                                  selected: _field == field,
-                                  onSelected: (_) =>
-                                      setState(() => _field = field),
-                                ),
-                            ],
-                          ),
-                        ),
-                      const SizedBox(height: 12),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Row(
-                          spacing: 8,
-                          children: [
-                            FilterChip(
-                              label: const Text('全部'),
-                              selected: _tag == null && !_favorites,
-                              onSelected: (_) => setState(() {
-                                _tag = null;
-                                _favorites = false;
-                              }),
-                            ),
-                            FilterChip(
-                              label: const Text('收藏'),
-                              avatar: const MenuIcon(
-                                Icons.favorite_border,
-                                size: 17,
-                              ),
-                              selected: _favorites,
-                              onSelected: (v) => setState(() => _favorites = v),
-                            ),
-                            for (final tag in tags)
-                              FilterChip(
-                                label: Text(tag),
-                                selected: _tag == tag,
-                                onSelected: (v) =>
-                                    setState(() => _tag = v ? tag : null),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: shown.isEmpty
-                            ? EmptyState(
-                                icon: Icons.search_off_outlined,
-                                title: '没有匹配的菜谱',
-                                message: '试试其他关键词，或调整标签和收藏筛选。',
-                                actionLabel: '清除筛选',
-                                onAction: _clearFilters,
-                              )
-                            : ListView.separated(
-                                padding: EdgeInsets.fromLTRB(
-                                  24,
-                                  0,
-                                  24,
-                                  112 + MediaQuery.paddingOf(context).bottom,
-                                ),
-                                itemCount: shown.length,
-                                separatorBuilder: (_, _) =>
-                                    const SizedBox(height: 12),
-                                itemBuilder: (_, index) => _RecipeCard(
-                                  recipe: shown[index],
-                                  onOpen: _rememberSearch,
-                                ),
-                              ),
-                      ),
-                    ],
+          if (_tags.isNotEmpty)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TabBar(
+                controller: _tabs,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                labelPadding: const EdgeInsets.symmetric(horizontal: 11),
+                labelStyle: const TextStyle(
+                  fontSize: 14,
+                  height: 1.2,
+                  fontWeight: FontWeight.w600,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 14,
+                  height: 1.2,
+                  fontWeight: FontWeight.w400,
+                ),
+                labelColor: Theme.of(context).colorScheme.primary,
+                unselectedLabelColor: Theme.of(
+                  context,
+                ).colorScheme.onSurfaceVariant,
+                indicatorSize: TabBarIndicatorSize.label,
+                indicatorWeight: 2,
+                indicator: UnderlineTabIndicator(
+                  borderSide: BorderSide(
+                    width: 2,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                dividerHeight: 0,
+                tabs: [
+                  _categoryTab('全部'),
+                  for (final tag in _tags) _categoryTab(tag),
+                ],
+              ),
+            ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabs,
+              children: [
+                for (final tag in <String?>[null, ..._tags])
+                  _RecipeTab(
+                    key: ValueKey<String?>(tag),
+                    child: Builder(
+                      builder: (context) {
+                        final recipes = sorted
+                            .where((r) => tag == null || r.tags.contains(tag))
+                            .toList();
+                        return recipes.isEmpty
+                            ? EmptyState(
+                                icon: Icons.menu_book_outlined,
+                                title: tag == null ? '从一道拿手菜开始' : '这个标签下还没有菜谱',
+                                message: '点击右上角的＋添加菜谱，记下喜欢的味道。',
+                                actionLabel: '添加菜谱',
+                                onAction: () => editRecipe(context),
+                              )
+                            : RecipeGrid(
+                                controller: _scrolls.putIfAbsent(
+                                  tag,
+                                  ScrollController.new,
+                                ),
+                                recipes: recipes,
+                                showCount: true,
+                                scrollKey: PageStorageKey(
+                                  'recipes:${tag ?? 'all'}',
+                                ),
+                              );
+                      },
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),
@@ -302,105 +223,23 @@ class _RecipesPageState extends State<RecipesPage> {
   }
 }
 
-class _RecipeCard extends StatelessWidget {
-  const _RecipeCard({required this.recipe, required this.onOpen});
-  final Recipe recipe;
-  final VoidCallback onOpen;
+class _RecipeTab extends StatefulWidget {
+  const _RecipeTab({super.key, required this.child});
+
+  final Widget child;
+
   @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onLongPress: () => editRecipe(context, recipe: recipe),
-      onTap: () {
-        onOpen();
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => RecipeDetailPage(recipeId: recipe.id),
-          ),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: SizedBox(
-                width: 88,
-                height: 88,
-                child: recipe.imagePaths.isEmpty
-                    ? ColoredBox(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primaryContainer.withValues(alpha: .4),
-                        child: MenuIcon(
-                          Icons.ramen_dining_outlined,
-                          size: 34,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      )
-                    : RecipePhoto(path: recipe.imagePaths.first),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          recipe.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      if (recipe.favorite) ...[
-                        const SizedBox(width: 8),
-                        MenuIcon(
-                          Icons.favorite,
-                          size: 17,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ],
-                    ],
-                  ),
-                  if (recipe.tags.isNotEmpty) ...[
-                    const SizedBox(height: 7),
-                    Text(
-                      recipe.tags.join(' · '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                  if (recipe.note.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      recipe.note,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 4),
-            const MenuIcon(Icons.chevron_right, size: 20),
-          ],
-        ),
-      ),
-    ),
-  );
+  State<_RecipeTab> createState() => _RecipeTabState();
+}
+
+class _RecipeTabState extends State<_RecipeTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
 }

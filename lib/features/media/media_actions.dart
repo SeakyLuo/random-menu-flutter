@@ -12,14 +12,17 @@ export 'photo_widget.dart' show LocalPhoto;
 Future<List<String>> choosePhotos(
   BuildContext context, {
   bool camera = false,
+  bool single = false,
 }) async {
   final store = MenuScope.of(context);
   var paths = <String>[];
   await performAction(context, () async {
     final picker = ImagePicker();
     final List<XFile> selected;
-    if (camera) {
-      final photo = await picker.pickImage(source: ImageSource.camera);
+    if (camera || single) {
+      final photo = await picker.pickImage(
+        source: camera ? ImageSource.camera : ImageSource.gallery,
+      );
       selected = photo == null ? [] : [photo];
     } else {
       selected = await picker.pickMultiImage();
@@ -36,10 +39,15 @@ Future<void> showPhotoViewer(
   List<String> paths,
   int initial, {
   String? title,
+  ValueChanged<int>? onPageChanged,
 }) => Navigator.of(context).push<void>(
   MaterialPageRoute(
-    builder: (_) =>
-        PhotoViewer(paths: [...paths], initial: initial, title: title),
+    builder: (_) => PhotoViewer(
+      paths: [...paths],
+      initial: initial,
+      title: title,
+      onPageChanged: onPageChanged,
+    ),
   ),
 );
 

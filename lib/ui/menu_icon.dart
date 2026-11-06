@@ -35,6 +35,10 @@ class MenuIcon extends StatelessWidget {
 
 enum _Glyph {
   random,
+  reset,
+  circle,
+  funnel,
+  list,
   book,
   shop,
   person,
@@ -89,6 +93,10 @@ _Glyph _glyphFor(IconData icon) => switch (icon) {
   Icons.casino_outlined ||
   Icons.shuffle ||
   Icons.shuffle_rounded => _Glyph.random,
+  Icons.radio_button_unchecked => _Glyph.circle,
+  Icons.restart_alt => _Glyph.reset,
+  Icons.format_list_bulleted => _Glyph.list,
+  Icons.filter_alt_outlined => _Glyph.funnel,
   Icons.menu_book || Icons.menu_book_outlined => _Glyph.book,
   Icons.storefront || Icons.storefront_outlined => _Glyph.shop,
   Icons.person_outline_rounded ||
@@ -109,7 +117,6 @@ _Glyph _glyphFor(IconData icon) => switch (icon) {
   Icons.tune_rounded ||
   Icons.filter_alt_off_outlined ||
   Icons.filter_list ||
-  Icons.filter_alt_outlined ||
   Icons.filter_list_rounded => _Glyph.filter,
   Icons.search => _Glyph.search,
   Icons.search_off || Icons.search_off_outlined => _Glyph.searchOff,
@@ -239,6 +246,22 @@ class _MenuIconPainter extends CustomPainter {
             ..lineTo(21, 6)
             ..lineTo(18, 9),
         );
+      case _Glyph.circle:
+        canvas.drawCircle(const Offset(12, 12), 9, pen);
+      case _Glyph.reset:
+        path(
+          Path()
+            ..moveTo(20, 8)
+            ..cubicTo(17, 2, 8, 2, 4, 8)
+            ..moveTo(4, 3)
+            ..lineTo(4, 8)
+            ..lineTo(9, 8)
+            ..moveTo(4, 16)
+            ..cubicTo(7, 22, 16, 22, 20, 16)
+            ..moveTo(20, 21)
+            ..lineTo(20, 16)
+            ..lineTo(15, 16),
+        );
       case _Glyph.book:
         path(
           Path()
@@ -302,14 +325,37 @@ class _MenuIconPainter extends CustomPainter {
         line(8.5, 10, 15.5, 10);
         line(8.5, 14, 15.5, 14);
         line(8.5, 18, 13, 18);
+      case _Glyph.funnel:
+        path(
+          Path()
+            ..moveTo(4.5, 4.5)
+            ..lineTo(19.5, 4.5)
+            ..quadraticBezierTo(20.5, 4.5, 19.85, 5.3)
+            ..lineTo(14.05, 12.25)
+            ..quadraticBezierTo(13.5, 12.9, 13.5, 13.7)
+            ..lineTo(13.5, 19)
+            ..quadraticBezierTo(13.5, 19.5, 13, 19.5)
+            ..lineTo(11, 19.5)
+            ..quadraticBezierTo(10.5, 19.5, 10.5, 19)
+            ..lineTo(10.5, 13.7)
+            ..quadraticBezierTo(10.5, 12.9, 9.95, 12.25)
+            ..lineTo(4.15, 5.3)
+            ..quadraticBezierTo(3.5, 4.5, 4.5, 4.5)
+            ..close(),
+        );
+      case _Glyph.list:
+        for (final y in [6.0, 12.0, 18.0]) {
+          line(9, y, 21, y);
+          canvas.drawCircle(Offset(4, y), .7, pen);
+        }
       case _Glyph.filter:
         line(3, 6, 21, 6);
         line(6, 12, 18, 12);
         line(10, 18, 14, 18);
       case _Glyph.search:
       case _Glyph.searchOff:
-        canvas.drawCircle(const Offset(10.5, 10.5), 6.5, pen);
-        line(15.3, 15.3, 21, 21);
+        canvas.drawCircle(const Offset(10.5, 10.5), 7, pen);
+        line(15.5, 15.5, 20.5, 20.5);
         if (glyph == _Glyph.searchOff) {
           line(8, 8, 13, 13);
           line(13, 8, 8, 13);
@@ -544,15 +590,9 @@ class _MenuIconPainter extends CustomPainter {
             ..cubicTo(21, 13.5, 22, 16, 22, 19),
         );
       case _Glyph.chart:
-        path(
-          Path()
-            ..moveTo(3, 3)
-            ..lineTo(3, 21)
-            ..lineTo(21, 21),
-        );
-        line(8, 16, 8, 11);
-        line(13, 16, 13, 5);
-        line(18, 16, 18, 8);
+        box(3.5, 12, 3.5, 8.5, 1);
+        box(10.25, 3.5, 3.5, 17, 1);
+        box(17, 8, 3.5, 12.5, 1);
       case _Glyph.camera:
         path(
           Path()

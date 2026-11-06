@@ -4,14 +4,16 @@ import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/widgets.dart';
+import '../../ui/library_widgets.dart';
 import 'restaurant_address_editor.dart';
 
 Future<bool> editRestaurant(
   BuildContext context, {
   Restaurant? restaurant,
 }) async =>
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute<bool>(
         builder: (_) => _RestaurantEditor(restaurant: restaurant),
       ),
     ) ==
@@ -181,10 +183,14 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
             onPressed: saving ? null : leave,
             icon: const MenuIcon(Icons.arrow_back),
           ),
-          actions: [
-            TextButton(
-              onPressed: saving ? null : save,
-              child: Text(saving ? '保存中' : '保存'),
+        ),
+        bottomNavigationBar: FixedPageActions(
+          children: [
+            Expanded(
+              child: FilledButton(
+                onPressed: saving ? null : save,
+                child: Text(saving ? '保存中…' : '保存餐厅'),
+              ),
             ),
           ],
         ),
@@ -207,7 +213,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                 controller: category,
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
-                  labelText: '分类',
+                  labelText: '菜系',
                   hintText: '如：川菜、咖啡、日料',
                 ),
               ),
@@ -288,7 +294,6 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('收藏餐厅'),
-                subtitle: const Text('在收藏中快速找到它'),
                 value: favorite,
                 onChanged: (v) => setState(() => favorite = v),
               ),

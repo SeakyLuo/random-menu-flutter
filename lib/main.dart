@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/menu_store.dart';
 import 'features/personal/personal_page.dart';
 import 'features/random/random_page.dart';
+import 'features/random/random_theme.dart';
 import 'features/recipes/recipes_page.dart';
 import 'features/restaurants/restaurants_page.dart';
 import 'ui/bottom_bar.dart';
@@ -16,29 +17,51 @@ Future<void> main() async {
   runApp(RandomMenuApp(store: store));
 }
 
-class RandomMenuApp extends StatelessWidget {
+class RandomMenuApp extends StatefulWidget {
   const RandomMenuApp({super.key, required this.store});
   final MenuStore store;
   @override
+  State<RandomMenuApp> createState() => _RandomMenuAppState();
+}
+
+class _RandomMenuAppState extends State<RandomMenuApp> {
+  late String _appearance = widget.store.data.themeMode;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.store.addListener(_appearanceChanged);
+  }
+
+  void _appearanceChanged() {
+    final appearance = widget.store.data.themeMode;
+    if (appearance == _appearance) return;
+    setState(() => _appearance = appearance);
+  }
+
+  @override
+  void dispose() {
+    widget.store.removeListener(_appearanceChanged);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) => MenuScope(
-    store: store,
-    child: ListenableBuilder(
-      listenable: store,
-      builder: (context, _) => MaterialApp(
-        title: '随机菜单',
-        debugShowCheckedModeBanner: false,
-        locale: const Locale('zh', 'CN'),
-        supportedLocales: const [Locale('zh', 'CN')],
-        localizationsDelegates: GlobalMaterialLocalizations.delegates,
-        theme: menuTheme(Brightness.light),
-        darkTheme: menuTheme(Brightness.dark),
-        themeMode: switch (store.data.themeMode) {
-          'light' => ThemeMode.light,
-          'dark' => ThemeMode.dark,
-          _ => ThemeMode.system,
-        },
-        home: const MenuHome(),
-      ),
+    store: widget.store,
+    child: MaterialApp(
+      title: '随机菜单',
+      debugShowCheckedModeBanner: false,
+      locale: const Locale('zh', 'CN'),
+      supportedLocales: const [Locale('zh', 'CN')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      theme: menuTheme(Brightness.light),
+      darkTheme: menuTheme(Brightness.dark),
+      themeMode: switch (_appearance) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      },
+      home: const MenuHome(),
     ),
   );
 }
@@ -51,6 +74,24 @@ class MenuHome extends StatefulWidget {
 
 class _MenuHomeState extends State<MenuHome> {
   int _selected = 0;
+  bool _picking = false;
+  final _recipesKey = GlobalKey<RecipesPageState>();
+  final _restaurantsKey = GlobalKey<RestaurantsPageState>();
+
+  void _selectTab(int index) {
+    if (_picking) return;
+    if (index == _selected) {
+      switch (index) {
+        case 1:
+          _recipesKey.currentState!.scrollToTop();
+        case 2:
+          _restaurantsKey.currentState!.scrollToTop();
+      }
+    } else {
+      setState(() => _selected = index);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
     value: menuSystemUiStyle(Theme.of(context).brightness),
@@ -61,33 +102,29 @@ class _MenuHomeState extends State<MenuHome> {
       },
       child: Scaffold(
         extendBody: true,
-        body: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Theme.of(
-                  context,
-                ).colorScheme.primaryContainer.withValues(alpha: .16),
-                Theme.of(context).scaffoldBackgroundColor,
-                Theme.of(context).scaffoldBackgroundColor,
-              ],
-            ),
-          ),
+        body: ColoredBox(
+          color: Theme.of(context).scaffoldBackgroundColor,
           child: IndexedStack(
             index: _selected,
             children: [
-              RandomPage(onOpenRecipes: () => setState(() => _selected = 1)),
-              const RecipesPage(),
-              const RestaurantsPage(),
-              const PersonalPage(),
+              Theme(
+                data: randomHomeTheme(Theme.of(context)),
+                child: RandomPage(
+                  onOpenRecipes: () => setState(() => _selected = 1),
+                  onBusy: (busy) => setState(() => _picking = busy),
+                ),
+              ),
+              RecipesPage(key: _recipesKey),
+              RestaurantsPage(key: _restaurantsKey),
+              PersonalPage(
+                onNavigate: (index) => setState(() => _selected = index),
+              ),
             ],
           ),
         ),
         bottomNavigationBar: MenuBottomBar(
           selected: _selected,
-          onSelected: (index) => setState(() => _selected = index),
+          onSelected: _selectTab,
         ),
       ),
     ),

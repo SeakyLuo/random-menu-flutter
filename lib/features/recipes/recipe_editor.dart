@@ -1,36 +1,45 @@
+import '../../ui/tag_selection_field.dart';
 import '../../ui/menu_icon.dart';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../media/media_actions.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/widgets.dart';
-import 'recipe_photos.dart';
 import 'recipe_dialogs.dart';
 import 'recipe_search.dart';
+import 'recipe_editor_fields.dart';
 
 Future<bool> editRecipe(
   BuildContext context, {
   Recipe? recipe,
   String? initialName,
+  String? wantedName,
   bool fromDraft = false,
-}) async =>
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => _RecipeEditor(
-          recipe: recipe,
-          initialName: initialName,
-          fromDraft: fromDraft,
-        ),
-      ),
-    ) ==
-    true;
+}) async {
+  final editor = _RecipeEditor(
+    recipe: recipe,
+    initialName: initialName,
+    wantedName: wantedName,
+    fromDraft: fromDraft,
+  );
+  return await Navigator.push<bool>(
+        context,
+        MaterialPageRoute<bool>(builder: (_) => editor),
+      ) ==
+      true;
+}
 
 class _RecipeEditor extends StatefulWidget {
-  const _RecipeEditor({this.recipe, this.initialName, required this.fromDraft});
+  const _RecipeEditor({
+    this.recipe,
+    this.initialName,
+    this.wantedName,
+    required this.fromDraft,
+  });
   final bool fromDraft;
   final Recipe? recipe;
   final String? initialName;
+  final String? wantedName;
   @override
   State<_RecipeEditor> createState() => _RecipeEditorState();
 }
@@ -85,7 +94,9 @@ class _RecipeEditorState extends State<_RecipeEditor> {
     createdAt: _createdAt,
   );
 
-  List<String> get _manualTags => _tags.text
+  List<String> get _manualTags => _selectedTags;
+
+  List<String> get _selectedTags => _tags.text
       .split(RegExp('[,，]'))
       .map((tag) => tag.trim())
       .where((tag) => tag.isNotEmpty)
@@ -163,7 +174,19 @@ class _RecipeEditorState extends State<_RecipeEditor> {
   }
 
   Future<void> _photoAction(int index, String action) async {
-    if (action == 'cover') {
+    if (action == 'replace' || action == 'replaceCamera') {
+      setState(() => _picking = true);
+      final paths = await choosePhotos(
+        context,
+        camera: action == 'replaceCamera',
+        single: true,
+      );
+      if (!mounted) return;
+      setState(() {
+        if (paths.isNotEmpty) _images[0] = paths.first;
+        _picking = false;
+      });
+    } else if (action == 'cover') {
       setState(() {
         final path = _images.removeAt(index);
         _images.insert(0, path);
@@ -273,6 +296,7 @@ class _RecipeEditorState extends State<_RecipeEditor> {
           }
         }
         draft.recipeTags = {...draft.recipeTags, ...tags}.toList();
+        if (widget.wantedName != null) draft.toCook.remove(widget.wantedName);
       }),
       success: '菜谱已保存',
     );
@@ -294,7 +318,13 @@ class _RecipeEditorState extends State<_RecipeEditor> {
         if (!didPop) _leave();
       },
       child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
+          titleTextStyle: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
           title: Text(
             widget.fromDraft
                 ? '编辑草稿'
@@ -307,172 +337,81 @@ class _RecipeEditorState extends State<_RecipeEditor> {
             onPressed: busy ? null : _leave,
             icon: const MenuIcon(Icons.arrow_back),
           ),
-          actions: [
-            TextButton(
-              onPressed: busy ? null : _save,
-              child: Text(_saving ? '保存中…' : '保存'),
+        ),
+        bottomNavigationBar: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ),
-            const SizedBox(width: 8),
-          ],
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              child: FilledButton(
+                onPressed: busy ? null : _save,
+                child: Text(
+                  _saving ? '正在保存…' : '保存菜谱',
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ),
+          ),
         ),
         body: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
+            constraints: const BoxConstraints(maxWidth: 560),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
               children: [
+                const RecipeFieldLabel('菜名', hint: '必填'),
                 TextField(
                   controller: _name,
                   enabled: !busy,
                   textInputAction: TextInputAction.next,
-                  maxLength: 80,
+                  maxLength: 60,
                   decoration: const InputDecoration(
-                    labelText: '菜名',
                     hintText: '例如：番茄炒蛋',
+                    counterText: '',
                   ),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _tags,
-                  enabled: !busy,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: '标签',
-                    hintText: '例如：家常菜，快手菜',
-                    helperText: '多个标签用逗号分隔',
-                  ),
+                const SizedBox(height: 24),
+                RecipePhotoFields(
+                  paths: _images,
+                  busy: busy,
+                  onPick: (camera) => _pickImages(camera: camera),
+                  onAction: _photoAction,
                 ),
-                if (MenuScope.of(context).data.recipeTags.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      for (final tag in orderedRecipeTags(
-                        MenuScope.of(context).data,
-                      ))
-                        FilterChip(
-                          label: Text(tag),
-                          selected: _manualTags.contains(tag),
-                          onSelected: busy
-                              ? null
-                              : (selected) {
-                                  final tags = _manualTags;
-                                  if (selected && tags.length == 10) {
-                                    showToast(context, '最多添加10个标签');
-                                    return;
-                                  }
-                                  selected ? tags.add(tag) : tags.remove(tag);
-                                  _tags.text = tags.join('，');
-                                },
-                        ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
+                TagSelectionField(
+                  selected: _selectedTags,
+                  choices: orderedRecipeTags(MenuScope.of(context).data),
+                  busy: busy,
+                  onChanged: (tags) => _tags.text = tags.join('，'),
+                ),
+                const SizedBox(height: 24),
+                const RecipeFieldLabel('备注', hint: '可选'),
                 TextField(
                   controller: _note,
                   enabled: !busy,
-                  minLines: 5,
+                  minLines: 3,
                   maxLines: 12,
+                  maxLength: 10000,
                   decoration: const InputDecoration(
-                    labelText: '做法与备注',
-                    hintText: '记录食材、步骤，或下次想改进的地方',
+                    hintText: '记下用料、做法或小贴士…',
+                    counterText: '',
                     alignLabelWithHint: true,
                   ),
                 ),
                 const SizedBox(height: 12),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('收藏菜谱'),
+                  secondary: const MenuIcon(Icons.favorite_border, size: 22),
+                  title: const Text('收藏这道菜', style: TextStyle(fontSize: 15)),
                   value: _favorite,
                   onChanged: busy ? null : (v) => setState(() => _favorite = v),
-                ),
-                SectionTitle(
-                  '照片',
-                  trailing: TextButton.icon(
-                    onPressed: busy ? null : _pickImages,
-                    icon: const MenuIcon(Icons.add_photo_alternate_outlined),
-                    label: Text(_picking ? '添加中…' : '添加照片'),
-                  ),
-                ),
-                if (Platform.isAndroid || Platform.isIOS)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      onPressed: busy ? null : () => _pickImages(camera: true),
-                      child: const Text('拍照添加'),
-                    ),
-                  ),
-                if (_images.isEmpty)
-                  Text(
-                    '添加成品或制作过程的照片，第一张作为封面。',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    for (var i = 0; i < _images.length; i++)
-                      SizedBox(
-                        width: 140,
-                        height: 140,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(14),
-                              child: GestureDetector(
-                                onTap: () =>
-                                    showRecipePhotos(context, _images, i),
-                                child: RecipePhoto(path: _images[i]),
-                              ),
-                            ),
-                            if (i == 0)
-                              Positioned(
-                                left: 6,
-                                bottom: 6,
-                                child: Chip(
-                                  label: const Text('封面'),
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                              ),
-                            Positioned(
-                              right: 4,
-                              top: 4,
-                              child: PopupMenuButton<String>(
-                                icon: const MenuIcon(Icons.more_horiz),
-                                tooltip: '照片操作',
-                                enabled: !busy,
-                                onSelected: (action) => _photoAction(i, action),
-                                itemBuilder: (_) => [
-                                  if (i != 0)
-                                    const PopupMenuItem(
-                                      value: 'cover',
-                                      child: Text('设为封面'),
-                                    ),
-                                  const PopupMenuItem(
-                                    value: 'crop',
-                                    child: Text('裁剪照片'),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'remove',
-                                    child: Text('移除照片'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 28),
-                FilledButton(
-                  onPressed: busy ? null : _save,
-                  child: Text(_saving ? '保存中…' : '保存菜谱'),
                 ),
               ],
             ),

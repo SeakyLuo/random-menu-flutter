@@ -1,42 +1,110 @@
-import '../../ui/menu_icon.dart';
+import 'dart:math' as math;
+import '../../ui/menu_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
+import '../../ui/menu_icon.dart';
+import '../../ui/menu_tag_colors.dart';
 import '../../ui/widgets.dart';
 import 'recipe_editor.dart';
 import 'recipe_photos.dart';
 
-class RecipeDetailPage extends StatelessWidget {
+enum _RecipeAction { favorite, hide }
+
+Future<void> showRecipeDetail(BuildContext context, String id) =>
+    showMenuBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      clipBehavior: Clip.antiAlias,
+      constraints: BoxConstraints(
+        maxWidth: 560,
+        maxHeight: MediaQuery.sizeOf(context).height * .88,
+      ),
+      sheetAnimationStyle: AnimationStyle(
+        duration: Duration(
+          milliseconds: MediaQuery.disableAnimationsOf(context) ? 0 : 240,
+        ),
+        reverseDuration: const Duration(milliseconds: 120),
+      ),
+      builder: (_) => RecipeDetailPage(recipeId: id),
+    );
+
+class RecipeDetailPage extends StatefulWidget {
   const RecipeDetailPage({super.key, required this.recipeId});
   final String recipeId;
+  @override
+  State<RecipeDetailPage> createState() => _RecipeDetailPageState();
+}
 
-  Future<void> _delete(BuildContext context, Recipe recipe) async {
-    final store = MenuScope.of(context);
-    if (!await confirmAction(
+class _RecipeDetailPageState extends State<RecipeDetailPage> {
+  bool _saving = false;
+  int _photo = 0;
+  String? _selectedPath;
+  final _photos = PageController(keepPage: false);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final recipe = MenuScope.of(
       context,
-      title: '删除“${recipe.name}”？',
-      message: '删除后无法恢复，也会从本次菜单中移除。',
-    )) {
-      return;
+    ).data.recipes.where((r) => r.id == widget.recipeId).firstOrNull;
+    if (recipe == null) return;
+    _photo = _selectedPath == null || !recipe.imagePaths.contains(_selectedPath)
+        ? 0
+        : recipe.imagePaths.indexOf(_selectedPath!);
+    _selectedPath = recipe.imagePaths.isEmpty
+        ? null
+        : recipe.imagePaths[_photo];
+    if (_photos.hasClients && recipe.imagePaths.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _photos.hasClients) _photos.jumpToPage(_photo);
+      });
     }
-    if (!context.mounted) return;
-    final success = await performAction(
+  }
+
+  @override
+  void dispose() {
+    _photos.dispose();
+    super.dispose();
+  }
+
+  Future<void> _copyName(String name) => performAction(
+    context,
+    () => Clipboard.setData(ClipboardData(text: name)),
+    success: '菜名已复制',
+  );
+
+  Future<void> _action(_RecipeAction action, Recipe recipe) async {
+    final store = MenuScope.of(context);
+    setState(() => _saving = true);
+    await performAction(
       context,
-      () => store.update((draft) {
-        draft.recipes.removeWhere((r) => r.id == recipeId);
-        draft.selectedMenu.remove(recipeId);
+      () => store.update((data) {
+        final item = data.recipes.firstWhere((item) => item.id == recipe.id);
+        switch (action) {
+          case _RecipeAction.favorite:
+            item.favorite = !item.favorite;
+          case _RecipeAction.hide:
+            item.hiddenRounds = item.hiddenRounds > 0 ? 0 : 3;
+        }
       }),
-      success: '菜谱已删除',
+      success: action == _RecipeAction.hide
+          ? recipe.hiddenRounds > 0
+                ? '已恢复抽取'
+                : '最近3轮不再出现'
+          : null,
     );
-    if (success && context.mounted) Navigator.of(context).pop();
+    if (mounted) setState(() => _saving = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final store = MenuScope.of(context);
-    final matches = store.data.recipes.where((r) => r.id == recipeId);
-    if (matches.isEmpty) {
+    final recipe = MenuScope.of(
+      context,
+    ).data.recipes.where((r) => r.id == widget.recipeId).firstOrNull;
+    if (recipe == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('菜谱')),
         body: EmptyState(
@@ -44,202 +112,226 @@ class RecipeDetailPage extends StatelessWidget {
           title: '这道菜谱已移除',
           message: '返回菜谱库，看看其他拿手菜。',
           actionLabel: '返回菜谱库',
-          onAction: () => Navigator.of(context).pop(),
+          onAction: () => Navigator.pop(context),
         ),
       );
     }
-    final recipe = matches.first;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('菜谱详情'),
-        actions: [
-          IconButton(
-            tooltip: recipe.favorite ? '取消收藏' : '收藏',
-            icon: MenuIcon(
-              recipe.favorite ? Icons.favorite : Icons.favorite_border,
-              color: recipe.favorite
-                  ? Theme.of(context).colorScheme.primary
-                  : null,
-            ),
-            onPressed: () => performAction(
-              context,
-              () => store.update((draft) {
-                final item = draft.recipes.firstWhere((r) => r.id == recipeId);
-                item.favorite = !item.favorite;
-              }),
-              success: recipe.favorite ? '已取消收藏' : '已收藏',
-            ),
-          ),
-          TextButton(
-            onPressed: () => editRecipe(context, recipe: recipe),
-            child: const Text('编辑'),
-          ),
-          PopupMenuButton<String>(
-            icon: const MenuIcon(Icons.more_horiz),
-            tooltip: '更多操作',
-            onSelected: (action) async {
-              if (action == 'delete') {
-                await _delete(context, recipe);
-                return;
-              }
-              if (action == 'copyName' || action == 'copyNote') {
-                await performAction(
-                  context,
-                  () => Clipboard.setData(
-                    ClipboardData(
-                      text: action == 'copyName' ? recipe.name : recipe.note,
-                    ),
-                  ),
-                  success: '已复制',
-                );
-                return;
-              }
-              final hidden = recipe.hiddenRounds > 0;
-              await performAction(
-                context,
-                () => store.update((data) {
-                  data.recipes
-                      .firstWhere((r) => r.id == recipeId)
-                      .hiddenRounds = hidden
-                      ? 0
-                      : 3;
-                }),
-                success: hidden ? '已恢复随机推荐' : '已隐藏3轮随机推荐',
-              );
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'hide',
-                child: Text(recipe.hiddenRounds > 0 ? '恢复随机推荐' : '隐藏3轮随机推荐'),
-              ),
-              const PopupMenuItem(value: 'copyName', child: Text('复制菜名')),
-              if (recipe.note.isNotEmpty)
-                const PopupMenuItem(value: 'copyNote', child: Text('复制做法与备注')),
-              const PopupMenuItem(value: 'delete', child: Text('删除菜谱')),
-            ],
-          ),
-        ],
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
-            children: [
-              if (recipe.imagePaths.isNotEmpty) ...[
-                GestureDetector(
-                  onTap: () => showRecipePhotos(context, recipe.imagePaths, 0),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: AspectRatio(
-                      aspectRatio: 4 / 3,
-                      child: RecipePhoto(path: recipe.imagePaths.first),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-              SelectableText(
-                recipe.name,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '创建于 ${dayLabel(recipe.createdAt)}',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              if (recipe.hiddenRounds > 0)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text('暂不推荐 · 剩余 ${recipe.hiddenRounds} 轮'),
+    final scheme = Theme.of(context).colorScheme;
+    final tagColors = MenuTagColors.of(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '菜谱详情',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
                       ),
-                      TextButton(
-                        onPressed: () => performAction(
-                          context,
-                          () => store.update((data) {
-                            data.recipes
-                                    .firstWhere((r) => r.id == recipeId)
-                                    .hiddenRounds =
-                                0;
-                          }),
-                          success: '已恢复随机推荐',
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: recipe.hiddenRounds > 0 ? '恢复随机推荐' : '最近3轮不出现',
+                    onPressed: _saving
+                        ? null
+                        : () => _action(_RecipeAction.hide, recipe),
+                    icon: MenuIcon(
+                      recipe.hiddenRounds > 0
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: recipe.hiddenRounds > 0
+                          ? scheme.primary
+                          : scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '关闭',
+                    onPressed: () => Navigator.pop(context),
+                    icon: const MenuIcon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              fit: FlexFit.loose,
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.only(bottom: 16),
+                children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) => ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: SizedBox(
+                        height: recipe.imagePaths.isEmpty
+                            ? 140
+                            : math.min(260, constraints.maxWidth / 1.6),
+                        child: recipe.imagePaths.isEmpty
+                            ? ColoredBox(
+                                color: scheme.primary.withValues(alpha: .08),
+                                child: Center(
+                                  child: MenuIcon(
+                                    Icons.ramen_dining_outlined,
+                                    size: 64,
+                                    color: scheme.primary,
+                                  ),
+                                ),
+                              )
+                            : PageView.builder(
+                                controller: _photos,
+                                itemCount: recipe.imagePaths.length,
+                                onPageChanged: (index) => setState(() {
+                                  _photo = index;
+                                  _selectedPath = recipe.imagePaths[index];
+                                }),
+                                itemBuilder: (_, index) => Semantics(
+                                  label: '查看${recipe.name}照片 ${index + 1}',
+                                  button: true,
+                                  child: GestureDetector(
+                                    onTap: () => showRecipePhotos(
+                                      context,
+                                      recipe.imagePaths,
+                                      index,
+                                      onPageChanged: (next) {
+                                        setState(() {
+                                          _photo = next;
+                                          _selectedPath =
+                                              recipe.imagePaths[next];
+                                        });
+                                        _photos.jumpToPage(next);
+                                      },
+                                    ),
+                                    child: RecipePhoto(
+                                      path: recipe.imagePaths[index],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Semantics(
+                    hint: '长按复制菜名',
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onLongPress: () => _copyName(recipe.name),
+                      child: Text(
+                        recipe.name,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          height: 1.4,
+                          fontWeight: FontWeight.w600,
                         ),
-                        child: const Text('恢复推荐'),
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              if (recipe.tags.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final tag in recipe.tags)
-                      Chip(
-                        label: Text(tag),
-                        side: BorderSide.none,
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.primaryContainer.withValues(alpha: .45),
-                      ),
-                  ],
-                ),
-              ],
-              const SectionTitle('做法与备注'),
-              if (recipe.note.isNotEmpty)
-                SelectableText(
-                  recipe.note,
-                  style: const TextStyle(fontSize: 16, height: 1.75),
-                )
-              else ...[
-                Text(
-                  '还没记录做法，下次做菜时可以随手记下来。',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    height: 1.6,
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: () => editRecipe(context, recipe: recipe),
-                    icon: const MenuIcon(Icons.edit_outlined),
-                    label: const Text('补充做法'),
-                  ),
-                ),
-              ],
-              if (recipe.imagePaths.length > 1) ...[
-                const SectionTitle('更多照片'),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    for (var i = 1; i < recipe.imagePaths.length; i++)
-                      GestureDetector(
-                        onTap: () =>
-                            showRecipePhotos(context, recipe.imagePaths, i),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: SizedBox(
-                            width: 140,
-                            height: 140,
-                            child: RecipePhoto(path: recipe.imagePaths[i]),
+                  if (recipe.tags.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final tag in recipe.tags)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: tagColors.background,
+                              border: Border.all(color: tagColors.border),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Text(
+                              tag,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: tagColors.foreground,
+                              ),
+                            ),
                           ),
+                      ],
+                    ),
+                  ],
+                  if (recipe.note.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: SelectableText(
+                        recipe.note,
+                        style: const TextStyle(fontSize: 14, height: 1.7),
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '添加于 ${dayLabel(recipe.createdAt)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  if (recipe.hiddenRounds > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        '暂时不参与抽取 · 剩余 ${recipe.hiddenRounds} 轮',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
                         ),
                       ),
-                  ],
-                ),
-              ],
-            ],
-          ),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 12),
+              child: Row(
+                spacing: 10,
+                children: [
+                  SizedBox.square(
+                    dimension: 48,
+                    child: IconButton(
+                      tooltip: recipe.favorite ? '取消收藏' : '收藏',
+                      isSelected: recipe.favorite,
+                      onPressed: _saving
+                          ? null
+                          : () => _action(_RecipeAction.favorite, recipe),
+                      icon: MenuIcon(
+                        recipe.favorite
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        size: 23,
+                        color: recipe.favorite
+                            ? const Color(0xffef4762)
+                            : scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _saving
+                          ? null
+                          : () => editRecipe(context, recipe: recipe),
+                      icon: const MenuIcon(Icons.edit_outlined, size: 19),
+                      label: const Text('编辑菜谱', style: TextStyle(fontSize: 15)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

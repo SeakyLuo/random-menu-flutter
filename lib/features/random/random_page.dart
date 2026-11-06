@@ -1,15 +1,25 @@
-import '../../ui/menu_icon.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
+import '../../ui/library_widgets.dart';
+import '../../ui/menu_icon.dart';
 import '../../ui/widgets.dart';
+import '../../ui/rolling_count.dart';
 import '../recipes/recipe_detail_page.dart';
+import '../recipes/recipe_editor.dart';
+import 'random_deck.dart';
+import 'random_panels.dart';
 import 'random_recipe_card.dart';
 
 class RandomPage extends StatefulWidget {
-  const RandomPage({super.key, required this.onOpenRecipes});
+  const RandomPage({
+    super.key,
+    required this.onOpenRecipes,
+    required this.onBusy,
+  });
   final VoidCallback onOpenRecipes;
+  final ValueChanged<bool> onBusy;
   @override
   State<RandomPage> createState() => _RandomPageState();
 }
@@ -18,503 +28,611 @@ class _RandomPageState extends State<RandomPage> {
   final _seen = <String>{};
   final _preferred = <String>{};
   final _excluded = <String>{};
+  final _queue = <String>[];
+  final _deck = GlobalKey<RandomDeckState>();
+  final _target = GlobalKey();
+  final _rail = ScrollController();
+  final _arrival = ValueNotifier(0.0);
   final _random = Random();
-  String? _current;
-  bool _saving = false;
+  bool _busy = false;
+  List<Recipe> _heldMenu = [];
+  List<Recipe> _heldCards = [];
 
-  List<Recipe> _matching(MenuData data, {bool includeHidden = false}) => data
-      .recipes
+  List<Recipe> _matching(MenuData data) => data.recipes
       .where(
         (r) =>
-            (includeHidden || r.hiddenRounds == 0) &&
             (_preferred.isEmpty || r.tags.any(_preferred.contains)) &&
             !r.tags.any(_excluded.contains),
       )
       .toList();
   List<Recipe> _available(MenuData data) => _matching(data)
-      .where((r) => !_seen.contains(r.id) && !data.selectedMenu.contains(r.id))
+      .where((r) => r.hiddenRounds == 0 && !data.selectedMenu.contains(r.id))
       .toList();
-  void _choose(MenuData data) {
-    final available = _available(data);
-    if (!available.any((r) => r.id == _current)) {
-      _current = available.isEmpty
-          ? null
-          : available[_random.nextInt(available.length)].id;
-    }
+  void _reconcile(MenuData data) {
+    final ids = _available(data).map((r) => r.id).toSet();
+    _queue.removeWhere((id) => !ids.contains(id) || _seen.contains(id));
+    final queued = _queue.toSet();
+    final added =
+        ids.where((id) => !queued.contains(id) && !_seen.contains(id)).toList()
+          ..shuffle(_random);
+    _queue.addAll(added);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_busy) return;
     final data = MenuScope.of(context).data;
     final tags = data.recipes.expand((r) => r.tags).toSet();
     _preferred.retainAll(tags);
     _excluded.retainAll(tags);
-    _choose(data);
+    _reconcile(data);
   }
 
-  void _skip(MenuData data) => setState(() {
-    _seen.add(_current!);
-    _current = null;
-    _choose(data);
-  });
+  @override
+  void dispose() {
+    _rail.dispose();
+    _arrival.dispose();
+    super.dispose();
+  }
 
-  Future<void> _select(MenuStore store) async {
-    final id = _current!;
-    setState(() => _saving = true);
-    final saved = await performAction(
-      context,
-      () => store.update((d) {
-        d.selectedMenu.add(id);
-      }),
-      success: '已加入本次菜单',
-    );
-    if (!mounted) return;
+  List<Recipe> _menu(MenuData data) {
+    final recipes = {for (final r in data.recipes) r.id: r};
+    return data.selectedMenu.reversed.map((id) => recipes[id]!).toList();
+  }
+
+  List<Recipe> _cards(MenuData data) {
+    final recipes = {for (final r in data.recipes) r.id: r};
+    // Keep one covered candidate mounted before it becomes the third card.
+    return _queue.take(4).map((id) => recipes[id]!).toList();
+  }
+
+  void _lock(bool busy) {
+    if (busy) {
+      final data = MenuScope.of(context).data;
+      _heldMenu = _menu(data);
+      _heldCards = _cards(data);
+    }
     setState(() {
-      _saving = false;
-      if (saved) {
-        _seen.add(id);
-        _current = null;
-        _choose(store.data);
+      _busy = busy;
+    });
+    widget.onBusy(busy);
+  }
+
+  Future<bool> _pick(PickAction action, Future<void> animation) async {
+    final store = MenuScope.of(context);
+    final current = _queue.first;
+    var railAnimation = Future<void>.value();
+    if (action == PickAction.add && _rail.hasClients) {
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _rail.jumpTo(0);
+      } else {
+        railAnimation = _rail.animateTo(
+          0,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+        );
       }
-    });
+    }
+    final handoff = Future.wait([animation, railAnimation]);
+    Object? failure;
+    final saved = action == PickAction.skip
+        ? Future.value(true)
+        : () async {
+            try {
+              await store.update((data) {
+                if (action == PickAction.add) {
+                  data.selectedMenu.add(current);
+                } else {
+                  data.selectedMenu.clear();
+                  for (final r in data.recipes) {
+                    if (r.hiddenRounds > 0) r.hiddenRounds--;
+                  }
+                }
+              }, publishAfter: handoff);
+              return true;
+            } catch (error, stack) {
+              failure = error;
+              debugPrint('Menu action failed: $error\n$stack');
+              return false;
+            }
+          }();
+    await handoff;
+    final success = await saved;
+    if (!mounted) return false;
+    if (success) {
+      setState(() {
+        if (action == PickAction.reset) {
+          _seen.clear();
+          _queue.clear();
+        } else {
+          _seen.add(current);
+          _queue.remove(current);
+        }
+        _reconcile(store.data);
+        _heldMenu = _menu(store.data);
+        _heldCards = _cards(store.data);
+        _arrival.value = 0;
+      });
+    } else if (failure != null) {
+      // Report after the deck has returned to its resting position.
+      Future<void>.delayed(
+        MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 310),
+        () {
+          if (mounted) showToast(context, '操作未完成，请重试');
+        },
+      );
+    }
+    return success;
   }
 
-  Future<void> _filters(MenuStore store) async {
-    final preferred = {..._preferred};
-    final excluded = {..._excluded};
-    final tags = store.data.recipes.expand((r) => r.tags).toSet().toList()
-      ..sort();
-    final apply = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(context).height * .8,
-            ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text('今天想吃什么', style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 8),
-                  const Text('优先标签匹配其中一个即可，排除标签不会参与抽取。'),
-                  if (tags.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Text('还没有标签，可以先到菜谱里添加。'),
-                    ),
-                  if (tags.isNotEmpty) ...[
-                    const SectionTitle('想吃的'),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        for (final tag in tags)
-                          FilterChip(
-                            label: Text(tag),
-                            selected: preferred.contains(tag),
-                            onSelected: (on) => setSheetState(() {
-                              if (on) {
-                                preferred.add(tag);
-                                excluded.remove(tag);
-                              } else {
-                                preferred.remove(tag);
-                              }
-                            }),
-                          ),
-                      ],
-                    ),
-                    const SectionTitle('这次不吃'),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        for (final tag in tags)
-                          FilterChip(
-                            label: Text(tag),
-                            selected: excluded.contains(tag),
-                            onSelected: (on) => setSheetState(() {
-                              if (on) {
-                                excluded.add(tag);
-                                preferred.remove(tag);
-                              } else {
-                                excluded.remove(tag);
-                              }
-                            }),
-                          ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('开始挑选'),
-                  ),
-                  TextButton(
-                    onPressed: () => setSheetState(() {
-                      preferred.clear();
-                      excluded.clear();
-                    }),
-                    child: const Text('清除筛选'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    if (apply != true || !mounted) return;
-    setState(() {
-      _preferred
-        ..clear()
-        ..addAll(preferred);
-      _excluded
-        ..clear()
-        ..addAll(excluded);
-    });
-    await _reshuffle(store);
-  }
-
-  Future<void> _reshuffle(MenuStore store) async {
-    if (_saving) return;
-    final previous = _current;
-    setState(() => _saving = true);
+  Future<void> _round({
+    bool clear = false,
+    bool restore = false,
+    bool decrement = true,
+  }) async {
+    final store = MenuScope.of(context);
+    _lock(true);
     final saved = await performAction(
       context,
       () => store.update((data) {
-        for (final recipe in data.recipes) {
-          if (recipe.hiddenRounds > 0) recipe.hiddenRounds--;
+        if (clear) data.selectedMenu.clear();
+        for (final r in data.recipes) {
+          if (restore) {
+            r.hiddenRounds = 0;
+          } else if (decrement && r.hiddenRounds > 0) {
+            r.hiddenRounds--;
+          }
         }
       }),
     );
     if (!mounted) return;
-    setState(() {
-      _saving = false;
-      if (saved) {
+    if (saved) {
+      setState(() {
         _seen.clear();
-        final choices = _available(store.data);
-        if (choices.length > 1) choices.removeWhere((r) => r.id == previous);
-        _current = choices.isEmpty
-            ? null
-            : choices[_random.nextInt(choices.length)].id;
-      }
+        _queue.clear();
+        _reconcile(store.data);
+      });
+    }
+    _lock(false);
+  }
+
+  Future<void> _reset() async {
+    final data = MenuScope.of(context).data;
+    if (data.selectedMenu.isNotEmpty &&
+        !await confirmAction(
+          context,
+          title: '重置菜单？',
+          message: '将清空菜单并重新开始挑选，菜谱和收藏会保留。',
+          confirmLabel: '确认重置',
+        )) {
+      return;
+    }
+    if (!mounted) return;
+    if (_queue.isEmpty) {
+      await _round(clear: true);
+    } else {
+      await _deck.currentState!.choose(PickAction.reset);
+    }
+  }
+
+  Future<void> _filter() async {
+    final result = await showHomeSheet<(Set<String>, Set<String>)>(
+      context,
+      fitContent: true,
+      child: RandomFilterSheet(
+        header: const HomeSheetHeader('筛选菜谱'),
+        preferred: _preferred,
+        excluded: _excluded,
+        onRecipes: widget.onOpenRecipes,
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _preferred
+        ..clear()
+        ..addAll(result.$1);
+      _excluded
+        ..clear()
+        ..addAll(result.$2);
+      _seen.clear();
+      _queue.clear();
+      _reconcile(MenuScope.of(context).data);
     });
   }
 
-  void _hidden(MenuStore store) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => ListenableBuilder(
-        listenable: store,
-        builder: (context, _) {
-          final hidden = _matching(
-            store.data,
-            includeHidden: true,
-          ).where((r) => r.hiddenRounds > 0).toList();
-          return SafeArea(
-            child: SizedBox(
-              height: MediaQuery.sizeOf(context).height * .6,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-                    child: Text(
-                      '暂时不推荐的菜谱',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  Expanded(
-                    child: hidden.isEmpty
-                        ? const Center(child: Text('匹配的菜谱都已恢复推荐'))
-                        : ListView.builder(
-                            itemCount: hidden.length,
-                            itemBuilder: (context, index) {
-                              final recipe = hidden[index];
-                              return ListTile(
-                                title: Text(recipe.name),
-                                subtitle: Text(
-                                  '再抽 ${recipe.hiddenRounds} 轮后恢复',
-                                ),
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute<void>(
-                                    builder: (_) =>
-                                        RecipeDetailPage(recipeId: recipe.id),
-                                  ),
-                                ),
-                                trailing: TextButton(
-                                  onPressed: () async {
-                                    final success = await performAction(
-                                      context,
-                                      () => store.update(
-                                        (data) =>
-                                            data.recipes
-                                                    .firstWhere(
-                                                      (r) => r.id == recipe.id,
-                                                    )
-                                                    .hiddenRounds =
-                                                0,
-                                      ),
-                                      success: '已恢复推荐',
-                                    );
-                                    if (success && mounted) {
-                                      setState(() {
-                                        _seen.remove(recipe.id);
-                                        _choose(store.data);
-                                      });
-                                    }
-                                  },
-                                  child: const Text('恢复推荐'),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: OutlinedButton(
-                      onPressed: _saving ? null : () => _reshuffle(store),
-                      child: const Text('再抽一轮'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
+  Future<void> _openMenu() async {
+    final before = {...MenuScope.of(context).data.selectedMenu};
+    await showHomeSheet<void>(
+      context,
+      child: RandomMenuSheet(
+        onRemoved: (ids) {
+          setState(() {
+            _seen.removeAll(ids);
+            _reconcile(MenuScope.of(context).data);
+          });
         },
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      _seen.removeAll(
+        before.difference(MenuScope.of(context).data.selectedMenu.toSet()),
+      );
+      _reconcile(MenuScope.of(context).data);
+    });
+  }
+
+  void _open(Recipe recipe) => showRecipeDetail(context, recipe.id);
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final data = MenuScope.of(context).data;
+    final cards = _busy ? _heldCards : _cards(data);
+    final filterCount = _preferred.length + _excluded.length;
+    return ColoredBox(
+      color: dark ? const Color(0xff111c17) : const Color(0xfff4f9f5),
+      child: SafeArea(
+        bottom: false,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+                final minHeight = scale > 1.3 ? 760.0 * scale / 1.3 : 600.0;
+                final height = max(constraints.maxHeight, minHeight);
+                return SingleChildScrollView(
+                  child: SizedBox(
+                    height: height,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          MenuAppBar(
+                            title: '随机菜单',
+                            actions: [
+                              PageActionButton(
+                                icon: Icons.filter_alt_outlined,
+                                label: '筛选菜谱',
+                                badgeCount: filterCount,
+                                onPressed: _busy ? null : _filter,
+                              ),
+                            ],
+                          ),
+                          _overview(context, _busy ? _heldMenu : _menu(data)),
+                          const SizedBox(height: 16),
+                          Expanded(
+                            child: cards.isNotEmpty
+                                ? RandomDeck(
+                                    key: _deck,
+                                    enabled: !_busy,
+                                    recipes: cards,
+                                    target: _target,
+                                    onAction: _pick,
+                                    onBusy: _lock,
+                                    onProgress: (value) =>
+                                        _arrival.value = value,
+                                    onOpen: () => _open(cards.first),
+                                    onFavorite: () async {
+                                      _lock(true);
+                                      await performAction(
+                                        context,
+                                        () => MenuScope.of(context).update(
+                                          (d) =>
+                                              d.recipes
+                                                      .firstWhere(
+                                                        (r) =>
+                                                            r.id ==
+                                                            cards.first.id,
+                                                      )
+                                                      .favorite =
+                                                  false,
+                                        ),
+                                      );
+                                      if (mounted) _lock(false);
+                                    },
+                                  )
+                                : _empty(context, data),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  void _menu(MenuStore store) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => ListenableBuilder(
-        listenable: store,
-        builder: (context, _) {
-          final recipes = {
-            for (final recipe in store.data.recipes) recipe.id: recipe,
-          };
-          final chosen = store.data.selectedMenu
-              .map((id) => recipes[id]!)
-              .toList();
-          return SafeArea(
-            child: SizedBox(
-              height: MediaQuery.sizeOf(context).height * .65,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-                    child: Text(
-                      '本次菜单 · ${chosen.length} 道菜',
-                      style: Theme.of(context).textTheme.titleLarge,
+  Widget _overview(BuildContext context, List<Recipe> menu) => Container(
+    padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(14),
+      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .04),
+    ),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _busy || menu.isEmpty ? null : _openMenu,
+                  child: SizedBox(
+                    height: 32,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          menu.isEmpty ? '菜单' : '菜单 · ',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Visibility(
+                          visible: menu.isNotEmpty,
+                          maintainState: true,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              RollingCount(
+                                value: menu.length,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                              Text(
+                                '道',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const MenuIcon(Icons.chevron_right, size: 14),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Expanded(
-                    child: chosen.isEmpty
-                        ? const SingleChildScrollView(
-                            padding: EdgeInsets.all(24),
-                            child: Column(
-                              children: [
-                                MenuIcon(Icons.restaurant_menu, size: 40),
-                                SizedBox(height: 16),
-                                Text('菜单还是空的', style: TextStyle(fontSize: 20)),
-                                SizedBox(height: 12),
-                                Text(
-                                  '抽到喜欢的菜，点“加入菜单”就能留在这里。',
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: chosen.length,
-                            itemBuilder: (context, index) {
-                              final recipe = chosen[index];
-                              return ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                ),
-                                leading: const MenuIcon(
-                                  Icons.check_circle_outline_rounded,
-                                ),
-                                title: Text(recipe.name),
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute<void>(
-                                    builder: (_) =>
-                                        RecipeDetailPage(recipeId: recipe.id),
+                ),
+              ),
+            ),
+            if (menu.isEmpty)
+              TextButton(
+                onPressed: _busy ? null : _openMenu,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant,
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('添加菜品', style: TextStyle(fontSize: 12)),
+                    SizedBox(width: 2),
+                    MenuIcon(Icons.chevron_right, size: 14),
+                  ],
+                ),
+              )
+            else
+              IconButton(
+                tooltip: '重置菜单',
+                style: IconButton.styleFrom(
+                  padding: const EdgeInsets.only(left: 16),
+                  minimumSize: const Size(44, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant,
+                  disabledForegroundColor: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant,
+                ),
+                onPressed: _busy || MenuScope.of(context).data.recipes.isEmpty
+                    ? null
+                    : _reset,
+                icon: const MenuIcon(Icons.restart_alt, size: 17),
+              ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final size = (constraints.maxWidth - 32) / 5;
+            return SizedBox(
+              height: size,
+              child: Stack(
+                children: [
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    child: SizedBox(key: _target, width: size, height: size),
+                  ),
+                  if (menu.isEmpty)
+                    Positioned.fill(
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: Text(
+                          '把想吃的菜拖到这里',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Positioned.fill(
+                      child: ClipRect(
+                        child: ValueListenableBuilder<double>(
+                          valueListenable: _arrival,
+                          builder: (context, progress, child) =>
+                              Transform.translate(
+                                offset: Offset((size + 8) * progress, 0),
+                                child: child,
+                              ),
+                          child: ListView.separated(
+                            controller: _rail,
+                            scrollDirection: Axis.horizontal,
+                            physics: _busy
+                                ? const NeverScrollableScrollPhysics()
+                                : null,
+                            itemCount: menu.length,
+                            findItemIndexCallback: (key) {
+                              final id = (key as ValueKey<String>).value;
+                              final index = menu.indexWhere(
+                                (recipe) => recipe.id == id,
+                              );
+                              return index == -1 ? null : index;
+                            },
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(width: 8),
+                            itemBuilder: (context, index) => SizedBox(
+                              key: ValueKey(menu[index].id),
+                              width: size,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(11),
+                                child: Semantics(
+                                  button: true,
+                                  label: '查看${menu[index].name}详情',
+                                  child: GestureDetector(
+                                    onTap: _busy
+                                        ? null
+                                        : () => _open(menu[index]),
+                                    child: RecipeCover(recipe: menu[index]),
                                   ),
                                 ),
-                                trailing: IconButton(
-                                  tooltip: '移出菜单',
-                                  icon: const MenuIcon(Icons.close_rounded),
-                                  onPressed: () async {
-                                    final removed = await performAction(
-                                      context,
-                                      () => store.update(
-                                        (d) => d.selectedMenu.remove(recipe.id),
-                                      ),
-                                      success: '已移出菜单',
-                                    );
-                                    if (removed && mounted) {
-                                      setState(() {
-                                        _seen.remove(recipe.id);
-                                        _choose(store.data);
-                                      });
-                                    }
-                                  },
-                                ),
-                              );
-                            },
+                              ),
+                            ),
                           ),
-                  ),
-                  if (chosen.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: OutlinedButton(
-                        onPressed: () async {
-                          if (!await confirmAction(
-                            context,
-                            title: '清空本次菜单？',
-                            message: '菜谱仍会保留，可以重新挑选。',
-                            confirmLabel: '清空',
-                          )) {
-                            return;
-                          }
-                          if (!context.mounted) return;
-                          final cleared = await performAction(
-                            context,
-                            () => store.update((d) => d.selectedMenu.clear()),
-                            success: '已清空菜单',
-                          );
-                          if (cleared && mounted) {
-                            setState(() {
-                              _seen.clear();
-                              _choose(store.data);
-                            });
-                          }
-                        },
-                        child: const Text('清空菜单'),
+                        ),
                       ),
                     ),
                 ],
               ),
+            );
+          },
+        ),
+      ],
+    ),
+  );
+
+  Widget _empty(BuildContext context, MenuData data) {
+    final matching = _matching(data);
+    final available = _available(data);
+    final hidden = matching.any(
+      (r) => r.hiddenRounds > 0 && !data.selectedMenu.contains(r.id),
+    );
+    final noRecipes = data.recipes.isEmpty;
+    final noMatch = matching.isEmpty && !noRecipes;
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 33,
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: .12),
+              child: MenuIcon(
+                noRecipes
+                    ? Icons.menu_book_outlined
+                    : noMatch
+                    ? Icons.filter_alt_outlined
+                    : Icons.check,
+                size: 32,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
-          );
-        },
+            const SizedBox(height: 16),
+            Text(
+              noRecipes
+                  ? '从一道拿手菜开始'
+                  : noMatch
+                  ? '换个口味，继续挑'
+                  : hidden && available.isEmpty
+                  ? '这些菜暂时休息一下'
+                  : '这一轮挑完了',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              noRecipes
+                  ? '记下喜欢的菜，下一餐就交给随机。'
+                  : noMatch
+                  ? '现有菜谱里没有符合这次筛选的菜，可以调整标签。'
+                  : '已选的菜会保留，也可以直接添加这餐想吃的菜。',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (noRecipes)
+              FilledButton.icon(
+                onPressed: () => editRecipe(context),
+                icon: const MenuIcon(Icons.add, size: 19),
+                label: const Text('添加我的菜谱'),
+              ),
+            if (noMatch) ...[
+              FilledButton(onPressed: _filter, child: const Text('调整筛选')),
+              TextButton(
+                onPressed: () => setState(() {
+                  _preferred.clear();
+                  _excluded.clear();
+                  _seen.clear();
+                  _queue.clear();
+                  _reconcile(data);
+                }),
+                child: const Text('清除筛选'),
+              ),
+            ],
+            if (!noRecipes && !noMatch) ...[
+              if (available.isNotEmpty)
+                FilledButton(
+                  onPressed: _busy ? null : () => _round(),
+                  child: const Text('再抽一轮'),
+                ),
+              if (hidden)
+                TextButton(
+                  onPressed: _busy ? null : () => _round(restore: true),
+                  child: const Text('恢复暂时隐藏的菜'),
+                ),
+              OutlinedButton(
+                onPressed: _busy ? null : _openMenu,
+                child: Text(data.selectedMenu.isEmpty ? '自己添加菜品' : '查看菜单'),
+              ),
+              TextButton(
+                onPressed: _busy ? null : _filter,
+                child: const Text('调整筛选'),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    final store = MenuScope.of(context);
-    final data = store.data;
-    final matching = _matching(data);
-    final tagged = _matching(data, includeHidden: true);
-    final recipe = _current == null
-        ? null
-        : data.recipes.firstWhere((r) => r.id == _current);
-    return MenuPage(
-      title: '今天吃什么',
-      subtitle: '把纠结交给随机，把喜欢留在菜单',
-      actions: [
-        IconButton(
-          tooltip: '再抽一轮',
-          onPressed: _saving ? null : () => _reshuffle(store),
-          icon: const MenuIcon(Icons.shuffle_rounded),
-        ),
-        IconButton(
-          tooltip: '筛选菜谱',
-          onPressed: () => _filters(store),
-          icon: Badge(
-            isLabelVisible: _preferred.isNotEmpty || _excluded.isNotEmpty,
-            child: const MenuIcon(Icons.tune_rounded),
-          ),
-        ),
-        IconButton(
-          tooltip: '本次菜单',
-          onPressed: () => _menu(store),
-          icon: Badge(
-            isLabelVisible: data.selectedMenu.isNotEmpty,
-            label: Text('${data.selectedMenu.length}'),
-            child: const MenuIcon(Icons.receipt_long_outlined),
-          ),
-        ),
-      ],
-      child: data.recipes.isEmpty
-          ? EmptyState(
-              icon: Icons.restaurant_rounded,
-              title: '从一道拿手菜开始',
-              message: '记下做过的菜，下次不知道吃什么时，\n就来这里抽一道。',
-              actionLabel: '添加我的菜谱',
-              onAction: widget.onOpenRecipes,
-            )
-          : tagged.isEmpty
-          ? EmptyState(
-              icon: Icons.filter_alt_off_outlined,
-              title: '没有符合条件的菜',
-              message: '换一组标签，给今天多一点选择。',
-              actionLabel: '调整筛选',
-              onAction: () => _filters(store),
-            )
-          : matching.isEmpty
-          ? EmptyState(
-              icon: Icons.visibility_off_outlined,
-              title: '这些菜谱正在暂时休息',
-              message: '匹配的菜谱都设置了暂不推荐。\n可以恢复推荐，或再抽一轮减少隐藏轮次。',
-              actionLabel: '查看隐藏菜谱',
-              onAction: () => _hidden(store),
-            )
-          : recipe == null
-          ? EmptyState(
-              icon: Icons.check_circle_outline_rounded,
-              title: '这一轮已经挑完了',
-              message: data.selectedMenu.isEmpty
-                  ? '再抽一轮，说不定会有新的灵感。'
-                  : '喜欢的菜已留在本次菜单里。\n重新抽取时会保留已选菜品。',
-              actionLabel: _availableAfterRestart(data) ? '再抽一轮' : '查看本次菜单',
-              onAction: () {
-                if (_availableAfterRestart(data)) {
-                  _reshuffle(store);
-                } else {
-                  _menu(store);
-                }
-              },
-            )
-          : _card(context, store, recipe),
-    );
-  }
-
-  bool _availableAfterRestart(MenuData data) =>
-      _matching(data).any((r) => !data.selectedMenu.contains(r.id));
-
-  Widget _card(BuildContext context, MenuStore store, Recipe recipe) =>
-      RandomRecipeCard(
-        recipe: recipe,
-        busy: _saving,
-        menuCount: store.data.selectedMenu.length,
-        onOpen: () => Navigator.push(
-          context,
-          MaterialPageRoute<void>(
-            builder: (_) => RecipeDetailPage(recipeId: recipe.id),
-          ),
-        ),
-        onSelect: () => _select(store),
-        onSkip: () => _skip(store.data),
-        onReshuffle: () => _reshuffle(store),
-      );
 }

@@ -1,9 +1,11 @@
+import '../../ui/menu_bottom_sheet.dart';
 import '../../ui/menu_icon.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/widgets.dart';
+import '../../ui/library_widgets.dart';
 import 'restaurant_address_editor.dart';
 import 'restaurant_images.dart';
 import 'visit_dish_editor.dart';
@@ -172,7 +174,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
       await addAddress();
       return;
     }
-    final selected = await showModalBottomSheet<RestaurantAddress>(
+    final selected = await showMenuBottomSheet<RestaurantAddress>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -373,10 +375,14 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
             onPressed: busy ? null : leave,
             icon: const MenuIcon(Icons.arrow_back),
           ),
-          actions: [
-            TextButton(
-              onPressed: busy ? null : save,
-              child: Text(saving ? '保存中' : '保存'),
+        ),
+        bottomNavigationBar: FixedPageActions(
+          children: [
+            Expanded(
+              child: FilledButton(
+                onPressed: busy ? null : save,
+                child: Text(saving ? '保存中…' : '保存记录'),
+              ),
             ),
           ],
         ),

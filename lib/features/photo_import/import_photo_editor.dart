@@ -1,3 +1,4 @@
+import '../../ui/menu_bottom_sheet.dart';
 import '../../ui/menu_icon.dart';
 import 'package:flutter/material.dart';
 import '../../core/models.dart';
@@ -45,7 +46,7 @@ Future<DateTime?> choosePhotoTime(
 Future<RestaurantAddress?> choosePhotoBranch(
   BuildContext context,
   List<RestaurantAddress> addresses,
-) => showModalBottomSheet<RestaurantAddress>(
+) => showMenuBottomSheet<RestaurantAddress>(
   context: context,
   showDragHandle: true,
   useSafeArea: true,
@@ -54,8 +55,11 @@ Future<RestaurantAddress?> choosePhotoBranch(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Padding(
-        padding: const EdgeInsets.all(20),
-        child: Text('选择照片对应的分店', style: Theme.of(context).textTheme.titleLarge),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        child: const Text(
+          '选择照片对应的分店',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        ),
       ),
       Flexible(
         child: ListView(

@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/widgets.dart';
+import '../../ui/library_widgets.dart';
 
 enum RestaurantSort { recent, visits, price }
 
 class RestaurantQuery {
   RestaurantQuery({
+    this.category = '',
+    this.companionsOnly = false,
     this.province = '',
     this.city = '',
     this.county = '',
@@ -18,6 +21,8 @@ class RestaurantQuery {
     this.favorite = false,
     this.sort = RestaurantSort.recent,
   }) : companions = companions ?? {};
+  String category;
+  bool companionsOnly;
   String province;
   String city;
   String county;
@@ -30,9 +35,15 @@ class RestaurantQuery {
   bool get hasRegion =>
       province.isNotEmpty || city.isNotEmpty || county.isNotEmpty;
   bool get hasRecords =>
-      start != null || end != null || companions.isNotEmpty || alone;
-  bool get active => hasRegion || hasRecords || favorite;
+      start != null ||
+      end != null ||
+      companions.isNotEmpty ||
+      alone ||
+      companionsOnly;
+  bool get active => hasRegion || hasRecords || favorite || category.isNotEmpty;
   RestaurantQuery copy() => RestaurantQuery(
+    category: category,
+    companionsOnly: companionsOnly,
     province: province,
     city: city,
     county: county,
@@ -51,19 +62,17 @@ class RestaurantQuery {
       (start == null || !v.date.isBefore(start!)) &&
       (end == null || v.date.isBefore(end!.add(const Duration(days: 1)))) &&
       (!alone || v.companions.isEmpty) &&
-      (companions.isEmpty || companions.any(v.companions.contains)) &&
-      (!hasRegion ||
-          r.addressEntries.any(
-            (a) => a.id == v.addressId && matchesAddress(a),
-          ));
+      (!companionsOnly ||
+          (v.companions.isNotEmpty && companions.every(v.companions.contains)));
   bool matches(Restaurant r) =>
       (!favorite || r.favorite) &&
+      (category.isEmpty || r.category == category) &&
       (!hasRegion || r.addressEntries.any(matchesAddress)) &&
       (!hasRecords || r.records.any((v) => matchesVisit(r, v)));
   String get sortLabel => switch (sort) {
-    RestaurantSort.recent => '最近用餐',
-    RestaurantSort.visits => '用餐次数最多',
-    RestaurantSort.price => '人均消费最高',
+    RestaurantSort.recent => '最近到店',
+    RestaurantSort.visits => '消费次数降序',
+    RestaurantSort.price => '人均价格降序',
   };
 }
 
@@ -151,6 +160,13 @@ class _FilterPageState extends State<_FilterPage> {
   @override
   Widget build(BuildContext context) {
     final restaurants = MenuScope.of(context).data.restaurants;
+    final categories =
+        restaurants
+            .map((r) => r.category)
+            .where((v) => v.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
     final addresses = restaurants.expand((r) => r.addressEntries).toList();
     List<String> unique(Iterable<String> values) =>
         values.where((v) => v.isNotEmpty).toSet().toList()..sort();
@@ -174,9 +190,33 @@ class _FilterPageState extends State<_FilterPage> {
     );
     return Scaffold(
       appBar: AppBar(title: const Text('筛选餐厅')),
+      bottomNavigationBar: FixedPageActions(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () =>
+                  setState(() => query = RestaurantQuery(sort: query.sort)),
+              child: const Text('重置'),
+            ),
+          ),
+          Expanded(
+            child: FilledButton(
+              onPressed: () => Navigator.pop(context, query),
+              child: Text('查看 ${restaurants.where(query.matches).length} 家餐厅'),
+            ),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
         children: [
+          const SectionTitle('菜系'),
+          selection(
+            '菜系',
+            query.category,
+            categories,
+            (v) => setState(() => query.category = v),
+          ),
           const SectionTitle('用餐时间'),
           ListTile(
             contentPadding: EdgeInsets.zero,
@@ -235,14 +275,27 @@ class _FilterPageState extends State<_FilterPage> {
             (v) => setState(() => query.county = v),
           ),
           const SectionTitle('同行人'),
-          const Text('选择多位时，匹配其中任意一位同行的用餐记录。'),
+          const Text('选择多位饭伙时，须在同一次用餐中全部出现。'),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('只看独自用餐'),
             value: query.alone,
             onChanged: (v) => setState(() {
               query.alone = v;
-              if (v) query.companions.clear();
+              if (v) {
+                query.companions.clear();
+                query.companionsOnly = false;
+              }
+            }),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('和饭伙用餐'),
+            value: query.companionsOnly,
+            onChanged: (v) => setState(() {
+              query.companionsOnly = v;
+              query.alone = false;
+              if (!v) query.companions.clear();
             }),
           ),
           if (people.isEmpty)
@@ -262,6 +315,7 @@ class _FilterPageState extends State<_FilterPage> {
                   selected: query.companions.contains(person),
                   onSelected: (selected) => setState(() {
                     query.alone = false;
+                    query.companionsOnly = true;
                     if (selected) {
                       query.companions.add(person);
                     } else {
@@ -279,24 +333,6 @@ class _FilterPageState extends State<_FilterPage> {
             onChanged: (v) => setState(() => query.favorite = v),
           ),
           const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () =>
-                      setState(() => query = RestaurantQuery(sort: query.sort)),
-                  child: const Text('重置筛选'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(context, query),
-                  child: const Text('应用筛选'),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );

@@ -3,59 +3,79 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'glass_surface.dart';
 
+class MenuAppBar extends StatelessWidget {
+  const MenuAppBar({
+    super.key,
+    required this.title,
+    this.actions = const [],
+    this.compact = false,
+    this.actionsSpacing = 8,
+  });
+  final String title;
+  final List<Widget> actions;
+  final bool compact;
+  final double actionsSpacing;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(bottom: compact ? 0 : 4),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(minHeight: compact ? 40 : 52),
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: compact ? 0 : 4),
+        child: Row(
+          spacing: actionsSpacing,
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontSize: 20,
+                  height: 1.2,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
+                ),
+              ),
+            ),
+            ...actions,
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class MenuPage extends StatelessWidget {
   const MenuPage({
     super.key,
     required this.title,
-    this.subtitle,
     this.actions = const [],
+    this.compactHeader = false,
+    this.actionsSpacing = 8,
     required this.child,
   });
   final String title;
-  final String? subtitle;
   final List<Widget> actions;
+  final bool compactHeader;
+  final double actionsSpacing;
   final Widget child;
   @override
   Widget build(BuildContext context) => SafeArea(
     bottom: false,
     child: Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 960),
+        constraints: const BoxConstraints(maxWidth: 600),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 22, 16, 18),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: Theme.of(context).textTheme.headlineMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -.8,
-                              ),
-                        ),
-                        if (subtitle != null) ...[
-                          const SizedBox(height: 5),
-                          Text(
-                            subtitle!,
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  ...actions,
-                ],
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: MenuAppBar(
+                title: title,
+                actions: actions,
+                compact: compactHeader,
+                actionsSpacing: actionsSpacing,
               ),
             ),
             Expanded(child: child),
@@ -82,7 +102,7 @@ class EmptyState extends StatelessWidget {
   final VoidCallback? onAction;
   @override
   Widget build(BuildContext context) => Center(
-    child: Padding(
+    child: SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(28, 28, 28, 110),
       child: Column(
         mainAxisSize: MainAxisSize.min,

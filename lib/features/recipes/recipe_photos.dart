@@ -5,6 +5,9 @@ class RecipePhoto extends LocalPhoto {
   const RecipePhoto({super.key, required super.path, super.fit});
 }
 
-void showRecipePhotos(BuildContext context, List<String> paths, int initial) {
-  showPhotoViewer(context, paths, initial);
-}
+Future<void> showRecipePhotos(
+  BuildContext context,
+  List<String> paths,
+  int initial, {
+  ValueChanged<int>? onPageChanged,
+}) => showPhotoViewer(context, paths, initial, onPageChanged: onPageChanged);
