@@ -46,14 +46,19 @@ ThemeData menuTheme(Brightness brightness) {
         ? const Color(0xff111c17)
         : const Color(0xfff4f9f5),
     appBarTheme: AppBarTheme(
+      toolbarHeight: 48,
+      leadingWidth: 56,
+      titleSpacing: 0,
       systemOverlayStyle: menuSystemUiStyle(brightness),
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       centerTitle: false,
       titleTextStyle: TextStyle(
         color: scheme.onSurface,
-        fontSize: 22,
+        fontSize: 20,
+        height: 1.2,
         fontWeight: FontWeight.w600,
+        letterSpacing: 0,
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(

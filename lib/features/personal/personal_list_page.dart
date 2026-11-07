@@ -36,7 +36,6 @@ class _PersonalListPageState extends State<PersonalListPage> {
       context: context,
       isScrollControlled: true,
       constraints: const BoxConstraints(maxWidth: 560),
-      isDismissible: false,
       enableDrag: false,
       showDragHandle: true,
       useSafeArea: true,
@@ -68,12 +67,7 @@ class _PersonalListPageState extends State<PersonalListPage> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
-        toolbarHeight: 60,
-        titleTextStyle: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.onSurface,
-        ),
+        toolbarHeight: 48,
         title: Row(
           children: [
             Text(_label),
@@ -109,7 +103,7 @@ class _PersonalListPageState extends State<PersonalListPage> {
                       onAction: _edit,
                     )
                   : ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
                       children: [
                         for (final item in displayed)
                           Padding(
@@ -117,45 +111,64 @@ class _PersonalListPageState extends State<PersonalListPage> {
                             child: Material(
                               color: Theme.of(context).colorScheme.surface,
                               borderRadius: BorderRadius.circular(2),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () =>
-                                          widget.kind == PersonalListKind.toCook
-                                          ? _makeRecipe(item)
-                                          : _edit(item),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 12,
-                                        ),
-                                        child: Text(
-                                          item,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            height: 1.5,
-                                            fontWeight: FontWeight.w500,
+                              clipBehavior: Clip.antiAlias,
+                              child: IntrinsicHeight(
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Expanded(
+                                      child: InkWell(
+                                        onTap: () =>
+                                            widget.kind ==
+                                                PersonalListKind.toCook
+                                            ? _makeRecipe(item)
+                                            : _edit(item),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 12,
+                                          ),
+                                          child: Text(
+                                            item,
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              height: 1.5,
+                                              fontWeight: FontWeight.w500,
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  SizedBox(
-                                    width: 44,
-                                    child: IconButton(
-                                      tooltip: '管理$_label记录：$item',
-                                      icon: MenuIcon(
-                                        Icons.more_horiz,
-                                        size: 18,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
+                                    SizedBox(
+                                      width: 44,
+                                      child: Tooltip(
+                                        message: '管理$_label记录：$item',
+                                        child: InkWell(
+                                          onTap: () => _edit(item, true),
+                                          splashFactory: NoSplash.splashFactory,
+                                          highlightColor: Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                              .withValues(alpha: .1),
+                                          hoverColor: Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                              .withValues(alpha: .05),
+                                          child: Center(
+                                            child: MenuIcon(
+                                              Icons.more_horiz,
+                                              size: 18,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                      onPressed: () => _edit(item, true),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -287,7 +300,7 @@ class _RecordEditorState extends State<_RecordEditor> {
     setState(() => _saving = true);
     final saved = await performAction(
       context,
-      () => store.update((data) {
+      () => store.update(MenuWriteScope.settings, (data) {
         final items = _items(data, widget.kind);
         items.remove(widget.original);
         if (!remove) items.insert(0, value);
@@ -377,7 +390,7 @@ class _RecordEditorState extends State<_RecordEditor> {
                       children: [
                         if (_view == _RecordView.manage) ...[
                           _option(
-                            Icons.edit_note,
+                            Icons.edit_outlined,
                             '修改名称',
                             () => _changeView(_RecordView.edit),
                           ),

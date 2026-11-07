@@ -1,3 +1,4 @@
+import 'dart:convert';
 import '../../ui/menu_bottom_sheet.dart';
 import '../../ui/menu_icon.dart';
 import 'package:flutter/material.dart';
@@ -5,7 +6,7 @@ import '../../core/models.dart';
 import '../../core/photo_location.dart';
 import '../../ui/widgets.dart';
 import '../media/media_actions.dart';
-import '../restaurants/restaurant_address_editor.dart';
+import '../restaurants/restaurant_address_fields.dart';
 import 'import_models.dart';
 
 class ImportPhotoEdit {
@@ -67,7 +68,7 @@ Future<RestaurantAddress?> choosePhotoBranch(
           children: [
             for (final a in addresses)
               ListTile(
-                title: Text(a.fullAddress),
+                title: Text(a.fullAddress.isEmpty ? '待填写详细地址' : a.fullAddress),
                 onTap: () => Navigator.pop(context, a),
               ),
           ],
@@ -83,9 +84,11 @@ class ImportPhotoEditor extends StatefulWidget {
     super.key,
     required this.photo,
     required this.addresses,
+    required this.lockedAddressIds,
   });
   final ImportPhoto photo;
   final List<RestaurantAddress> addresses;
+  final Set<String> lockedAddressIds;
   @override
   State<ImportPhotoEditor> createState() => _ImportPhotoEditorState();
 }
@@ -108,7 +111,8 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
       price.text !=
           (widget.photo.price == 0 ? '' : money(widget.photo.price)) ||
       quantity.text != '${widget.photo.quantity}' ||
-      addresses.length != widget.addresses.length;
+      jsonEncode(addresses.map((a) => a.toJson()).toList()) !=
+          jsonEncode(widget.addresses.map((a) => a.toJson()).toList());
   @override
   void initState() {
     super.initState();
@@ -142,9 +146,8 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
     Navigator.pop(context);
   }
 
-  Future<void> addAddress({RestaurantAddress? suggestion}) async {
-    final address = await editRestaurantAddress(context, address: suggestion);
-    if (address == null || !mounted) return;
+  void addAddress({RestaurantAddress? suggestion}) {
+    final address = suggestion ?? RestaurantAddress(id: newId());
     final existing = addresses
         .where((a) => a.fullAddress == address.fullAddress)
         .firstOrNull;
@@ -167,12 +170,12 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
       showToast(context, '未能识别地点，请手动填写分店地址');
       return;
     }
-    await addAddress(suggestion: suggestion);
+    addAddress(suggestion: suggestion);
   }
 
   Future<void> branch() async {
     if (addresses.isEmpty) {
-      await addAddress();
+      addAddress();
       return;
     }
     final selected = await choosePhotoBranch(context, addresses);
@@ -181,7 +184,24 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
     }
   }
 
+  Future<void> removeLocalAddress(RestaurantAddress address) async {
+    if (!await confirmAction(
+      context,
+      title: '移除这个地址？',
+      message: address.fullAddress,
+      confirmLabel: '移除',
+    )) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      addresses.removeWhere((a) => a.id == address.id);
+      photo.addressId = '';
+    });
+  }
+
   void done() {
+    if (!validateRestaurantAddresses(context, addresses)) return;
     final amount = price.text.trim().isEmpty
         ? 0.0
         : double.tryParse(price.text.trim());
@@ -237,8 +257,16 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
               SizedBox(
                 height: 220,
                 child: InkWell(
-                  onTap: () => showPhotoViewer(context, [photo.path], 0),
-                  child: LocalPhoto(path: photo.path, fit: BoxFit.contain),
+                  onTap: () => showPhotoViewer(
+                    context,
+                    [photo.path],
+                    0,
+                    heroTagForIndex: (_) => (this, photo.path),
+                  ),
+                  child: Hero(
+                    tag: (this, photo.path),
+                    child: LocalPhoto(path: photo.path, fit: BoxFit.contain),
+                  ),
                 ),
               ),
               const SectionTitle('拍摄时间'),
@@ -266,10 +294,34 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(branch?.fullAddress ?? '待选择分店'),
+                title: Text(
+                  branch == null
+                      ? '待选择分店'
+                      : widget.lockedAddressIds.contains(branch.id)
+                      ? branch.fullAddress
+                      : '更换分店',
+                ),
                 trailing: const MenuIcon(Icons.chevron_right),
                 onTap: this.branch,
               ),
+              if (branch != null &&
+                  !widget.lockedAddressIds.contains(branch.id))
+                RestaurantAddressFields(
+                  key: ValueKey(branch.id),
+                  address: branch,
+                  autofocus: branch.detail.isEmpty,
+                  onChanged: (address) => setState(() {
+                    addresses[addresses.indexWhere((a) => a.id == address.id)] =
+                        address;
+                  }),
+                  trailing: widget.addresses.any((a) => a.id == branch.id)
+                      ? null
+                      : IconButton(
+                          tooltip: '移除这个地址',
+                          onPressed: () => removeLocalAddress(branch),
+                          icon: const MenuIcon(Icons.delete_outline, size: 18),
+                        ),
+                ),
               if (photo.latitude != null && photo.longitude != null)
                 OutlinedButton.icon(
                   onPressed: identify,
@@ -307,7 +359,6 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
                   decoration: const InputDecoration(
                     labelText: '本次单价',
                     prefixText: '¥ ',
-                    hintText: '选填',
                   ),
                 ),
                 const SizedBox(height: 20),

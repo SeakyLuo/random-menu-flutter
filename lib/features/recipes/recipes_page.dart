@@ -1,7 +1,7 @@
+import '../../ui/library_layout.dart';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../ui/library_widgets.dart';
-import '../../ui/menu_icon.dart';
 import '../../ui/widgets.dart';
 import 'recipe_editor.dart';
 import 'recipe_grid.dart';
@@ -63,32 +63,10 @@ class RecipesPageState extends State<RecipesPage>
     super.dispose();
   }
 
-  Widget _categoryTab(String label) =>
-      Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(label));
-
-  Future<void> _resume() async {
-    final data = MenuScope.of(context).data;
-    await editRecipe(context, recipe: data.recipeDraft!, fromDraft: true);
-  }
-
-  Future<void> _deleteDraft() async {
-    if (!await confirmAction(
-      context,
-      title: '删除未完成的草稿？',
-      message: '已保存的菜谱不会受影响。',
-    )) {
-      return;
-    }
-    if (!mounted) return;
-    await performAction(
-      context,
-      () => MenuScope.of(context).update((d) {
-        d.recipeDraft = null;
-        d.recipeDraftSourceId = null;
-      }),
-      success: '草稿已删除',
-    );
-  }
+  Widget _categoryTab(String label) => Padding(
+    padding: const EdgeInsets.only(top: 6, bottom: 8),
+    child: Text(label),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -96,6 +74,7 @@ class RecipesPageState extends State<RecipesPage>
     final sorted = [...data.recipes]
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return MenuPage(
+      maxWidth: LibraryLayout.maxWidth,
       title: '菜谱',
       compactHeader: true,
       actions: [
@@ -112,35 +91,6 @@ class RecipesPageState extends State<RecipesPage>
       ],
       child: Column(
         children: [
-          if (data.recipeDraft != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Material(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                child: ListTile(
-                  title: const Text('未完成的菜谱'),
-                  subtitle: Text(
-                    data.recipeDraft!.name.isEmpty
-                        ? '还未命名的草稿'
-                        : data.recipeDraft!.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  onTap: _resume,
-                  trailing: PopupMenuButton<String>(
-                    tooltip: '草稿操作',
-                    icon: const MenuIcon(Icons.more_horiz),
-                    onSelected: (v) =>
-                        v == 'resume' ? _resume() : _deleteDraft(),
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'resume', child: Text('继续编辑')),
-                      PopupMenuItem(value: 'delete', child: Text('删除草稿')),
-                    ],
-                  ),
-                ),
-              ),
-            ),
           if (_tags.isNotEmpty)
             Align(
               alignment: Alignment.centerLeft,

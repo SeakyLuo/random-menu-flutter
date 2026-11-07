@@ -6,6 +6,7 @@ import 'package:archive/archive.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../core/tag_patterns.dart';
+import '../../core/photo_storage.dart';
 import 'legacy_import.dart';
 
 Iterable<List<String>> _imageLists(MenuData data) sync* {
@@ -28,10 +29,16 @@ Iterable<List<String>> _imageLists(MenuData data) sync* {
 }
 
 class PreparedBackup {
-  PreparedBackup(this.data, this.photos, {this.summary = '本应用完整备份'});
+  PreparedBackup(
+    this.data,
+    this.photos, {
+    this.summary = '本应用完整备份',
+    this.sources = const {},
+  });
   final String summary;
   final MenuData data;
   final Map<String, Uint8List> photos;
+  final Map<String, Uint8List> sources;
 }
 
 class BackupService {
@@ -40,6 +47,7 @@ class BackupService {
       jsonDecode(jsonEncode(source.toJson())) as Map<String, dynamic>,
     );
     final photos = <String, Uint8List>{};
+    final sources = <String, Uint8List>{};
     final paths = <String, String>{};
     for (final list in _imageLists(data)) {
       for (var i = 0; i < list.length; i++) {
@@ -47,6 +55,8 @@ class BackupService {
         if (!paths.containsKey(original)) {
           final name = 'photos/${newId()}.${original.split('.').last}';
           photos[name] = await File(original).readAsBytes();
+          final source = PhotoStorage.sourceFile(original);
+          if (await source.exists()) sources[name] = await source.readAsBytes();
           paths[original] = name;
         }
         list[i] = paths[original]!;
@@ -57,6 +67,11 @@ class BackupService {
       final archive = Archive()..addFile(ArchiveFile.string('menu.json', json));
       for (final entry in photos.entries) {
         archive.addFile(ArchiveFile.bytes(entry.key, entry.value));
+      }
+      for (final entry in sources.entries) {
+        archive.addFile(
+          ArchiveFile.bytes('${entry.key}.source.json', entry.value),
+        );
       }
       return ZipEncoder().encodeBytes(archive);
     });
@@ -94,16 +109,20 @@ class BackupService {
         throw const FormatException('备份内容不完整，无法恢复。');
       }
       final photos = <String, Uint8List>{};
+      final sources = <String, Uint8List>{};
       for (final name in _imageLists(data).expand((paths) => paths).toSet()) {
         final photo = archive.findFile(name);
         if (!name.startsWith('photos/') || photo == null || !photo.isFile) {
           throw const FormatException('备份缺少照片，无法完整恢复。');
         }
         photos[name] = photo.content;
+        final source = archive.findFile('$name.source.json');
+        if (source != null) sources[name] = source.content;
       }
       return PreparedBackup(
         data,
         photos,
+        sources: sources,
         summary:
             '本应用备份：${data.recipes.length} 道菜谱、${data.restaurants.length} 家餐厅、${photos.length} 张照片。',
       );
@@ -126,6 +145,12 @@ class BackupService {
         final destination =
             '${directory.path}/${newId()}.${photo.key.split('.').last}';
         await File(destination).writeAsBytes(photo.value, flush: true);
+        final source = backup.sources[photo.key];
+        if (source != null) {
+          await PhotoStorage.sourceFile(
+            destination,
+          ).writeAsBytes(source, flush: true);
+        }
         paths[photo.key] = destination;
       }
       for (final list in _imageLists(backup.data)) {

@@ -1,7 +1,11 @@
+import 'restaurant_grid.dart';
+import '../../ui/library_layout.dart';
 import '../../ui/menu_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
+import '../../core/geo_point.dart';
+import 'restaurant_distance.dart';
 import '../../ui/menu_icon.dart';
 import '../../ui/library_widgets.dart';
 import '../../ui/widgets.dart';
@@ -15,8 +19,9 @@ export 'restaurant_card.dart' show RestaurantCard;
 
 List<Restaurant> orderedRestaurants(
   List<Restaurant> source,
-  RestaurantSort sort,
-) {
+  RestaurantSort sort, {
+  Map<String, RestaurantDistance> distances = const {},
+}) {
   DateTime latest(Restaurant r) => r.records.isEmpty
       ? DateTime(1900)
       : r.records.map((v) => v.date).reduce((a, b) => a.isAfter(b) ? a : b);
@@ -27,6 +32,10 @@ List<Restaurant> orderedRestaurants(
       RestaurantSort.recent => 0,
       RestaurantSort.visits => b.records.length.compareTo(a.records.length),
       RestaurantSort.price => b.averageCost.compareTo(a.averageCost),
+      RestaurantSort.nearest =>
+        (distances[a.id]?.meters ?? double.infinity).compareTo(
+          distances[b.id]?.meters ?? double.infinity,
+        ),
     };
     if (compared != 0) return compared;
     final date = dates[b.id]!.compareTo(dates[a.id]!);
@@ -43,6 +52,8 @@ class RestaurantsPage extends StatefulWidget {
 class RestaurantsPageState extends State<RestaurantsPage> {
   RestaurantQuery _query = RestaurantQuery();
   final _scroll = ScrollController();
+  GeoPoint? _origin;
+  bool _locating = false;
   void scrollToTop() => scrollMenuToTop(context, _scroll);
   void _update(VoidCallback change) {
     setState(change);
@@ -55,7 +66,6 @@ class RestaurantsPageState extends State<RestaurantsPage> {
     super.dispose();
   }
 
-  bool _fromStats = false;
   double _rankingOffset = 0;
   Future<void> _filter() async {
     final result = await editRestaurantFilter(context, _query);
@@ -73,14 +83,12 @@ class RestaurantsPageState extends State<RestaurantsPage> {
       ),
     );
     if (result != null && mounted) {
-      _update(() {
-        _query = result;
-        _fromStats = true;
-      });
+      _update(() => _query = result);
     }
   }
 
   Future<void> _sort() async {
+    if (_locating) return;
     final sort = await showMenuBottomSheet<RestaurantSort>(
       context: context,
       showDragHandle: true,
@@ -99,10 +107,29 @@ class RestaurantsPageState extends State<RestaurantsPage> {
               for (final sort in RestaurantSort.values)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(RestaurantQuery(sort: sort).sortLabel),
+                  leading: MenuIcon(
+                    switch (sort) {
+                      RestaurantSort.recent => Icons.schedule,
+                      RestaurantSort.visits => Icons.bar_chart_outlined,
+                      RestaurantSort.price => Icons.receipt_long_outlined,
+                      RestaurantSort.nearest => Icons.location_on_outlined,
+                    },
+                    color: sort == _query.sort
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  title: Text(
+                    RestaurantQuery(sort: sort).sortLabel,
+                    style: sort == _query.sort
+                        ? TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                          )
+                        : null,
+                  ),
                   trailing: sort == _query.sort
                       ? MenuIcon(
                           Icons.check,
+                          size: 28,
                           color: Theme.of(context).colorScheme.primary,
                         )
                       : null,
@@ -113,58 +140,49 @@ class RestaurantsPageState extends State<RestaurantsPage> {
         ),
       ),
     );
-    if (sort != null && mounted) _update(() => _query.sort = sort);
+    if (sort == null || !mounted) return;
+    if (sort == RestaurantSort.nearest) {
+      setState(() => _locating = true);
+      GeoPoint? origin;
+      final success = await performAction(context, () async {
+        origin = await locateForRestaurantSort(context);
+      });
+      if (!mounted) return;
+      setState(() => _locating = false);
+      if (!success || origin == null) return;
+      _origin = origin;
+    }
+    _update(() => _query.sort = sort);
   }
 
   @override
   Widget build(BuildContext context) {
     final restaurants = MenuScope.of(context).data.restaurants;
+    final matching = restaurants.where(_query.matches).toList();
+    final distances = <String, RestaurantDistance>{};
+    if (_query.sort == RestaurantSort.nearest && _origin != null) {
+      for (final restaurant in matching) {
+        final nearest = nearestRestaurantAddress(
+          restaurant.addressEntries.where(_query.matchesAddress),
+          _origin!,
+        );
+        if (nearest != null) distances[restaurant.id] = nearest;
+      }
+    }
     final results = orderedRestaurants(
-      restaurants.where(_query.matches).toList(),
+      matching,
       _query.sort,
+      distances: distances,
     );
-    final filters = <({String label, VoidCallback remove})>[
-      if (_query.category.isNotEmpty)
-        (label: _query.category, remove: () => _query.category = ''),
-      if (_query.hasRegion)
-        (
-          label: [
-            _query.province,
-            _query.city,
-            _query.county,
-          ].where((v) => v.isNotEmpty).join(' '),
-          remove: () {
-            _query.province = '';
-            _query.city = '';
-            _query.county = '';
-          },
-        ),
-      if (_query.start != null || _query.end != null)
-        (
-          label:
-              '${_query.start == null ? '不限' : dayLabel(_query.start!)} 至 ${_query.end == null ? '不限' : dayLabel(_query.end!)}',
-          remove: () {
-            _query.start = null;
-            _query.end = null;
-          },
-        ),
-      if (_query.alone || _query.companionsOnly)
-        (
-          label: _query.alone
-              ? '独自用餐'
-              : _query.companions.isEmpty
-              ? '有饭伙'
-              : _query.companions.join('、'),
-          remove: () {
-            _query.alone = false;
-            _query.companionsOnly = false;
-            _query.companions.clear();
-          },
-        ),
-      if (_query.favorite)
-        (label: '收藏餐厅', remove: () => _query.favorite = false),
-    ];
+    final filterCount = [
+      _query.category.isNotEmpty,
+      _query.hasRegion,
+      _query.start != null || _query.end != null,
+      _query.alone || _query.companionsOnly,
+      _query.favorite,
+    ].where((active) => active).length;
     return MenuPage(
+      maxWidth: LibraryLayout.maxWidth,
       title: '餐厅',
       actionsSpacing: 4,
       actions: [
@@ -181,7 +199,7 @@ class RestaurantsPageState extends State<RestaurantsPage> {
         PageActionButton(
           icon: Icons.filter_alt_outlined,
           label: '筛选餐厅',
-          badgeCount: filters.length,
+          badgeCount: filterCount,
           onPressed: _filter,
         ),
         PageActionButton(
@@ -191,116 +209,106 @@ class RestaurantsPageState extends State<RestaurantsPage> {
         ),
         PageAddButton(label: '添加餐厅', onPressed: () => editRestaurant(context)),
       ],
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${results.length} 家餐厅',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+      child: CustomScrollView(
+        controller: _scroll,
+        key: const PageStorageKey('restaurants'),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${results.length} 家餐厅',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                ),
-                TextButton(
-                  onPressed: _sort,
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(
-                      context,
-                    ).colorScheme.onSurfaceVariant,
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        _query.sortLabel,
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                      const MenuIcon(Icons.chevron_right, size: 13),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (_fromStats)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: _statistics,
-                icon: const MenuIcon(Icons.arrow_back, size: 18),
-                label: const Text('返回用餐统计'),
-              ),
-            ),
-          if (filters.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
-                  children: [
-                    for (final filter in filters)
-                      InputChip(
-                        label: Text(
-                          filter.label,
-                          style: const TextStyle(fontSize: 12),
+                  Semantics(
+                    button: true,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _sort,
+                      child: SizedBox(
+                        height: 36,
+                        child: IconTheme.merge(
+                          data: IconThemeData(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const MenuIcon(Icons.sort, size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                _locating ? '定位中…' : _query.sortLabel,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const RotatedBox(
+                                quarterTurns: 1,
+                                child: MenuIcon(Icons.chevron_right, size: 13),
+                              ),
+                            ],
+                          ),
                         ),
-                        deleteIcon: const MenuIcon(Icons.close, size: 15),
-                        onDeleted: () => _update(filter.remove),
                       ),
-                    TextButton(
-                      onPressed: () => _update(
-                        () => _query = RestaurantQuery(sort: _query.sort),
-                      ),
-                      child: const Text('清除筛选'),
                     ),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (results.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: EmptyState(
+                icon: _query.active
+                    ? Icons.search_off
+                    : Icons.storefront_outlined,
+                title: _query.active ? '没有符合条件的餐厅' : '收好值得再去的地方',
+                message: _query.active
+                    ? '换个筛选条件，继续找找。'
+                    : '点击右上角的＋添加餐厅，再记下吃过的菜和用餐感受。',
+                actionLabel: _query.active ? '查看全部餐厅' : '添加餐厅',
+                onAction: () {
+                  if (_query.active) {
+                    _update(() => _query = RestaurantQuery(sort: _query.sort));
+                  } else {
+                    editRestaurant(context);
+                  }
+                },
+              ),
+            )
+          else
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                4,
+                16,
+                120 + MediaQuery.viewPaddingOf(context).bottom,
+              ),
+              sliver: SliverRestaurantGrid(
+                mainAxisSpacing: 10,
+                itemCount: results.length,
+                itemBuilder: (_, index) => RestaurantCard(
+                  key: ValueKey(results[index].id),
+                  restaurant: results[index],
+                  distance: distances[results[index].id],
+                  showDistance: _query.sort == RestaurantSort.nearest,
                 ),
               ),
             ),
-          Expanded(
-            child: results.isEmpty
-                ? EmptyState(
-                    icon: _query.active
-                        ? Icons.search_off
-                        : Icons.storefront_outlined,
-                    title: _query.active ? '没有符合条件的餐厅' : '收好值得再去的地方',
-                    message: _query.active
-                        ? '换个筛选条件，继续找找。'
-                        : '点击右上角的＋添加餐厅，再记下吃过的菜和用餐感受。',
-                    actionLabel: _query.active ? '查看全部餐厅' : '添加餐厅',
-                    onAction: () {
-                      if (_query.active) {
-                        _update(
-                          () => _query = RestaurantQuery(sort: _query.sort),
-                        );
-                      } else {
-                        editRestaurant(context);
-                      }
-                    },
-                  )
-                : ListView.separated(
-                    controller: _scroll,
-                    key: const PageStorageKey('restaurants'),
-                    padding: EdgeInsets.fromLTRB(
-                      16,
-                      12,
-                      16,
-                      120 + MediaQuery.viewPaddingOf(context).bottom,
-                    ),
-                    itemCount: results.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 18),
-                    itemBuilder: (_, index) => RestaurantCard(
-                      key: ValueKey(results[index].id),
-                      restaurant: results[index],
-                    ),
-                  ),
-          ),
         ],
       ),
     );

@@ -1,5 +1,15 @@
 import 'models.dart';
 
+Map<String, dynamic> upgradeMenuV2(Map<String, dynamic> source) => {
+  ...source,
+  'version': 3,
+  'restaurantCategories': {
+    for (final raw in source['restaurants'] as List)
+      if ((raw as Map<String, dynamic>)['category'] != '')
+        raw['category'] as String,
+  }.toList(),
+};
+
 // Upgrade the first Flutter snapshot explicitly. Later schemas remain strict.
 Map<String, dynamic> upgradeMenuV1(Map<String, dynamic> source) {
   final upgradedAt = DateTime.now().toIso8601String();
@@ -42,6 +52,5 @@ Map<String, dynamic> upgradeMenuV1(Map<String, dynamic> source) {
     'restaurantSearchHistory': <String>[],
     'recipeTagSort': 'default',
     'patternTagRules': <String, dynamic>{},
-    'legacyMetadata': <String, dynamic>{},
   };
 }

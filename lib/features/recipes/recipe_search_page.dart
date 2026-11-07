@@ -1,10 +1,17 @@
+import '../../ui/library_layout.dart';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
+import '../../core/models.dart';
 import '../../ui/menu_icon.dart';
+import '../../ui/retained_tab_view.dart';
 import '../../ui/widgets.dart';
+import 'recipe_detail_page.dart';
 import 'recipe_editor.dart';
-import 'recipe_grid.dart';
+import 'recipe_search_results.dart';
 import 'recipe_search.dart';
+import '../../ui/search_discovery.dart';
+import '../../ui/search_field_bar.dart';
+import '../../ui/search_scope.dart';
 
 class RecipeSearchPage extends StatefulWidget {
   const RecipeSearchPage({super.key});
@@ -14,217 +21,402 @@ class RecipeSearchPage extends StatefulWidget {
 
 class _RecipeSearchPageState extends State<RecipeSearchPage> {
   final _search = TextEditingController();
+  final _focus = FocusNode();
+  final _resultsScroll = {
+    for (final scope in [
+      RecipeSearchField.all,
+      RecipeSearchField.name,
+      RecipeSearchField.note,
+    ])
+      scope: ScrollController(keepScrollOffset: false),
+  };
   RecipeSearchField _scope = RecipeSearchField.all;
+  String _query = '';
+  String _text = '';
+  bool _managing = false;
+  bool _historyBusy = false;
+  bool _opening = false;
+
+  static const _labels = {
+    RecipeSearchField.all: '全部',
+    RecipeSearchField.name: '菜名',
+    RecipeSearchField.note: '备注',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _search.addListener(_changed);
+  }
+
   @override
   void dispose() {
     _search.dispose();
+    _focus.dispose();
+    for (final controller in _resultsScroll.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
-  Future<void> _remember([String? text]) async {
-    if (text != null) setState(() => _search.text = text);
-    final term = _search.text.trim();
-    if (term.isEmpty) return;
-    await performAction(
+  void _resetResults() {
+    for (final controller in _resultsScroll.values) {
+      if (controller.hasClients) controller.jumpTo(0);
+    }
+  }
+
+  void _changed() {
+    if (!_search.value.composing.isCollapsed) return;
+    final text = _search.text;
+    if (text == _text) return;
+    final query = text.trim();
+    final changed = query != _query;
+    setState(() {
+      _text = text;
+      _query = query;
+      _managing = false;
+    });
+    if (changed) _resetResults();
+  }
+
+  void _changeScope(RecipeSearchField scope) {
+    _focus.unfocus();
+    setState(() => _scope = scope);
+  }
+
+  Future<bool> _remember(String term) async {
+    if (term.isEmpty) return true;
+    final store = MenuScope.of(context);
+    final history = store.data.recipeSearchHistory;
+    if (history.isNotEmpty && history.first == term) return true;
+    return performAction(
       context,
-      () => MenuScope.of(context).update((d) {
-        d.recipeSearchHistory.remove(term);
-        d.recipeSearchHistory.insert(0, term);
-        if (d.recipeSearchHistory.length > 20) {
-          d.recipeSearchHistory.removeRange(20, d.recipeSearchHistory.length);
+      () => store.update(MenuWriteScope.settings, (data) {
+        data.recipeSearchHistory.remove(term);
+        data.recipeSearchHistory.insert(0, term);
+        if (data.recipeSearchHistory.length > 20) {
+          data.recipeSearchHistory.removeRange(
+            20,
+            data.recipeSearchHistory.length,
+          );
         }
       }),
     );
   }
 
+  Future<void> _useKeyword(String term) async {
+    _search.value = TextEditingValue(
+      text: term,
+      selection: TextSelection.collapsed(offset: term.length),
+    );
+    setState(() {
+      _query = term;
+      _managing = false;
+    });
+    _resetResults();
+    _focus.unfocus();
+    await _remember(term);
+  }
+
+  Future<void> _submit() async {
+    _changed();
+    _focus.unfocus();
+    await _remember(_search.text.trim());
+  }
+
+  Future<void> _openRecipe(Recipe recipe) async {
+    if (_opening) return;
+    _opening = true;
+    await _remember(_query);
+    if (!mounted) return;
+    _focus.unfocus();
+    await showRecipeDetail(context, recipe.id);
+    _opening = false;
+  }
+
+  Future<void> _removeHistory(String term) async {
+    setState(() => _historyBusy = true);
+    final store = MenuScope.of(context);
+    await performAction(
+      context,
+      () => store.update(
+        MenuWriteScope.settings,
+        (data) => data.recipeSearchHistory.remove(term),
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      _historyBusy = false;
+      if (store.data.recipeSearchHistory.isEmpty) _managing = false;
+    });
+  }
+
+  Future<void> _clearHistory() async {
+    if (!await confirmAction(
+      context,
+      title: '清空搜索历史？',
+      message: '清空后无法恢复。',
+      confirmLabel: '清空',
+    )) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _historyBusy = true);
+    final saved = await performAction(
+      context,
+      () => MenuScope.of(context).update(
+        MenuWriteScope.settings,
+        (data) => data.recipeSearchHistory.clear(),
+      ),
+      success: '搜索历史已清空',
+    );
+    if (!mounted) return;
+    setState(() {
+      _historyBusy = false;
+      if (saved) _managing = false;
+    });
+  }
+
+  void _rewrite() {
+    _search.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _search.text.length,
+    );
+    _focus.requestFocus();
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = MenuScope.of(context).data;
-    final term = _search.text.trim().toLowerCase();
-    final results = data.recipes.where((r) {
-      final fields = switch (_scope) {
-        RecipeSearchField.name => [r.name],
-        RecipeSearchField.tags => r.tags,
-        RecipeSearchField.note => [r.note],
-        RecipeSearchField.all => [r.name, ...r.tags, r.note],
-      };
-      return fields.any((field) => field.toLowerCase().contains(term));
-    }).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final scheme = Theme.of(context).colorScheme;
+    final searchClearance = SearchFieldBar.clearance(context);
+    final term = _query.toLowerCase();
+    final results = _resultsFor(data, _scope);
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
+            constraints: const BoxConstraints(maxWidth: LibraryLayout.maxWidth),
             child: Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 8, 16, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        tooltip: '返回菜谱',
-                        onPressed: () => Navigator.pop(context),
-                        icon: const MenuIcon(Icons.arrow_back),
-                      ),
-                      Expanded(
-                        child: TextField(
-                          controller: _search,
-                          autofocus: true,
-                          onChanged: (_) => setState(() {}),
-                          textInputAction: TextInputAction.search,
-                          onSubmitted: (_) => _remember(),
-                          decoration: InputDecoration(
-                            hintText: '搜索菜名、标签或备注',
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            prefixIcon: const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: MenuIcon(Icons.search, size: 20),
-                            ),
-                            suffixIcon: term.isEmpty
-                                ? null
-                                : IconButton(
-                                    tooltip: '清除搜索',
-                                    onPressed: () => setState(_search.clear),
-                                    icon: const MenuIcon(Icons.close, size: 18),
-                                  ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(24),
-                              borderSide: BorderSide.none,
-                            ),
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 600),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            tooltip: '返回菜谱',
+                            onPressed: () => Navigator.pop(context),
+                            icon: const MenuIcon(Icons.arrow_back),
                           ),
-                        ),
+                          Expanded(
+                            child: term.isEmpty
+                                ? const Padding(
+                                    padding: EdgeInsets.only(left: 8),
+                                    child: Text(
+                                      '搜索菜谱',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  )
+                                : SearchScope(
+                                    labels: _labels,
+                                    selected: _scope,
+                                    onChanged: _changeScope,
+                                  ),
+                          ),
+                          const SizedBox(width: 48),
+                        ],
                       ),
-                      TextButton(onPressed: _remember, child: const Text('搜索')),
-                    ],
+                    ),
                   ),
                 ),
-                Row(
-                  children: [
-                    for (final scope in RecipeSearchField.values)
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => setState(() => _scope = scope),
-                          child: Container(
-                            alignment: Alignment.center,
-                            padding: const EdgeInsets.symmetric(vertical: 17),
-                            decoration: BoxDecoration(
-                              border: Border(
-                                bottom: BorderSide(
-                                  width: _scope == scope ? 3 : 1,
-                                  color: _scope == scope
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(
-                                          context,
-                                        ).colorScheme.outlineVariant,
-                                ),
-                              ),
-                            ),
-                            child: Text(
-                              switch (scope) {
-                                RecipeSearchField.all => '全部',
-                                RecipeSearchField.name => '菜名',
-                                RecipeSearchField.tags => '标签',
-                                RecipeSearchField.note => '备注',
-                              },
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: _scope == scope
-                                    ? Theme.of(context).colorScheme.primary
-                                    : null,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                if (term.isNotEmpty)
+                if (results.isNotEmpty)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        '找到 ${results.length} 道菜',
+                        '${results.length} 道菜',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          color: scheme.onSurfaceVariant,
                         ),
                       ),
                     ),
                   ),
                 Expanded(
-                  child: term.isEmpty
-                      ? ListView(
-                          padding: const EdgeInsets.all(24),
-                          children: [
-                            Row(
-                              children: [
-                                const Expanded(
-                                  child: Text(
-                                    '搜索历史',
-                                    style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: term.isEmpty
+                            ? SearchDiscovery(
+                                emptyTitle: '先收下一道喜欢的菜',
+                                emptyMessage: '添加菜谱后，就能按菜名和备注查找。',
+                                createLabel: '添加菜谱',
+                                libraryEmpty: data.recipes.isEmpty,
+                                bottom: searchClearance,
+                                history: data.recipeSearchHistory,
+                                managing: _managing,
+                                busy: _historyBusy,
+                                onManage: () {
+                                  _focus.unfocus();
+                                  setState(() => _managing = !_managing);
+                                },
+                                onHistory: _useKeyword,
+                                onRemove: _removeHistory,
+                                onClear: _clearHistory,
+                                onCreate: () {
+                                  _focus.unfocus();
+                                  editRecipe(context);
+                                },
+                              )
+                            : NotificationListener<ScrollStartNotification>(
+                                onNotification: (notification) {
+                                  if (notification.dragDetails != null) {
+                                    _focus.unfocus();
+                                  }
+                                  return false;
+                                },
+                                child: RetainedTabView(
+                                  index: _labels.keys.toList().indexOf(_scope),
+                                  onChanged: (index) => _changeScope(
+                                    _labels.keys.elementAt(index),
                                   ),
-                                ),
-                                if (data.recipeSearchHistory.isNotEmpty)
-                                  TextButton(
-                                    onPressed: () => performAction(
-                                      context,
-                                      () => MenuScope.of(context).update(
-                                        (d) => d.recipeSearchHistory.clear(),
+                                  children: [
+                                    for (final scope in _labels.keys)
+                                      _resultsPage(
+                                        data,
+                                        scope,
+                                        searchClearance,
                                       ),
-                                    ),
-                                    child: const Text('清空'),
-                                  ),
-                              ],
+                                  ],
+                                ),
+                              ),
+                      ),
+                      Positioned(
+                        left: 24,
+                        right: 24,
+                        bottom: 16,
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 600),
+                            child: SearchFieldBar(
+                              hintText: '搜索菜名、备注',
+                              controller: _search,
+                              focusNode: _focus,
+                              onSubmitted: (_) => _submit(),
                             ),
-                            if (data.recipeSearchHistory.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.only(top: 28),
-                                child: Text('搜索过的关键词会留在这里'),
-                              ),
-                            for (final item in data.recipeSearchHistory)
-                              ListTile(
-                                contentPadding: EdgeInsets.zero,
-                                leading: const MenuIcon(
-                                  Icons.history,
-                                  size: 21,
-                                ),
-                                title: Text(item),
-                                onTap: () => _remember(item),
-                                trailing: IconButton(
-                                  tooltip: '删除搜索历史$item',
-                                  icon: const MenuIcon(Icons.close, size: 19),
-                                  onPressed: () => performAction(
-                                    context,
-                                    () => MenuScope.of(context).update(
-                                      (d) => d.recipeSearchHistory.remove(item),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        )
-                      : results.isEmpty
-                      ? EmptyState(
-                          icon: Icons.search_off,
-                          title: '没有找到相关菜谱',
-                          message: '换个关键词，或记下这道想吃的菜。',
-                          actionLabel: '添加菜谱',
-                          onAction: () => editRecipe(context),
-                        )
-                      : RecipeGrid(recipes: results, bottom: 24),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  List<Recipe> _resultsFor(MenuData data, RecipeSearchField scope) {
+    final term = _query.toLowerCase();
+    if (term.isEmpty) return [];
+    return data.recipes.where((recipe) {
+      return (scope != RecipeSearchField.note &&
+              recipe.name.toLowerCase().contains(term)) ||
+          (scope != RecipeSearchField.name &&
+              recipe.note.toLowerCase().contains(term));
+    }).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  Widget _resultsPage(MenuData data, RecipeSearchField scope, double bottom) {
+    if (data.recipes.isEmpty) {
+      return _emptyResults(context, libraryEmpty: true, scope: scope);
+    }
+    final results = _resultsFor(data, scope);
+    if (results.isEmpty) return _emptyResults(context, scope: scope);
+    return RecipeSearchResults(
+      recipes: results,
+      query: _query,
+      bottom: bottom,
+      controller: _resultsScroll[scope]!,
+      onOpen: _openRecipe,
+    );
+  }
+
+  Widget _emptyResults(
+    BuildContext context, {
+    bool libraryEmpty = false,
+    required RecipeSearchField scope,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: EdgeInsets.fromLTRB(
+        28,
+        40,
+        28,
+        SearchFieldBar.clearance(context),
+      ),
+      children: [
+        Center(
+          child: MenuIcon(
+            libraryEmpty ? Icons.menu_book : Icons.search_off,
+            size: 40,
+            color: scheme.onSurfaceVariant.withValues(alpha: .65),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          libraryEmpty ? '先收下一道喜欢的菜' : '没有找到相关菜谱',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          libraryEmpty
+              ? '添加菜谱后，就能按菜名和备注查找。'
+              : scope == RecipeSearchField.all
+              ? '试试更短的关键词。'
+              : '没有${_labels[scope]}包含“$_query”的菜谱。',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.5,
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 20),
+        if (libraryEmpty)
+          Center(
+            child: FilledButton(
+              onPressed: () {
+                _focus.unfocus();
+                editRecipe(context);
+              },
+              child: const Text('添加菜谱'),
+            ),
+          )
+        else if (scope != RecipeSearchField.all)
+          Center(
+            child: TextButton(
+              onPressed: () => _changeScope(RecipeSearchField.all),
+              child: const Text('搜索全部'),
+            ),
+          ),
+        if (!libraryEmpty && scope == RecipeSearchField.all)
+          Center(
+            child: TextButton(onPressed: _rewrite, child: const Text('换个关键词')),
+          ),
+      ],
     );
   }
 }

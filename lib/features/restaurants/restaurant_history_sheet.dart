@@ -47,6 +47,7 @@ class _HistorySheet extends StatelessWidget {
                       await performAction(
                         context,
                         () => store.update(
+                          MenuWriteScope.settings,
                           (data) => data.restaurantSearchHistory.clear(),
                         ),
                         success: '搜索历史已清空',
@@ -78,6 +79,7 @@ class _HistorySheet extends StatelessWidget {
                             onPressed: () => performAction(
                               context,
                               () => store.update(
+                                MenuWriteScope.settings,
                                 (data) =>
                                     data.restaurantSearchHistory.remove(query),
                               ),

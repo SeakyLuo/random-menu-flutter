@@ -1,6 +1,6 @@
+import '../../ui/menu_popup.dart';
 import '../../ui/menu_icon.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/widgets.dart';
@@ -83,15 +83,11 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
   Future<void> pick() async {
     setState(() => busy = true);
     await performAction(context, () async {
-      final files = await ImagePicker().pickMultiImage(
-        requestFullMetadata: true,
-      );
+      final files = await MenuScope.of(context).photos.pick();
       final added = <ImportPhoto>[];
       for (var offset = 0; offset < files.length; offset += 8) {
         added.addAll(
-          await Future.wait(
-            files.skip(offset).take(8).map((f) => readImportPhoto(f.path)),
-          ),
+          await Future.wait(files.skip(offset).take(8).map(readImportPhoto)),
         );
       }
       if (mounted) setState(() => photos.addAll(added));
@@ -177,8 +173,11 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
     final result = await Navigator.push<ImportPhotoEdit>(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            ImportPhotoEditor(photo: photos[index], addresses: addresses),
+        builder: (_) => ImportPhotoEditor(
+          photo: photos[index],
+          addresses: addresses,
+          lockedAddressIds: initialAddressIds,
+        ),
       ),
     );
     if (result != null && mounted) {
@@ -291,7 +290,7 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
                   controller: category,
                   decoration: const InputDecoration(
                     labelText: '分类',
-                    hintText: '选填，如川菜、咖啡',
+                    hintText: '如川菜、咖啡',
                   ),
                 ),
               ] else
@@ -324,7 +323,7 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
                         : () => editAddress(index),
                     trailing: initialAddressIds.contains(addresses[index].id)
                         ? null
-                        : PopupMenuButton<String>(
+                        : MenuPopupButton<String>(
                             icon: const MenuIcon(Icons.more_horiz),
                             tooltip: '本次新增分店操作',
                             onSelected: (value) {
@@ -335,11 +334,14 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
                               }
                             },
                             itemBuilder: (_) => const [
-                              PopupMenuItem(
+                              MenuPopupItem(
+                                icon: Icons.edit_outlined,
                                 value: 'edit',
                                 child: Text('修改新增分店'),
                               ),
-                              PopupMenuItem(
+                              MenuPopupItem(
+                                icon: Icons.delete_outline,
+                                destructive: true,
                                 value: 'remove',
                                 child: Text('移除新增分店'),
                               ),
@@ -430,8 +432,13 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
                               context,
                               photos.map((p) => p.path).toList(),
                               i,
+                              heroTagForIndex: (index) =>
+                                  (this, photos[index].path),
                             ),
-                            child: LocalPhoto(path: photos[i].path),
+                            child: Hero(
+                              tag: (this, photos[i].path),
+                              child: LocalPhoto(path: photos[i].path),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 10),

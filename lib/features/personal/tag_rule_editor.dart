@@ -17,7 +17,6 @@ Future<void> showTagRuleEditor(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
-  isDismissible: false,
   enableDrag: false,
   showDragHandle: true,
   constraints: const BoxConstraints(maxWidth: 560),
@@ -118,7 +117,7 @@ class _TagRuleEditorState extends State<_TagRuleEditor> {
     }
     final success = await performAction(
       context,
-      () => store.update((draft) {
+      () => store.update(MenuWriteScope.settings, (draft) {
         final target = _pattern ? draft.patternTagRules : draft.tagRules;
         if (widget.existingKey != null) target.remove(widget.existingKey);
         target[key] = values;
@@ -161,7 +160,7 @@ class _TagRuleEditorState extends State<_TagRuleEditor> {
     setState(() => _saving = true);
     final success = await performAction(
       context,
-      () => MenuScope.of(context).update((draft) {
+      () => MenuScope.of(context).update(MenuWriteScope.settings, (draft) {
         (_pattern ? draft.patternTagRules : draft.tagRules).remove(
           widget.existingKey,
         );

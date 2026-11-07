@@ -1,23 +1,30 @@
+import '../../ui/menu_popup.dart';
 import '../../ui/menu_bottom_sheet.dart';
 import '../../ui/menu_icon.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
+import '../../core/record_conflicts.dart';
 import '../../core/models.dart';
 import '../../ui/widgets.dart';
 import '../../ui/library_widgets.dart';
 import 'restaurant_address_editor.dart';
 import 'restaurant_images.dart';
 import 'visit_dish_editor.dart';
+import 'restaurant_record_draft.dart';
+import '../photo_import/import_models.dart';
+import '../media/photo_widget.dart';
 
 class RestaurantVisitEditor extends StatefulWidget {
   const RestaurantVisitEditor({
     super.key,
     required this.restaurant,
     this.visit,
+    this.draftOnly = false,
   });
   final Restaurant restaurant;
   final Visit? visit;
+  final bool draftOnly;
   @override
   State<RestaurantVisitEditor> createState() => _RestaurantVisitEditorState();
 }
@@ -47,6 +54,14 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
       (widget.restaurant.addressEntries.length == 1
           ? widget.restaurant.addressEntries.single.fullAddress
           : '');
+  late final draftAddresses = widget.restaurant.addressEntries
+      .map((entry) => RestaurantAddress.fromJson(entry.toJson()))
+      .toList();
+  List<RestaurantAddress> get availableAddresses => widget.draftOnly
+      ? draftAddresses
+      : MenuScope.of(context).data.restaurants
+            .firstWhere((r) => r.id == widget.restaurant.id)
+            .addressEntries;
   bool saving = false;
   bool picking = false;
   bool get busy => saving || picking;
@@ -72,7 +87,14 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
           jsonEncode(
             widget.visit?.items.map((i) => i.toJson()).toList() ?? [],
           ) ||
-      jsonEncode(images) != jsonEncode(widget.visit?.imagePaths ?? []);
+      jsonEncode(images) != jsonEncode(widget.visit?.imagePaths ?? []) ||
+      (widget.draftOnly &&
+          jsonEncode(draftAddresses.map((a) => a.toJson()).toList()) !=
+              jsonEncode(
+                widget.restaurant.addressEntries
+                    .map((a) => a.toJson())
+                    .toList(),
+              ));
   List<String> get people => companions.text
       .split(RegExp('[,，\n]'))
       .map((v) => v.trim())
@@ -140,16 +162,23 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
     final store = MenuScope.of(context);
     final entry = await editRestaurantAddress(context);
     if (entry == null || !mounted) return;
-    final r = store.data.restaurants.firstWhere(
-      (r) => r.id == widget.restaurant.id,
-    );
-    if (r.addressEntries.any((a) => a.fullAddress == entry.fullAddress)) {
+    if (availableAddresses.any((a) => a.fullAddress == entry.fullAddress)) {
       showToast(context, '这个地址已经添加过了，请直接选择');
+      return;
+    }
+    if (widget.draftOnly) {
+      setState(() {
+        draftAddresses.add(entry);
+        addressId = entry.id;
+        address = entry.fullAddress;
+      });
       return;
     }
     final success = await performAction(
       context,
-      () => store.update((draft) {
+      () => store.update(MenuWriteScope.restaurant(widget.restaurant.id), (
+        draft,
+      ) {
         final r = draft.restaurants.firstWhere(
           (r) => r.id == widget.restaurant.id,
         );
@@ -167,10 +196,8 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
   }
 
   Future<void> chooseAddress() async {
-    final r = MenuScope.of(
-      context,
-    ).data.restaurants.firstWhere((r) => r.id == widget.restaurant.id);
-    if (r.addressEntries.isEmpty) {
+    final entries = availableAddresses;
+    if (entries.isEmpty) {
       await addAddress();
       return;
     }
@@ -194,7 +221,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
               Expanded(
                 child: ListView(
                   children: [
-                    for (final entry in r.addressEntries)
+                    for (final entry in entries)
                       ListTile(
                         title: Text(entry.fullAddress),
                         trailing: entry.id == addressId
@@ -230,6 +257,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
           title: '按菜品重新计算？',
           message: '消费总额将替换为菜品合计 ¥${money(subtotal)}。',
           confirmLabel: '使用菜品合计',
+          destructive: false,
         )) {
       return;
     }
@@ -241,7 +269,9 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
   }
 
   Future<void> addItem() async {
-    final item = await pickVisitDish(context, widget.restaurant.id);
+    final item = widget.draftOnly
+        ? await editVisitDish(context, VisitDish(dishId: '', name: ''))
+        : await pickVisitDish(context, widget.restaurant.id);
     if (item != null && mounted) {
       setState(() {
         items.add(item);
@@ -258,6 +288,35 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
         recalculate();
       });
     }
+  }
+
+  Future<void> addPhotoItems() async {
+    setState(() => picking = true);
+    await performAction(context, () async {
+      final paths = await MenuScope.of(context).photos.pick();
+      final photos = <ImportPhoto>[];
+      for (var offset = 0; offset < paths.length; offset += 8) {
+        photos.addAll(
+          await Future.wait(paths.skip(offset).take(8).map(readImportPhoto)),
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        if (items.isEmpty && widget.visit == null) {
+          final dates = photos.map((p) => p.date).whereType<DateTime>().toList()
+            ..sort();
+          if (dates.isNotEmpty) date = dates.first;
+        }
+        items.addAll(
+          photos.map(
+            (photo) =>
+                VisitDish(dishId: '', name: '', imagePaths: [photo.path]),
+          ),
+        );
+        recalculate();
+      });
+    });
+    if (mounted) setState(() => picking = false);
   }
 
   void moveItem(int from, int to) => setState(() {
@@ -294,7 +353,25 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
       return;
     }
     if (people.toSet().length != people.length) {
-      showToast(context, '同行人姓名重复，请检查');
+      showToast(context, '饭搭子姓名重复，请检查');
+      return;
+    }
+    if (widget.draftOnly) {
+      final result = Visit(
+        id: widget.visit?.id ?? newId(),
+        date: date,
+        totalCost: value,
+        companions: people,
+        note: note.text.trim(),
+        items: items,
+        dishes: items.map((item) => item.name).toList(),
+        autoCost: autoCost,
+        addressId: addressId,
+        address: address,
+        imagePaths: images,
+      );
+      setState(() => leaving = true);
+      Navigator.pop(context, RestaurantVisitDraft(result, draftAddresses));
       return;
     }
     final store = MenuScope.of(context);
@@ -317,10 +394,25 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
           ),
         ),
       );
-      await store.update((draft) {
+      await store.update(MenuWriteScope.restaurant(widget.restaurant.id), (
+        draft,
+      ) {
         final r = draft.restaurants.firstWhere(
           (r) => r.id == widget.restaurant.id,
         );
+        if (widget.visit != null) {
+          requireUnchangedRecord(
+            widget.visit!.toJson(),
+            r.records
+                .where((v) => v.id == widget.visit!.id)
+                .firstOrNull
+                ?.toJson(),
+          );
+        }
+        if (addressId.isNotEmpty &&
+            !r.addressEntries.any((a) => a.id == addressId)) {
+          throw StateError('餐厅地址已变化，请重新选择分店');
+        }
         final edited = Visit(
           id: widget.visit?.id ?? newId(),
           date: date,
@@ -368,6 +460,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
         if (!didPop) leave();
       },
       child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
           title: Text(widget.visit == null ? '记录一次用餐' : '编辑用餐记录'),
           leading: IconButton(
@@ -381,7 +474,13 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
             Expanded(
               child: FilledButton(
                 onPressed: busy ? null : save,
-                child: Text(saving ? '保存中…' : '保存记录'),
+                child: Text(
+                  saving
+                      ? '保存中…'
+                      : widget.draftOnly
+                      ? '完成'
+                      : '保存记录',
+                ),
               ),
             ),
           ],
@@ -418,7 +517,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
               TextField(
                 controller: companions,
                 decoration: const InputDecoration(
-                  labelText: '同行人',
+                  labelText: '饭搭子',
                   hintText: '姓名用逗号分隔，独自用餐可留空',
                 ),
               ),
@@ -446,6 +545,18 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
                     ],
                   ),
                 ),
+              if (widget.draftOnly)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: addPhotoItems,
+                    icon: const MenuIcon(
+                      Icons.add_photo_alternate_outlined,
+                      size: 18,
+                    ),
+                    label: const Text('批量添加照片'),
+                  ),
+                ),
               SectionTitle(
                 '本次菜品 · ${items.length}',
                 trailing: TextButton.icon(
@@ -454,16 +565,25 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
                   label: const Text('添加菜品'),
                 ),
               ),
-              if (items.isEmpty) const Text('可先记录同行人和环境，也可以添加本次吃过的菜。'),
+              if (items.isEmpty) const Text('可先记录饭搭子和环境，也可以添加本次吃过的菜。'),
               for (var i = 0; i < items.length; i++)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(items[i].name),
+                  leading: widget.draftOnly && items[i].imagePaths.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: SizedBox.square(
+                            dimension: 48,
+                            child: LocalPhoto(path: items[i].imagePaths.first),
+                          ),
+                        )
+                      : null,
+                  title: Text(items[i].name.isEmpty ? '填写菜名' : items[i].name),
                   subtitle: Text(
                     '¥${money(items[i].price)} × ${items[i].quantity} 份 = ¥${money(items[i].cost)}',
                   ),
                   onTap: () => editItem(i),
-                  trailing: PopupMenuButton<String>(
+                  trailing: MenuPopupButton<String>(
                     icon: const MenuIcon(Icons.more_horiz),
                     tooltip: '本次菜品操作',
                     onSelected: (action) {
@@ -479,12 +599,29 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
                       }
                     },
                     itemBuilder: (_) => [
-                      const PopupMenuItem(value: 'edit', child: Text('编辑本次点单')),
+                      const MenuPopupItem(
+                        icon: Icons.edit_outlined,
+                        value: 'edit',
+                        child: Text('编辑本次点单'),
+                      ),
                       if (i > 0)
-                        const PopupMenuItem(value: 'up', child: Text('上移')),
+                        const MenuPopupItem(
+                          icon: Icons.arrow_upward,
+                          value: 'up',
+                          child: Text('上移'),
+                        ),
                       if (i < items.length - 1)
-                        const PopupMenuItem(value: 'down', child: Text('下移')),
-                      const PopupMenuItem(value: 'remove', child: Text('移除')),
+                        const MenuPopupItem(
+                          icon: Icons.arrow_downward,
+                          value: 'down',
+                          child: Text('下移'),
+                        ),
+                      const MenuPopupItem(
+                        icon: Icons.delete_outline,
+                        destructive: true,
+                        value: 'remove',
+                        child: Text('移除'),
+                      ),
                     ],
                   ),
                 ),

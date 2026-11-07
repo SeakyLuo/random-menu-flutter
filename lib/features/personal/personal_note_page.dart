@@ -54,13 +54,21 @@ class _PersonalNotePageState extends State<PersonalNotePage> {
     setState(() => _saving = true);
     final saved = await performAction(
       context,
-      () => MenuScope.of(context).update((d) => d.note = value),
+      () => MenuScope.of(
+        context,
+      ).update(MenuWriteScope.settings, (d) => d.note = value),
       success: '随手记已保存',
     );
-    if (mounted) {
+    if (!mounted) return;
+    if (saved) {
+      setState(() {
+        _baseline = value;
+        _leaving = true;
+      });
+      Navigator.pop(context);
+    } else {
       setState(() {
         _saving = false;
-        if (saved) _baseline = value;
       });
     }
   }

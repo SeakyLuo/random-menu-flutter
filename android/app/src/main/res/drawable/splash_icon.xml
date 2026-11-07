@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Keep the logo inside Android 12's circular splash-icon safe area. -->
+    <item android:width="288dp" android:height="288dp">
+        <shape><solid android:color="@android:color/transparent" /></shape>
+    </item>
+    <item
+        android:width="112dp"
+        android:height="112dp"
+        android:gravity="center"
+        android:drawable="@drawable/splash_logo" />
+</layer-list>

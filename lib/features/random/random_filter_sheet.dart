@@ -1,9 +1,10 @@
+import '../../ui/menu_popup.dart';
 import '../../ui/menu_bottom_sheet.dart';
 import 'dart:math' show min;
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../ui/menu_icon.dart';
-import '../../ui/menu_tag_colors.dart';
+import '../../ui/menu_tag.dart';
 
 enum _TagDestination { pool, preferred, excluded }
 
@@ -44,38 +45,11 @@ class _RandomFilterSheetState extends State<RandomFilterSheet> {
     null => Theme.of(context).colorScheme.onSurfaceVariant,
   };
 
-  Widget _tagFace(String tag, {bool removable = false}) {
-    final tagColors = MenuTagColors.of(context);
-    final color = tagColors.foreground;
-    return Container(
-      constraints: const BoxConstraints(minHeight: 32),
-      padding: EdgeInsets.fromLTRB(13, 4, removable ? 4 : 13, 4),
-      decoration: BoxDecoration(
-        color: tagColors.background,
-        border: Border.all(color: tagColors.border),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(tag, style: TextStyle(fontSize: 14, color: color)),
-          ),
-          if (removable)
-            SizedBox.square(
-              dimension: 24,
-              child: IconButton(
-                tooltip: '将$tag移回标签池',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onPressed: () => _move(tag, _TagDestination.pool),
-                icon: MenuIcon(Icons.close, size: 14, color: color),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+  Widget _tagFace(String tag, {bool removable = false}) => MenuTag(
+    tag,
+    removable: removable,
+    onRemove: () => _move(tag, _TagDestination.pool),
+  );
 
   Widget _tag(String tag) {
     final destination = _selection[tag];
@@ -102,23 +76,26 @@ class _RandomFilterSheetState extends State<RandomFilterSheet> {
           type: MaterialType.transparency,
           borderRadius: BorderRadius.circular(16),
           clipBehavior: Clip.antiAlias,
-          child: PopupMenuButton<_TagDestination>(
+          child: MenuPopupButton<_TagDestination>(
             borderRadius: BorderRadius.circular(16),
             tooltip: '移动$tag',
             onSelected: (target) => _move(tag, target),
             itemBuilder: (_) => [
               if (destination != _TagDestination.preferred)
-                const PopupMenuItem(
+                const MenuPopupItem(
+                  icon: Icons.favorite_border,
                   value: _TagDestination.preferred,
                   child: Text('想吃的'),
                 ),
               if (destination != _TagDestination.excluded)
-                const PopupMenuItem(
+                const MenuPopupItem(
+                  icon: Icons.block,
                   value: _TagDestination.excluded,
                   child: Text('这次不吃'),
                 ),
               if (destination != null)
-                const PopupMenuItem(
+                const MenuPopupItem(
+                  icon: Icons.label_outline,
                   value: _TagDestination.pool,
                   child: Text('移回标签池'),
                 ),

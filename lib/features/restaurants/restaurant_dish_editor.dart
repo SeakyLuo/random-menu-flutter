@@ -11,15 +11,19 @@ class RestaurantDishEditor extends StatefulWidget {
     super.key,
     required this.restaurantId,
     this.dish,
+    this.initialName,
   });
   final String restaurantId;
   final RestaurantDish? dish;
+  final String? initialName;
   @override
   State<RestaurantDishEditor> createState() => _RestaurantDishEditorState();
 }
 
 class _RestaurantDishEditorState extends State<RestaurantDishEditor> {
-  late final name = TextEditingController(text: widget.dish?.name ?? '');
+  late final name = TextEditingController(
+    text: widget.dish?.name ?? widget.initialName ?? '',
+  );
   late final price = TextEditingController(
     text: widget.dish == null || widget.dish!.price == 0
         ? ''
@@ -53,7 +57,7 @@ class _RestaurantDishEditorState extends State<RestaurantDishEditor> {
   }
 
   bool get dirty =>
-      name.text != (widget.dish?.name ?? '') ||
+      name.text != (widget.dish?.name ?? widget.initialName ?? '') ||
       price.text !=
           (widget.dish == null || widget.dish!.price == 0
               ? ''
@@ -114,7 +118,9 @@ class _RestaurantDishEditorState extends State<RestaurantDishEditor> {
               : await store.keepImage(path),
         ),
       );
-      await store.update((draft) {
+      await store.update(MenuWriteScope.restaurant(widget.restaurantId), (
+        draft,
+      ) {
         final r = draft.restaurants.firstWhere(
           (r) => r.id == widget.restaurantId,
         );
@@ -150,6 +156,7 @@ class _RestaurantDishEditorState extends State<RestaurantDishEditor> {
       if (!didPop) leave();
     },
     child: Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: Text(widget.dish == null ? '添加菜品' : '编辑菜品'),
         leading: IconButton(
@@ -184,7 +191,6 @@ class _RestaurantDishEditorState extends State<RestaurantDishEditor> {
               decoration: const InputDecoration(
                 labelText: '价格',
                 prefixText: '¥ ',
-                hintText: '选填',
               ),
             ),
             const SizedBox(height: 20),

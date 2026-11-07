@@ -35,11 +35,6 @@ LegacyImportResult parseLegacyArchive(Archive archive) {
   final reader = _LegacyMenu(files);
   final data = current ? reader.current(raw) : reader.early(raw);
   data.legacyImagePaths = files.imagePaths;
-  data.legacyMetadata = {
-    'format': current ? 'android-room-export' : 'android-early-settings',
-    'source': reader.originals,
-    'imageNames': files.imageNames,
-  };
   final recordCount = data.restaurants.fold(
     0,
     (count, restaurant) => count + restaurant.records.length,

@@ -1,15 +1,19 @@
-import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'models.dart';
+import 'menu_database.dart';
+import 'menu_write_scope.dart';
+export 'menu_write_scope.dart';
+import 'menu_sql_statement.dart';
+import 'photo_storage.dart';
 
 class MenuStore extends ChangeNotifier {
-  MenuStore._(this.directory, this._data, this._snapshot);
+  MenuStore._(this.directory, this._database, this._data, this.photos);
+  final PhotoStorage photos;
+  final MenuDatabase _database;
   final Directory directory;
   MenuData _data;
-  String _snapshot;
   MenuData get data => _data;
   Future<void> _pending = Future.value();
 
@@ -17,37 +21,43 @@ class MenuStore extends ChangeNotifier {
     final root = await getApplicationSupportDirectory();
     final directory = Directory('${root.path}/random_menu');
     await directory.create(recursive: true);
-    final file = File('${directory.path}/menu.json');
-    final snapshot = await file.exists()
-        ? await file.readAsString()
-        : jsonEncode(MenuData().toJson());
-    final data = MenuData.fromJson(
-      jsonDecode(snapshot) as Map<String, dynamic>,
-    );
-    return MenuStore._(directory, data, snapshot);
+    final database = await MenuDatabase.open(directory);
+    final data = await database.read();
+    final photos = await PhotoStorage.open(directory);
+    return MenuStore._(directory, database, data, photos);
   }
 
-  // Serialize edits and publish only after the complete snapshot is on disk.
-  Future<void> update(
-    void Function(MenuData draft) edit, {
-    Future<void>? publishAfter,
-  }) {
+  Future<void> reload({MenuWriteScope scope = MenuWriteScope.all}) {
     final result = _pending.then((_) async {
-      final draft = await _copyMenu(_snapshot);
-      edit(draft);
-      final temporary = File('${directory.path}/menu.json.tmp');
-      final snapshot = await _prepareMenu(draft, temporary.path);
-      if (publishAfter != null) await publishAfter;
-      await temporary.rename('${directory.path}/menu.json');
-      _data = draft;
-      _snapshot = snapshot;
+      final data = await _database.read(scope: scope, current: _data);
+      _data = data;
       notifyListeners();
     });
     _pending = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     return result;
   }
 
-  Future<void> replace(MenuData source) => update((draft) {
+  // Serialize edits and publish only after the complete snapshot is on disk.
+  Future<void> update(
+    MenuWriteScope scope,
+    void Function(MenuData draft) edit, {
+    Future<void>? publishAfter,
+  }) {
+    final result = _pending.then((_) async {
+      final draft = await _database.edit(_data, scope, edit);
+      if (publishAfter != null) await publishAfter;
+      _data = draft;
+      notifyListeners();
+    });
+    _pending = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return result;
+  }
+
+  Future<void> replace(MenuData source) => update(MenuWriteScope.all, (draft) {
+    draft.recipePositions = {};
+    draft.restaurantPositions = {};
+    draft.recipeTagIds = {};
+    draft.restaurantCategoryIds = {};
     draft.recipes = source.recipes;
     draft.restaurants = source.restaurants;
     draft.toCook = source.toCook;
@@ -62,33 +72,45 @@ class MenuStore extends ChangeNotifier {
     draft.recipeDraftSourceId = source.recipeDraftSourceId;
     draft.legacyImagePaths = source.legacyImagePaths;
     draft.recipeTags = source.recipeTags;
+    draft.restaurantCategories = source.restaurantCategories;
     draft.recipeSearchHistory = source.recipeSearchHistory;
     draft.restaurantSearchHistory = source.restaurantSearchHistory;
     draft.recipeTagSort = source.recipeTagSort;
     draft.patternTagRules = source.patternTagRules;
-    draft.legacyMetadata = source.legacyMetadata;
   });
 
+  Future<Map<String, Object?>> inspectSqlDatabase() =>
+      _scheduleSql(_database.inspectSql);
+
+  Future<Map<String, Object?>> querySql(
+    MenuSqlStatement statement,
+    List<Object?> parameters,
+    int limit,
+    int offset,
+  ) => _scheduleSql(
+    () => _database.querySql(statement, parameters, limit, offset),
+  );
+
+  Future<Map<String, Object?>> executeSql(
+    List<({MenuSqlStatement statement, List<Object?> parameters})> statements,
+  ) => _scheduleSql(() async {
+    final saved = await _database.executeSql(statements);
+    _data = saved.data;
+    notifyListeners();
+    return saved.result;
+  });
+
+  Future<T> _scheduleSql<T>(Future<T> Function() action) {
+    final result = _pending.then((_) => action());
+    // Continue the queue; the original future still delivers errors to MCP.
+    _pending = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return result;
+  }
+
   Future<String> keepImage(String source) async {
-    final images = Directory('${directory.path}/images');
-    await images.create(recursive: true);
-    final extension = source.split('.').last.toLowerCase();
-    final destination = '${images.path}/${newId()}.$extension';
-    await File(source).copy(destination);
-    return destination;
+    return photos.keep(source);
   }
 }
-
-Future<MenuData> _copyMenu(String snapshot) => Isolate.run(
-  () => MenuData.fromJson(jsonDecode(snapshot) as Map<String, dynamic>),
-);
-
-Future<String> _prepareMenu(MenuData data, String path) =>
-    Isolate.run(() async {
-      final snapshot = jsonEncode(data.toJson());
-      await File(path).writeAsString(snapshot, flush: true);
-      return snapshot;
-    });
 
 class MenuScope extends InheritedNotifier<MenuStore> {
   const MenuScope({super.key, required MenuStore store, required super.child})

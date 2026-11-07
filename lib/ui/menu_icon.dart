@@ -35,6 +35,8 @@ class MenuIcon extends StatelessWidget {
 
 enum _Glyph {
   random,
+  dice,
+  cutlery,
   reset,
   circle,
   funnel,
@@ -54,6 +56,7 @@ enum _Glyph {
   brokenPhoto,
   back,
   next,
+  chevronDown,
   close,
   check,
   checkCircle,
@@ -86,13 +89,13 @@ enum _Glyph {
   minusCircle,
   tag,
   hourglass,
+  merge,
+  split,
 }
 
 _Glyph _glyphFor(IconData icon) => switch (icon) {
-  Icons.casino ||
-  Icons.casino_outlined ||
-  Icons.shuffle ||
-  Icons.shuffle_rounded => _Glyph.random,
+  Icons.casino || Icons.casino_outlined => _Glyph.dice,
+  Icons.shuffle || Icons.shuffle_rounded => _Glyph.random,
   Icons.radio_button_unchecked => _Glyph.circle,
   Icons.restart_alt => _Glyph.reset,
   Icons.format_list_bulleted => _Glyph.list,
@@ -108,8 +111,8 @@ _Glyph _glyphFor(IconData icon) => switch (icon) {
   Icons.soup_kitchen_outlined ||
   Icons.restaurant_menu ||
   Icons.restaurant_outlined ||
-  Icons.restaurant_rounded ||
-  Icons.restaurant => _Glyph.bowl,
+  Icons.restaurant_rounded => _Glyph.bowl,
+  Icons.restaurant => _Glyph.cutlery,
   Icons.receipt_long_outlined ||
   Icons.list_alt ||
   Icons.list_alt_outlined => _Glyph.menu,
@@ -134,6 +137,7 @@ _Glyph _glyphFor(IconData icon) => switch (icon) {
   Icons.skip_next_rounded ||
   Icons.arrow_forward ||
   Icons.arrow_forward_rounded => _Glyph.next,
+  Icons.expand_more => _Glyph.chevronDown,
   Icons.close || Icons.close_rounded => _Glyph.close,
   Icons.check || Icons.done => _Glyph.check,
   Icons.check_circle_outline_rounded ||
@@ -198,6 +202,8 @@ _Glyph _glyphFor(IconData icon) => switch (icon) {
   Icons.remove_circle_outline => _Glyph.minusCircle,
   Icons.label_outline => _Glyph.tag,
   Icons.hourglass_top => _Glyph.hourglass,
+  Icons.call_merge => _Glyph.merge,
+  Icons.call_split => _Glyph.split,
   _ => throw ArgumentError('Missing MenuIcon drawing for ${icon.codePoint}'),
 };
 
@@ -226,6 +232,26 @@ class _MenuIconPainter extends CustomPainter {
           pen,
         );
     switch (glyph) {
+      case _Glyph.dice:
+        box(4, 4, 16, 16, 3.5);
+        final dot = Paint()..color = color;
+        for (final position in [8.0, 12.0, 16.0]) {
+          canvas.drawCircle(Offset(position, position), 1.1, dot);
+        }
+      case _Glyph.cutlery:
+        path(
+          Path()
+            ..moveTo(3.5, 3.5)
+            ..lineTo(3.5, 8)
+            ..cubicTo(3.5, 12, 9.5, 12, 9.5, 8)
+            ..lineTo(9.5, 3.5)
+            ..moveTo(6.5, 3.5)
+            ..lineTo(6.5, 20.5)
+            ..moveTo(19.5, 20.5)
+            ..lineTo(19.5, 3.5)
+            ..cubicTo(16, 5, 14.5, 8.5, 14.5, 12.5)
+            ..lineTo(19.5, 12.5),
+        );
       case _Glyph.random:
         path(
           Path()
@@ -403,6 +429,13 @@ class _MenuIconPainter extends CustomPainter {
             ..moveTo(9, 5)
             ..lineTo(16, 12)
             ..lineTo(9, 19),
+        );
+      case _Glyph.chevronDown:
+        path(
+          Path()
+            ..moveTo(6, 9)
+            ..lineTo(12, 15)
+            ..lineTo(18, 9),
         );
       case _Glyph.close:
         line(6, 6, 18, 18);
@@ -675,6 +708,37 @@ class _MenuIconPainter extends CustomPainter {
             ..lineTo(12, 12)
             ..lineTo(5, 6)
             ..close(),
+        );
+      case _Glyph.merge:
+        path(
+          Path()
+            ..moveTo(5, 20)
+            ..lineTo(5, 16)
+            ..quadraticBezierTo(5, 12, 12, 10)
+            ..moveTo(19, 20)
+            ..lineTo(19, 16)
+            ..quadraticBezierTo(19, 12, 12, 10)
+            ..lineTo(12, 4)
+            ..moveTo(8, 8)
+            ..lineTo(12, 4)
+            ..lineTo(16, 8),
+        );
+      case _Glyph.split:
+        path(
+          Path()
+            ..moveTo(12, 20)
+            ..lineTo(12, 16)
+            ..quadraticBezierTo(12, 12, 5, 10)
+            ..lineTo(5, 4)
+            ..moveTo(12, 16)
+            ..quadraticBezierTo(12, 12, 19, 10)
+            ..lineTo(19, 4)
+            ..moveTo(2, 7)
+            ..lineTo(5, 4)
+            ..lineTo(8, 7)
+            ..moveTo(16, 7)
+            ..lineTo(19, 4)
+            ..lineTo(22, 7),
         );
       case _Glyph.arrowUp:
       case _Glyph.arrowDown:

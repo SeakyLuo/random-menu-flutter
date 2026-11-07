@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/menu_store.dart';
 import '../../ui/widgets.dart';
 import 'photo_viewer.dart';
+import 'photo_edit_actions.dart';
 export 'photo_crop_page.dart' show cropPhoto;
 export 'photo_widget.dart' show LocalPhoto;
 
@@ -17,19 +17,15 @@ Future<List<String>> choosePhotos(
   final store = MenuScope.of(context);
   var paths = <String>[];
   await performAction(context, () async {
-    final picker = ImagePicker();
-    final List<XFile> selected;
-    if (camera || single) {
-      final photo = await picker.pickImage(
-        source: camera ? ImageSource.camera : ImageSource.gallery,
-      );
-      selected = photo == null ? [] : [photo];
-    } else {
-      selected = await picker.pickMultiImage();
+    final selected = await store.photos.pick(camera: camera, single: single);
+    final kept = <String>[];
+    for (final path in selected) {
+      kept.add(await store.keepImage(path));
     }
-    paths = await Future.wait(
-      selected.map((photo) => store.keepImage(photo.path)),
-    );
+    for (final path in selected) {
+      await store.photos.releaseSelection(path);
+    }
+    paths = kept;
   });
   return paths;
 }
@@ -39,14 +35,28 @@ Future<void> showPhotoViewer(
   List<String> paths,
   int initial, {
   String? title,
-  ValueChanged<int>? onPageChanged,
+  List<PhotoCaption>? captions,
+  ValueChanged<int>? onReturnIndex,
+  Object? Function(int)? heroTagForIndex,
+  PhotoEditCallback? onEdit,
 }) => Navigator.of(context).push<void>(
-  MaterialPageRoute(
-    builder: (_) => PhotoViewer(
+  PageRouteBuilder<void>(
+    transitionDuration: Duration(
+      milliseconds: MediaQuery.disableAnimationsOf(context) ? 0 : 280,
+    ),
+    reverseTransitionDuration: Duration(
+      milliseconds: MediaQuery.disableAnimationsOf(context) ? 0 : 220,
+    ),
+    transitionsBuilder: (_, animation, _, child) =>
+        FadeTransition(opacity: animation, child: child),
+    pageBuilder: (_, _, _) => PhotoViewer(
       paths: [...paths],
       initial: initial,
       title: title,
-      onPageChanged: onPageChanged,
+      captions: captions,
+      onReturnIndex: onReturnIndex,
+      heroTagForIndex: heroTagForIndex,
+      onEdit: onEdit,
     ),
   ),
 );
@@ -66,6 +76,18 @@ Future<void> savePhoto(BuildContext context, String path) async {
     if (context.mounted) showToast(context, '照片已保存');
   });
 }
+
+Future<void> showOriginalPhoto(BuildContext context, String path) =>
+    performAction(context, () async {
+      final original = await MenuScope.of(context).photos.original(path);
+      try {
+        if (context.mounted) {
+          await showPhotoViewer(context, [original], 0, title: '原图');
+        }
+      } finally {
+        await File(original).delete();
+      }
+    });
 
 Future<void> sharePhoto(
   BuildContext context,

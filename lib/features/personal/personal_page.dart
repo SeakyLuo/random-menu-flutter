@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../ui/menu_icon.dart';
+import '../../ui/menu_settings_section.dart';
 import '../../ui/widgets.dart';
 import '../backup/backup_page.dart';
+import '../mcp/menu_mcp_page.dart';
 import 'appearance_page.dart';
 import 'personal_collections.dart';
 import 'personal_note_page.dart';
@@ -21,7 +23,7 @@ class PersonalPage extends StatelessWidget {
       child: ListView(
         padding: EdgeInsets.fromLTRB(
           16,
-          16,
+          8,
           16,
           100 + MediaQuery.viewPaddingOf(context).bottom,
         ),
@@ -79,6 +81,13 @@ class PersonalPage extends StatelessWidget {
           _group(context, '偏好设置', [
             _entry(
               context,
+              Icons.link,
+              'MCP 连接',
+              detail: '让AI管理菜谱、餐厅和探店记录',
+              onTap: () => _open(context, const MenuMcpPage()),
+            ),
+            _entry(
+              context,
               Icons.palette_outlined,
               '外观',
               value: switch (data.themeMode) {
@@ -113,42 +122,7 @@ class PersonalPage extends StatelessWidget {
   }
 
   Widget _group(BuildContext context, String title, List<Widget> entries) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: 26),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            Material(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  for (var i = 0; i < entries.length; i++) ...[
-                    if (i > 0)
-                      const Padding(
-                        padding: EdgeInsets.only(left: 58),
-                        child: Divider(),
-                      ),
-                    entries[i],
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
+      MenuSettingsSection(title: title, children: entries);
   Widget _entry(
     BuildContext context,
     IconData icon,

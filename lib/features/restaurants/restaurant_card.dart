@@ -2,20 +2,29 @@ import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../core/menu_store.dart';
 import '../../ui/favorite_glass_button.dart';
-import '../../ui/library_widgets.dart';
 import '../../ui/glass_surface.dart';
 import '../../ui/menu_icon.dart';
 import '../../ui/widgets.dart';
-import '../media/photo_viewer.dart';
 import '../media/photo_widget.dart';
 import 'restaurant_detail_page.dart';
-import 'restaurant_editor.dart';
 import 'restaurant_gallery_data.dart';
 import 'restaurant_photo_deck.dart';
+import 'restaurant_distance.dart';
 
 class RestaurantCard extends StatefulWidget {
-  const RestaurantCard({super.key, required this.restaurant});
+  const RestaurantCard({
+    super.key,
+    required this.restaurant,
+    this.distance,
+    this.showDistance = false,
+    this.onOpen,
+    this.titleBuilder,
+  });
+  final RestaurantDistance? distance;
+  final bool showDistance;
   final Restaurant restaurant;
+  final VoidCallback? onOpen;
+  final InlineSpan Function(bool hasPhoto)? titleBuilder;
   @override
   State<RestaurantCard> createState() => _RestaurantCardState();
 }
@@ -69,6 +78,7 @@ class _RestaurantCardState extends State<RestaurantCard> {
     await performAction(
       context,
       () => MenuScope.of(context).update(
+        MenuWriteScope.restaurant(widget.restaurant.id),
         (data) =>
             data.restaurants
                     .firstWhere((r) => r.id == widget.restaurant.id)
@@ -80,23 +90,16 @@ class _RestaurantCardState extends State<RestaurantCard> {
     if (mounted) setState(() => _savingFavorite = false);
   }
 
-  void _open() => showMenuDetail<void>(
-    context,
-    RestaurantDetailPage(restaurantId: widget.restaurant.id),
-  );
-  Future<void> _gallery() async {
-    await Navigator.push<void>(
+  void _open() {
+    if (widget.onOpen case final onOpen?) {
+      onOpen();
+      return;
+    }
+    Navigator.push<void>(
       context,
-      MaterialPageRoute(
-        builder: (_) => PhotoViewer(
-          paths: _photos.map((p) => p.path).toList(),
-          initial: _index,
-          title: widget.restaurant.name,
-          captions: _photos
-              .map((photo) => PhotoCaption(name: photo.name, note: photo.note))
-              .toList(),
-          onPageChanged: _select,
-        ),
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            RestaurantDetailPage(restaurantId: widget.restaurant.id),
       ),
     );
   }
@@ -109,7 +112,7 @@ class _RestaurantCardState extends State<RestaurantCard> {
         ? r.addresses.length
         : r.addressEntries.length;
     return GestureDetector(
-      onLongPress: () => editRestaurant(context, restaurant: r),
+      onTap: _open,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -127,7 +130,7 @@ class _RestaurantCardState extends State<RestaurantCard> {
                   itemCount: _photos.length,
                   index: _index,
                   onChanged: _select,
-                  onTap: _gallery,
+                  onTap: _open,
                   itemBuilder: (context, index) => _cover(context, index),
                 ),
               if (r.favorite)
@@ -143,30 +146,62 @@ class _RestaurantCardState extends State<RestaurantCard> {
           ),
           InkWell(
             onTap: _open,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(3, 7, 3, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${restaurantDisplayAddress(r)}${count > 1 ? ' 等 $count 家' : ''}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13),
+            borderRadius: BorderRadius.circular(8),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 32),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(3, 5, 3, 5),
+                child: Row(
+                  children: [
+                    MenuIcon(
+                      Icons.location_on_outlined,
+                      size: 15,
+                      color: scheme.onSurfaceVariant,
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    r.averageCost > 0 ? '人均 ¥${money(r.averageCost)}' : '未记录人均',
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                  const SizedBox(width: 8),
-                  MenuIcon(
-                    Icons.chevron_right,
-                    size: 16,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ],
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        '${widget.showDistance ? '${widget.distance?.label ?? '位置待补充'} · ' : ''}${restaurantDisplayAddress(r, address: widget.distance?.address)}${count > 1 ? ' 等 $count 家' : ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    if (r.averageCost > 0)
+                      Text.rich(
+                        TextSpan(
+                          text: '¥${money(r.averageCost)}',
+                          children: [
+                            TextSpan(
+                              text: ' /人',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w400,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: scheme.onSurface,
+                        ),
+                      )
+                    else
+                      Text(
+                        '未记录人均',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -287,8 +322,9 @@ class _RestaurantCardState extends State<RestaurantCard> {
             right: _photos.isEmpty ? 65 : 16,
             bottom: 17,
             child: IgnorePointer(
-              child: Text(
-                r.name,
+              child: Text.rich(
+                widget.titleBuilder?.call(_photos.isNotEmpty) ??
+                    TextSpan(text: r.name),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

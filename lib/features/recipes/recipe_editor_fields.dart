@@ -1,36 +1,11 @@
-import '../../ui/menu_bottom_sheet.dart';
-import 'dart:io';
+import '../../ui/menu_field_label.dart';
+export '../../ui/menu_field_label.dart';
 import 'package:flutter/material.dart';
 import '../../ui/menu_icon.dart';
 import 'recipe_photos.dart';
-
-class RecipeFieldLabel extends StatelessWidget {
-  const RecipeFieldLabel(this.text, {super.key, this.hint});
-  final String text;
-  final String? hint;
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(
-            text: text,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-          ),
-          if (hint != null)
-            TextSpan(
-              text: '   $hint',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-        ],
-      ),
-    ),
-  );
-}
+import '../../core/menu_store.dart';
+import '../media/media_actions.dart' show showOriginalPhoto;
+import '../media/photo_edit_actions.dart';
 
 class RecipePhotoFields extends StatelessWidget {
   const RecipePhotoFields({
@@ -39,74 +14,34 @@ class RecipePhotoFields extends StatelessWidget {
     required this.busy,
     required this.onPick,
     required this.onAction,
+    required this.onOpen,
   });
   final List<String> paths;
   final bool busy;
   final ValueChanged<bool> onPick;
-  final void Function(int, String) onAction;
+  final Future<void> Function(int, String) onAction;
+  final ValueChanged<int> onOpen;
 
-  Future<void> _choose(BuildContext context, {bool replace = false}) async {
-    if (Platform.isAndroid || Platform.isIOS) {
-      final camera = await showMenuBottomSheet<bool>(
-        context: context,
-        showDragHandle: true,
-        builder: (context) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const MenuIcon(Icons.photo_library_outlined),
-                title: const Text('从相册选择'),
-                onTap: () => Navigator.pop(context, false),
-              ),
-              ListTile(
-                leading: const MenuIcon(Icons.camera_alt_outlined),
-                title: const Text('拍照'),
-                onTap: () => Navigator.pop(context, true),
-              ),
-            ],
-          ),
-        ),
-      );
-      if (camera == null) return;
-      if (replace) {
-        onAction(0, camera ? 'replaceCamera' : 'replace');
-      } else {
-        onPick(camera);
-      }
-    } else if (replace) {
-      onAction(0, 'replace');
-    } else {
-      onPick(false);
-    }
+  Future<void> _choose(BuildContext context) async {
+    final camera = await choosePhotoSource(context);
+    if (camera != null) onPick(camera);
   }
 
   Future<void> _manage(BuildContext context, int index) async {
-    final action = await showMenuBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (index > 0)
-              ListTile(
-                title: const Text('设为封面'),
-                onTap: () => Navigator.pop(context, 'cover'),
-              ),
-            ListTile(
-              title: const Text('裁剪照片'),
-              onTap: () => Navigator.pop(context, 'crop'),
-            ),
-            ListTile(
-              title: const Text('移除照片'),
-              onTap: () => Navigator.pop(context, 'remove'),
-            ),
-          ],
-        ),
-      ),
+    final path = paths[index];
+    final hasOriginal = await MenuScope.of(context).photos.hasOriginal(path);
+    if (!context.mounted) return;
+    final action = await showPhotoEditMenu(
+      context,
+      isCover: index == 0,
+      hasOriginal: hasOriginal,
     );
-    if (action != null) onAction(index, action);
+    if (action == null || !context.mounted) return;
+    if (action == 'original') {
+      await showOriginalPhoto(context, path);
+    } else {
+      await onAction(index, action);
+    }
   }
 
   @override
@@ -115,117 +50,28 @@ class RecipePhotoFields extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const RecipeFieldLabel('照片', hint: '可选'),
-        if (paths.isEmpty)
-          Material(
-            color: scheme.primary.withValues(alpha: .08),
-            borderRadius: BorderRadius.circular(11),
-            child: InkWell(
-              onTap: busy ? null : () => _choose(context),
-              borderRadius: BorderRadius.circular(11),
-              child: Container(
-                height: 110,
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: scheme.primary.withValues(alpha: .25),
-                  ),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    MenuIcon(
-                      Icons.add_photo_alternate_outlined,
-                      size: 29,
-                      color: scheme.primary,
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      '添加菜品照片',
-                      style: TextStyle(fontSize: 14, color: scheme.primary),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          )
-        else ...[
-          ClipRRect(
-            borderRadius: BorderRadius.circular(11),
-            child: SizedBox(
-              height: 160,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  GestureDetector(
-                    onTap: () => showRecipePhotos(context, paths, 0),
-                    onLongPress: busy ? null : () => _manage(context, 0),
-                    child: RecipePhoto(path: paths.first),
-                  ),
-                  Positioned(
-                    left: 10,
-                    top: 10,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: const Color(0xc914251b),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        child: Text(
-                          '封面',
-                          style: TextStyle(fontSize: 11, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 10,
-                    bottom: 10,
-                    child: TextButton.icon(
-                      onPressed: busy
-                          ? null
-                          : () => _choose(context, replace: true),
-                      style: TextButton.styleFrom(
-                        backgroundColor: const Color(0xdfffffff),
-                        foregroundColor: const Color(0xff111720),
-                        minimumSize: const Size(64, 36),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                      ),
-                      icon: const MenuIcon(
-                        Icons.add_photo_alternate_outlined,
-                        size: 17,
-                      ),
-                      label: const Text('更换'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 9,
-            runSpacing: 9,
-            children: [
-              for (var i = 0; i < paths.length; i++)
-                SizedBox.square(
-                  dimension: 58,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(9),
+        const MenuFieldLabel('照片'),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final size = (constraints.maxWidth - 16) / 3;
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (var i = 0; i < paths.length; i++)
+                  SizedBox.square(
+                    dimension: size,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
                           child: Semantics(
-                            label: '菜品照片 ${i + 1}，长按管理照片',
+                            label:
+                                '照片 ${i + 1}${i == 0 ? '，封面' : ''}，点击预览，长按管理',
                             button: true,
                             child: GestureDetector(
-                              onTap: () => showRecipePhotos(context, paths, i),
+                              onTap: busy ? null : () => onOpen(i),
                               onLongPress: busy
                                   ? null
                                   : () => _manage(context, i),
@@ -233,53 +79,83 @@ class RecipePhotoFields extends StatelessWidget {
                             ),
                           ),
                         ),
-                      ),
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: SizedBox.square(
-                          dimension: 32,
-                          child: IconButton(
-                            tooltip: '移除照片 ${i + 1}',
-                            padding: EdgeInsets.zero,
-                            onPressed: busy
-                                ? null
-                                : () => onAction(i, 'remove'),
-                            icon: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Color(0xdfffffff),
-                                shape: BoxShape.circle,
+                        if (i == 0)
+                          Positioned(
+                            left: 6,
+                            top: 6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
                               ),
-                              child: const MenuIcon(
-                                Icons.delete_outline,
-                                size: 15,
-                                color: Color(0xff111720),
+                              decoration: BoxDecoration(
+                                color: const Color(0xc914251b),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                '封面',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: SizedBox.square(
+                            dimension: 36,
+                            child: IconButton(
+                              tooltip: '移除照片 ${i + 1}',
+                              padding: EdgeInsets.zero,
+                              onPressed: busy
+                                  ? null
+                                  : () => onAction(i, 'remove'),
+                              icon: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: scheme.surface.withValues(alpha: .94),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: MenuIcon(
+                                  Icons.close,
+                                  size: 15,
+                                  color: scheme.onSurface,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              SizedBox.square(
-                dimension: 58,
-                child: OutlinedButton(
-                  onPressed: busy ? null : () => _choose(context),
-                  style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    backgroundColor: scheme.surfaceContainerLow,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9),
+                      ],
                     ),
                   ),
-                  child: const MenuIcon(Icons.add, size: 24),
+                SizedBox.square(
+                  dimension: size,
+                  child: TextButton(
+                    onPressed: busy ? null : () => _choose(context),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      backgroundColor: scheme.onSurface.withValues(alpha: .04),
+                      foregroundColor: scheme.onSurfaceVariant,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        MenuIcon(Icons.add_photo_alternate_outlined, size: 24),
+                        SizedBox(height: 8),
+                        Text('添加照片', style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            );
+          },
+        ),
       ],
     );
   }

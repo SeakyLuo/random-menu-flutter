@@ -12,6 +12,32 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+    let photos = FlutterMethodChannel(name: "com.seakyluo.random_menu/photo_library", binaryMessenger: flutterViewController.engine.binaryMessenger)
+    photos.setMethodCallHandler { call, result in
+      let arguments = call.arguments as! [String: String]
+      do {
+        switch call.method {
+        case "retainFile":
+          let url = URL(fileURLWithPath: arguments["path"]!)
+          let bookmark = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+          result(bookmark.base64EncodedString())
+        case "original":
+          var stale = false
+          let url = try URL(resolvingBookmarkData: Data(base64Encoded: arguments["source"]!)!, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
+          guard url.startAccessingSecurityScopedResource() else {
+            result(FlutterError(code: "original_unavailable", message: "原图已移除或没有文件访问权限", details: nil))
+            return
+          }
+          defer { url.stopAccessingSecurityScopedResource() }
+          let destination = FileManager.default.temporaryDirectory.appendingPathComponent("original_\(UUID().uuidString).\(url.pathExtension)")
+          try FileManager.default.copyItem(at: url, to: destination)
+          result(destination.path)
+        default: result(FlutterMethodNotImplemented)
+        }
+      } catch {
+        result(FlutterError(code: "photo_library", message: error.localizedDescription, details: nil))
+      }
+    }
     let tags = FlutterMethodChannel(name: "com.seakyluo.random_menu/tag_patterns", binaryMessenger: flutterViewController.engine.binaryMessenger)
     tags.setMethodCallHandler { call, result in handleTagPatterns(call, result: result) }
     let channel = FlutterMethodChannel(name: "com.seakyluo.random_menu/photo_location", binaryMessenger: flutterViewController.engine.binaryMessenger)

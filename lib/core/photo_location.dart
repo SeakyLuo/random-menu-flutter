@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'models.dart';
+import 'geo_point.dart';
 
 const _locationChannel = MethodChannel(
   'com.seakyluo.random_menu/photo_location',
@@ -17,6 +18,7 @@ Future<RestaurantAddress?> resolvePhotoAddress(
   if (address == null) return null;
   return RestaurantAddress(
     id: newId(),
+    location: GeoPoint(latitude: latitude, longitude: longitude),
     province: address['province'] as String,
     city: address['city'] as String,
     county: address['county'] as String,

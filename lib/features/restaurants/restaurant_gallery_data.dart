@@ -98,9 +98,12 @@ String localAddressText(String value) => value.replaceFirst(
   RegExp(r'^(?:[一-鿿]{2,}?(?:省|自治区|特别行政区)\s*)?(?:[一-鿿]{2,}?市\s*)?'),
   '',
 );
-String restaurantDisplayAddress(Restaurant restaurant) {
-  if (restaurant.addressEntries.isNotEmpty) {
-    final a = restaurant.addressEntries.first;
+String restaurantDisplayAddress(
+  Restaurant restaurant, {
+  RestaurantAddress? address,
+}) {
+  if (address != null || restaurant.addressEntries.isNotEmpty) {
+    final a = address ?? restaurant.addressEntries.first;
     return [
       a.county,
       a.detail,

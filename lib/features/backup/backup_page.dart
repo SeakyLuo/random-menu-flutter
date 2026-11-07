@@ -87,7 +87,7 @@ class _BackupPageState extends State<BackupPage> {
     child: Scaffold(
       appBar: AppBar(titleSpacing: 0, title: const Text('资料导入与备份')),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
         children: [
           const Text(
             '导入菜谱、餐厅、用餐记录和照片，或导出一份完整备份。',

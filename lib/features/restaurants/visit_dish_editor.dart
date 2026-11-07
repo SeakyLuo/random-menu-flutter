@@ -40,6 +40,7 @@ class _PickDishPage extends StatelessWidget {
       ),
     );
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: const Text('选择菜品'),
         actions: [
@@ -186,6 +187,7 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
         if (!didPop) leave();
       },
       child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
           title: const Text('本次点单'),
           leading: IconButton(

@@ -81,7 +81,7 @@ class RestaurantVisitCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
-              '同行 · ${visit.companions.join('、')}',
+              '饭搭子 · ${visit.companions.join('、')}',
               style: TextStyle(
                 fontSize: 13,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -122,8 +122,13 @@ class RestaurantVisitCard extends StatelessWidget {
                               food.imagePaths,
                               0,
                               title: food.name,
+                              heroTagForIndex: (i) =>
+                                  i == 0 ? (context, food) : null,
                             ),
-                            child: LocalPhoto(path: food.imagePaths.first),
+                            child: Hero(
+                              tag: (context, food),
+                              child: LocalPhoto(path: food.imagePaths.first),
+                            ),
                           ),
                   ),
                 ),
@@ -155,6 +160,8 @@ class RestaurantVisitCard extends StatelessWidget {
                             food.imagePaths,
                             0,
                             title: food.name,
+                            heroTagForIndex: (i) =>
+                                i == 0 ? (context, food) : null,
                           ),
                           child: Text('查看 ${food.imagePaths.length} 张照片'),
                         ),
@@ -195,8 +202,12 @@ class RestaurantVisitCard extends StatelessWidget {
                       visit.imagePaths,
                       index,
                       title: '用餐环境',
+                      heroTagForIndex: (i) => (context, 'environment', i),
                     ),
-                    child: LocalPhoto(path: visit.imagePaths[index]),
+                    child: Hero(
+                      tag: (context, 'environment', index),
+                      child: LocalPhoto(path: visit.imagePaths[index]),
+                    ),
                   ),
                 ),
               ),

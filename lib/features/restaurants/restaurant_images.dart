@@ -1,3 +1,4 @@
+import '../../ui/menu_popup.dart';
 import '../../ui/menu_icon.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -97,13 +98,19 @@ class _RestaurantImagesState extends State<RestaurantImages> {
                             widget.paths,
                             i,
                             title: '照片',
+                            heroTagForIndex: (index) => (this, index),
                           ),
-                    child: Image.file(
-                      File(widget.paths[i]),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, error, stack) => const ColoredBox(
-                        color: Color(0xffe5ebe5),
-                        child: MenuIcon(Icons.broken_image_outlined),
+                    child: Hero(
+                      tag: (this, i),
+                      child: Image.file(
+                        File(widget.paths[i]),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, error, stack) => ColoredBox(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHigh,
+                          child: const MenuIcon(Icons.broken_image_outlined),
+                        ),
                       ),
                     ),
                   ),
@@ -137,38 +144,56 @@ class _RestaurantImagesState extends State<RestaurantImages> {
                 Positioned(
                   right: 0,
                   top: 0,
-                  child: PopupMenuButton<String>(
+                  child: MenuPopupButton<String>(
                     enabled: !busy,
                     tooltip: '照片操作',
-                    icon: const DecoratedBox(
+                    icon: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: Color(0xb3ffffff),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surface.withValues(alpha: .94),
                         shape: BoxShape.circle,
                       ),
                       child: Padding(
-                        padding: EdgeInsets.all(4),
+                        padding: const EdgeInsets.all(4),
                         child: MenuIcon(
                           Icons.more_horiz,
-                          color: Color(0xff20372c),
+                          color: Theme.of(context).colorScheme.onSurface
+                              .withValues(alpha: busy ? .38 : 1),
                         ),
                       ),
                     ),
                     onSelected: (value) => edit(i, value),
                     itemBuilder: (_) => [
                       if (widget.cover && i > 0)
-                        const PopupMenuItem(
+                        const MenuPopupItem(
+                          icon: Icons.image_outlined,
                           value: 'cover',
                           child: Text('设为封面'),
                         ),
                       if (i > 0)
-                        const PopupMenuItem(
+                        const MenuPopupItem(
+                          icon: Icons.arrow_upward,
                           value: 'previous',
                           child: Text('向前移动'),
                         ),
                       if (i < widget.paths.length - 1)
-                        const PopupMenuItem(value: 'next', child: Text('向后移动')),
-                      const PopupMenuItem(value: 'crop', child: Text('裁剪照片')),
-                      const PopupMenuItem(value: 'remove', child: Text('移除照片')),
+                        const MenuPopupItem(
+                          icon: Icons.arrow_downward,
+                          value: 'next',
+                          child: Text('向后移动'),
+                        ),
+                      const MenuPopupItem(
+                        icon: Icons.crop,
+                        value: 'crop',
+                        child: Text('裁剪照片'),
+                      ),
+                      const MenuPopupItem(
+                        icon: Icons.delete_outline,
+                        destructive: true,
+                        value: 'remove',
+                        child: Text('移除照片'),
+                      ),
                     ],
                   ),
                 ),
@@ -179,15 +204,23 @@ class _RestaurantImagesState extends State<RestaurantImages> {
         SizedBox(
           width: 96,
           height: 96,
-          child: PopupMenuButton<bool>(
+          child: MenuPopupButton<bool>(
             enabled: !busy,
             tooltip: '添加照片',
             onSelected: pick,
             itemBuilder: (_) => [
-              const PopupMenuItem(value: false, child: Text('从相册选择')),
+              const MenuPopupItem(
+                icon: Icons.photo_library_outlined,
+                value: false,
+                child: Text('从相册选择'),
+              ),
               if (defaultTargetPlatform == TargetPlatform.android ||
                   defaultTargetPlatform == TargetPlatform.iOS)
-                const PopupMenuItem(value: true, child: Text('拍照')),
+                const MenuPopupItem(
+                  icon: Icons.camera_alt_outlined,
+                  value: true,
+                  child: Text('拍照'),
+                ),
             ],
             child: Container(
               decoration: BoxDecoration(

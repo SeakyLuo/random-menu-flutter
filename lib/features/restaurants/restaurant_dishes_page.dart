@@ -1,3 +1,4 @@
+import '../../ui/menu_popup.dart';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
@@ -33,15 +34,18 @@ class RestaurantDishesPage extends StatelessWidget {
     if (!context.mounted) return;
     await performAction(
       context,
-      () => MenuScope.of(context).update((d) {
-        final foods = d.restaurants
-            .firstWhere((r) => r.id == restaurantId)
-            .foods;
-        final food = foods.removeAt(index);
-        if (action != 'delete') {
-          foods.insert(action == 'up' ? index - 1 : index + 1, food);
-        }
-      }),
+      () => MenuScope.of(context).update(
+        MenuWriteScope.restaurant(restaurantId),
+        (d) {
+          final foods = d.restaurants
+              .firstWhere((r) => r.id == restaurantId)
+              .foods;
+          final food = foods.removeAt(index);
+          if (action != 'delete') {
+            foods.insert(action == 'up' ? index - 1 : index + 1, food);
+          }
+        },
+      ),
       success: action == 'delete' ? '菜品已删除' : null,
     );
   }
@@ -96,24 +100,32 @@ class RestaurantDishesPage extends StatelessWidget {
                           ),
                         ),
                       ),
-                      trailing: PopupMenuButton<String>(
+                      trailing: MenuPopupButton<String>(
                         tooltip: '菜品操作',
                         icon: const MenuIcon(Icons.more_horiz),
                         onSelected: (value) =>
                             _action(context, value, r, index),
                         itemBuilder: (_) => [
-                          const PopupMenuItem(
+                          const MenuPopupItem(
+                            icon: Icons.edit_outlined,
                             value: 'edit',
                             child: Text('编辑菜品'),
                           ),
                           if (index > 0)
-                            const PopupMenuItem(value: 'up', child: Text('上移')),
+                            const MenuPopupItem(
+                              icon: Icons.arrow_upward,
+                              value: 'up',
+                              child: Text('上移'),
+                            ),
                           if (index < r.foods.length - 1)
-                            const PopupMenuItem(
+                            const MenuPopupItem(
+                              icon: Icons.arrow_downward,
                               value: 'down',
                               child: Text('下移'),
                             ),
-                          const PopupMenuItem(
+                          const MenuPopupItem(
+                            icon: Icons.delete_outline,
+                            destructive: true,
                             value: 'delete',
                             child: Text('删除菜品'),
                           ),

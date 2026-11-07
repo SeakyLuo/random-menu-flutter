@@ -1,3 +1,5 @@
+import '../../ui/menu_popup.dart';
+import '../../ui/menu_dialog.dart';
 import '../../ui/menu_icon.dart';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
@@ -17,11 +19,12 @@ class RecipeTagsPage extends StatelessWidget {
     if (result == null || result == oldName || !context.mounted) return;
     await performAction(
       context,
-      () => store.update((data) {
+      () => store.update(MenuWriteScope.recipesAll, (data) {
         if (oldName == null) {
           data.recipeTags.add(result);
           return;
         }
+        data.recipeTagIds[result] = data.recipeTagIds.remove(oldName)!;
         data.recipeTags[data.recipeTags.indexOf(oldName)] = result;
         for (final recipe in data.recipes) {
           recipe.tags = recipe.tags
@@ -65,7 +68,7 @@ class RecipeTagsPage extends StatelessWidget {
     if (!context.mounted) return;
     await performAction(
       context,
-      () => store.update((data) {
+      () => store.update(MenuWriteScope.recipesAll, (data) {
         data.recipeTags.remove(tag);
         for (final recipe in data.recipes) {
           recipe.tags.remove(tag);
@@ -93,23 +96,28 @@ class RecipeTagsPage extends StatelessWidget {
             onPressed: () => _rename(context),
             child: const Text('新增'),
           ),
-          PopupMenuButton<String>(
+          MenuPopupButton<String>(
             icon: const MenuIcon(Icons.more_horiz),
             tooltip: '标签排序',
-            initialValue: store.data.recipeTagSort,
+
             onSelected: (sort) => performAction(
               context,
-              () => store.update((data) => data.recipeTagSort = sort),
+              () => store.update(
+                MenuWriteScope.settings,
+                (data) => data.recipeTagSort = sort,
+              ),
             ),
             itemBuilder: (_) => [
-              CheckedPopupMenuItem(
+              MenuPopupItem(
+                icon: Icons.bar_chart,
                 value: 'default',
-                checked: store.data.recipeTagSort == 'default',
+                selected: store.data.recipeTagSort == 'default',
                 child: const Text('按使用数量排序'),
               ),
-              CheckedPopupMenuItem(
+              MenuPopupItem(
+                icon: Icons.sort_by_alpha,
                 value: 'name',
-                checked: store.data.recipeTagSort == 'name',
+                selected: store.data.recipeTagSort == 'name',
                 child: const Text('按名称排序'),
               ),
             ],
@@ -139,15 +147,24 @@ class RecipeTagsPage extends StatelessWidget {
                     return ListTile(
                       title: Text(tag),
                       subtitle: Text('$count 道菜谱'),
-                      trailing: PopupMenuButton<String>(
+                      trailing: MenuPopupButton<String>(
                         icon: const MenuIcon(Icons.more_horiz),
                         tooltip: '管理“$tag”',
                         onSelected: (action) => action == 'rename'
                             ? _rename(context, oldName: tag)
                             : _delete(context, tag),
                         itemBuilder: (_) => const [
-                          PopupMenuItem(value: 'rename', child: Text('重命名')),
-                          PopupMenuItem(value: 'delete', child: Text('删除标签')),
+                          MenuPopupItem(
+                            icon: Icons.edit_outlined,
+                            value: 'rename',
+                            child: Text('重命名'),
+                          ),
+                          MenuPopupItem(
+                            icon: Icons.delete_outline,
+                            destructive: true,
+                            value: 'delete',
+                            child: Text('删除标签'),
+                          ),
                         ],
                       ),
                     );
@@ -193,8 +210,8 @@ class _TagNameDialogState extends State<_TagNameDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.initialName == null ? '添加标签' : '重命名标签'),
+  Widget build(BuildContext context) => MenuDialog(
+    title: widget.initialName == null ? '添加标签' : '重命名标签',
     content: TextField(
       controller: _controller,
       autofocus: true,
@@ -203,12 +220,20 @@ class _TagNameDialogState extends State<_TagNameDialog> {
       onSubmitted: (_) => _submit(),
       decoration: const InputDecoration(labelText: '标签名称'),
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('取消'),
-      ),
-      FilledButton(onPressed: _submit, child: const Text('保存')),
-    ],
+    actions: Row(
+      children: [
+        Expanded(
+          child: MenuDialogButton(
+            label: '取消',
+            role: MenuDialogRole.secondary,
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: MenuDialogButton(label: '保存', onPressed: _submit),
+        ),
+      ],
+    ),
   );
 }

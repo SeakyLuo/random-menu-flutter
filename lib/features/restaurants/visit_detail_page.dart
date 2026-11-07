@@ -1,3 +1,4 @@
+import '../../ui/menu_popup.dart';
 import '../../ui/menu_icon.dart';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
@@ -23,6 +24,7 @@ Future<bool> removeRestaurantVisit(
   return performAction(
     context,
     () => store.update(
+      MenuWriteScope.restaurant(restaurantId),
       (draft) => draft.restaurants
           .firstWhere((r) => r.id == restaurantId)
           .records
@@ -48,11 +50,13 @@ class VisitDetailPage extends StatelessWidget {
     final visit = r.records.where((v) => v.id == visitId).firstOrNull;
     if (visit == null) {
       return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(title: const Text('用餐记录')),
         body: const SizedBox.shrink(),
       );
     }
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: const Text('用餐记录'),
         actions: [
@@ -61,7 +65,7 @@ class VisitDetailPage extends StatelessWidget {
             onPressed: () => editRestaurantVisit(context, r, visit: visit),
             icon: const MenuIcon(Icons.edit_outlined),
           ),
-          PopupMenuButton<String>(
+          MenuPopupButton<String>(
             icon: const MenuIcon(Icons.more_horiz),
             tooltip: '记录操作',
             onSelected: (_) async {
@@ -73,7 +77,12 @@ class VisitDetailPage extends StatelessWidget {
               if (deleted && context.mounted) Navigator.pop(context);
             },
             itemBuilder: (_) => const [
-              PopupMenuItem(value: 'delete', child: Text('删除记录')),
+              MenuPopupItem(
+                icon: Icons.delete_outline,
+                destructive: true,
+                value: 'delete',
+                child: Text('删除记录'),
+              ),
             ],
           ),
         ],
@@ -121,7 +130,7 @@ class VisitDetailPage extends StatelessWidget {
               Text(
                 visit.companions.isEmpty
                     ? '独自用餐'
-                    : '同行：${visit.companions.join('、')}',
+                    : '饭搭子：${visit.companions.join('、')}',
               ),
               if (visit.note.isNotEmpty)
                 Padding(

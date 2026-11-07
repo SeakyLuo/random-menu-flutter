@@ -13,6 +13,9 @@ class RandomRecipeCard extends StatelessWidget {
     this.onFavorite,
     this.onLongPress,
     this.compact = false,
+    this.coverPath,
+    this.showFavorite = true,
+    this.titleSpan,
   });
   final Recipe recipe;
   final double captionOpacity;
@@ -20,28 +23,30 @@ class RandomRecipeCard extends StatelessWidget {
   final VoidCallback? onFavorite;
   final VoidCallback? onLongPress;
   final bool compact;
+  final String? coverPath;
+  final bool showFavorite;
+  final InlineSpan? titleSpan;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final hasPhoto = coverPath != null || recipe.imagePaths.isNotEmpty;
     final caption = Opacity(
       opacity: captionOpacity,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            recipe.name,
+          Text.rich(
+            titleSpan ?? TextSpan(text: recipe.name),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: compact ? 16 : 25,
               height: 1.4,
               fontWeight: FontWeight.w600,
-              color: recipe.imagePaths.isEmpty
-                  ? scheme.onSurface
-                  : Colors.white,
+              color: hasPhoto ? Colors.white : scheme.onSurface,
             ),
           ),
           if (compact && recipe.hiddenRounds > 0)
@@ -51,9 +56,9 @@ class RandomRecipeCard extends StatelessWidget {
                 '暂时不参与抽取',
                 style: TextStyle(
                   fontSize: 11,
-                  color: recipe.imagePaths.isEmpty
-                      ? scheme.onSurfaceVariant
-                      : Colors.white.withValues(alpha: .85),
+                  color: hasPhoto
+                      ? Colors.white.withValues(alpha: .85)
+                      : scheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -82,8 +87,10 @@ class RandomRecipeCard extends StatelessWidget {
           child: Stack(
             fit: compact ? StackFit.loose : StackFit.expand,
             children: [
-              Positioned.fill(child: RecipeCover(recipe: recipe)),
-              if (recipe.imagePaths.isNotEmpty)
+              Positioned.fill(
+                child: RecipeCover(recipe: recipe, path: coverPath),
+              ),
+              if (hasPhoto)
                 const Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -127,7 +134,7 @@ class RandomRecipeCard extends StatelessWidget {
                     ),
                   ),
                 ),
-              if (recipe.favorite)
+              if (showFavorite && recipe.favorite)
                 Positioned(
                   top: compact ? 8 : 12,
                   right: compact ? 8 : 12,
@@ -147,11 +154,13 @@ class RandomRecipeCard extends StatelessWidget {
 }
 
 class RecipeCover extends StatelessWidget {
-  const RecipeCover({super.key, required this.recipe});
+  const RecipeCover({super.key, required this.recipe, this.path});
   final Recipe recipe;
+  final String? path;
   @override
-  Widget build(BuildContext context) => recipe.imagePaths.isNotEmpty
-      ? RetainedLocalPhoto(path: recipe.imagePaths.first)
+  Widget build(BuildContext context) =>
+      path != null || recipe.imagePaths.isNotEmpty
+      ? RetainedLocalPhoto(path: path ?? recipe.imagePaths.first)
       : DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(

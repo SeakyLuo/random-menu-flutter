@@ -1,4 +1,5 @@
 import 'tag_patterns.dart';
+import 'geo_point.dart';
 import 'menu_schema.dart';
 import 'package:uuid/uuid.dart';
 
@@ -85,12 +86,14 @@ class RestaurantAddress {
     this.city = '',
     this.county = '',
     this.detail = '',
+    this.location,
   });
   String id;
   String province;
   String city;
   String county;
   String detail;
+  GeoPoint? location;
   String get fullAddress =>
       '$province${city == province ? '' : city}$county$detail';
   factory RestaurantAddress.fromJson(Map<String, dynamic> j) =>
@@ -100,6 +103,9 @@ class RestaurantAddress {
         city: j['city'] as String,
         county: j['county'] as String,
         detail: j['detail'] as String,
+        location: j['location'] == null
+            ? null
+            : GeoPoint.fromJson(j['location'] as Map<String, dynamic>),
       );
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -107,6 +113,7 @@ class RestaurantAddress {
     'city': city,
     'county': county,
     'detail': detail,
+    'location': location?.toJson(),
   };
 }
 
@@ -276,12 +283,17 @@ class MenuData {
     this.recipeDraftSourceId,
     this.legacyImagePaths = const [],
     this.recipeTags = const [],
+    this.restaurantCategories = const [],
     this.recipeSearchHistory = const [],
     this.restaurantSearchHistory = const [],
     this.recipeTagSort = 'default',
     this.patternTagRules = const {},
-    this.legacyMetadata = const {},
   });
+  // Stable catalog identities are internal; portable backups retain names.
+  Map<String, int> recipePositions = {};
+  Map<String, int> restaurantPositions = {};
+  Map<String, String> recipeTagIds = {};
+  Map<String, String> restaurantCategoryIds = {};
   List<Recipe> recipes;
   List<Restaurant> restaurants;
   List<String> toCook;
@@ -296,11 +308,11 @@ class MenuData {
   String? recipeDraftSourceId;
   List<String> legacyImagePaths;
   List<String> recipeTags;
+  List<String> restaurantCategories;
   List<String> recipeSearchHistory;
   List<String> restaurantSearchHistory;
   String recipeTagSort;
   Map<String, List<String>> patternTagRules;
-  Map<String, dynamic> legacyMetadata;
   Future<List<String>> inferRecipeTags(String name) async {
     if (!autoTag) return [];
     final result = <String>{};
@@ -319,7 +331,8 @@ class MenuData {
 
   factory MenuData.fromJson(Map<String, dynamic> j) {
     if (j['version'] == 1) j = upgradeMenuV1(j);
-    if (j['version'] != 2) {
+    if (j['version'] == 2) j = upgradeMenuV2(j);
+    if (j['version'] != 3) {
       throw const FormatException('Unsupported menu format');
     }
     return MenuData(
@@ -329,6 +342,9 @@ class MenuData {
           ? null
           : Recipe.fromJson(j['recipeDraft'] as Map<String, dynamic>),
       recipeTags: List<String>.from(j['recipeTags'] as List),
+      restaurantCategories: List<String>.from(
+        j['restaurantCategories'] as List,
+      ),
       recipeSearchHistory: List<String>.from(j['recipeSearchHistory'] as List),
       restaurantSearchHistory: List<String>.from(
         j['restaurantSearchHistory'] as List,
@@ -337,7 +353,6 @@ class MenuData {
       patternTagRules: (j['patternTagRules'] as Map<String, dynamic>).map(
         (k, v) => MapEntry(k, List<String>.from(v as List)),
       ),
-      legacyMetadata: j['legacyMetadata'] as Map<String, dynamic>,
       recipes: (j['recipes'] as List)
           .map((e) => Recipe.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -357,7 +372,7 @@ class MenuData {
     );
   }
   Map<String, dynamic> toJson() => {
-    'version': 2,
+    'version': 3,
     'recipes': recipes.map((e) => e.toJson()).toList(),
     'restaurants': restaurants.map((e) => e.toJson()).toList(),
     'toCook': toCook,
@@ -372,10 +387,10 @@ class MenuData {
     'recipeDraftSourceId': recipeDraftSourceId,
     'legacyImagePaths': legacyImagePaths,
     'recipeTags': recipeTags,
+    'restaurantCategories': restaurantCategories,
     'recipeSearchHistory': recipeSearchHistory,
     'restaurantSearchHistory': restaurantSearchHistory,
     'recipeTagSort': recipeTagSort,
     'patternTagRules': patternTagRules,
-    'legacyMetadata': legacyMetadata,
   };
 }

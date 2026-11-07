@@ -53,8 +53,12 @@ class _SplitVisitPageState extends State<SplitVisitPage> {
                       context,
                       widget.photos.map((p) => p.path).toList(),
                       i,
+                      heroTagForIndex: (index) => (this, index),
                     ),
-                    child: LocalPhoto(path: widget.photos[i].path),
+                    child: Hero(
+                      tag: (this, i),
+                      child: LocalPhoto(path: widget.photos[i].path),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),

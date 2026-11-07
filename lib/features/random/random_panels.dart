@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/menu_icon.dart';
+import '../../ui/glass_surface.dart';
 import '../../ui/widgets.dart';
 import '../../ui/rolling_count.dart';
 import '../recipes/recipe_detail_page.dart';
@@ -93,7 +94,7 @@ class _RandomMenuSheetState extends State<RandomMenuSheet> {
     setState(() => _busy = true);
     final saved = await performAction(
       context,
-      () => MenuScope.of(context).update(edit),
+      () => MenuScope.of(context).update(MenuWriteScope.settings, edit),
     );
     if (saved) widget.onRemoved(removed);
     if (mounted) setState(() => _busy = false);
@@ -210,13 +211,20 @@ class _RandomMenuSheetState extends State<RandomMenuSheet> {
                                       (d) => d.selectedMenu.remove(recipe.id),
                                       removed: [recipe.id],
                                     ),
-                              icon: const CircleAvatar(
-                                radius: 14,
-                                backgroundColor: Color(0x6617211c),
-                                child: MenuIcon(
-                                  Icons.close,
-                                  size: 17,
-                                  color: Colors.white,
+                              icon: const GlassSurface(
+                                radius: 16,
+                                blurSigma: 24,
+                                color: Color(0x18ffffff),
+                                borderColor: Color(0x48ffffff),
+                                child: SizedBox.square(
+                                  dimension: 32,
+                                  child: Center(
+                                    child: MenuIcon(
+                                      Icons.close,
+                                      size: 18,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -382,6 +390,7 @@ class _RandomPickerSheetState extends State<RandomPickerSheet> {
                             await performAction(
                               context,
                               () => store.update(
+                                MenuWriteScope.settings,
                                 (d) => d.selectedMenu.add(recipe.id),
                               ),
                             );

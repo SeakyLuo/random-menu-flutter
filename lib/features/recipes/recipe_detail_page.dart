@@ -1,33 +1,27 @@
+import '../../ui/menu_popup.dart';
 import 'dart:math' as math;
-import '../../ui/menu_bottom_sheet.dart';
+import '../../ui/hero_sheet_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/menu_icon.dart';
+import '../../ui/glass_surface.dart';
 import '../../ui/menu_tag_colors.dart';
 import '../../ui/widgets.dart';
 import 'recipe_editor.dart';
 import 'recipe_photos.dart';
+import 'recipe_tag_sheet.dart';
+import 'recipe_share_page.dart';
 
 enum _RecipeAction { favorite, hide }
 
 Future<void> showRecipeDetail(BuildContext context, String id) =>
-    showMenuBottomSheet<void>(
+    showHeroSheet<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      clipBehavior: Clip.antiAlias,
       constraints: BoxConstraints(
         maxWidth: 560,
         maxHeight: MediaQuery.sizeOf(context).height * .88,
-      ),
-      sheetAnimationStyle: AnimationStyle(
-        duration: Duration(
-          milliseconds: MediaQuery.disableAnimationsOf(context) ? 0 : 240,
-        ),
-        reverseDuration: const Duration(milliseconds: 120),
       ),
       builder: (_) => RecipeDetailPage(recipeId: id),
     );
@@ -40,7 +34,9 @@ class RecipeDetailPage extends StatefulWidget {
 }
 
 class _RecipeDetailPageState extends State<RecipeDetailPage> {
-  bool _saving = false;
+  late String _recipeId = widget.recipeId;
+  final _scroll = ScrollController();
+  final _savingActions = <(String, _RecipeAction)>{};
   int _photo = 0;
   String? _selectedPath;
   final _photos = PageController(keepPage: false);
@@ -49,7 +45,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
     super.didChangeDependencies();
     final recipe = MenuScope.of(
       context,
-    ).data.recipes.where((r) => r.id == widget.recipeId).firstOrNull;
+    ).data.recipes.where((r) => r.id == _recipeId).firstOrNull;
     if (recipe == null) return;
     _photo = _selectedPath == null || !recipe.imagePaths.contains(_selectedPath)
         ? 0
@@ -66,8 +62,20 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
 
   @override
   void dispose() {
+    _scroll.dispose();
     _photos.dispose();
     super.dispose();
+  }
+
+  Future<void> _openTag(String tag) async {
+    final id = await showRecipeTagSheet(context, tag);
+    if (!mounted || id == null || id == _recipeId) return;
+    setState(() {
+      _recipeId = id;
+      _photo = 0;
+      _selectedPath = null;
+    });
+    _scroll.jumpTo(0);
   }
 
   Future<void> _copyName(String name) => performAction(
@@ -78,10 +86,10 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
 
   Future<void> _action(_RecipeAction action, Recipe recipe) async {
     final store = MenuScope.of(context);
-    setState(() => _saving = true);
+    setState(() => _savingActions.add((recipe.id, action)));
     await performAction(
       context,
-      () => store.update((data) {
+      () => store.update(MenuWriteScope.recipe(recipe.id), (data) {
         final item = data.recipes.firstWhere((item) => item.id == recipe.id);
         switch (action) {
           case _RecipeAction.favorite:
@@ -96,14 +104,14 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                 : '最近3轮不再出现'
           : null,
     );
-    if (mounted) setState(() => _saving = false);
+    if (mounted) setState(() => _savingActions.remove((recipe.id, action)));
   }
 
   @override
   Widget build(BuildContext context) {
     final recipe = MenuScope.of(
       context,
-    ).data.recipes.where((r) => r.id == widget.recipeId).firstOrNull;
+    ).data.recipes.where((r) => r.id == _recipeId).firstOrNull;
     if (recipe == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('菜谱')),
@@ -127,36 +135,81 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: 4),
               child: Row(
                 children: [
                   Expanded(
                     child: Text(
                       '菜谱详情',
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                   IconButton(
-                    tooltip: recipe.hiddenRounds > 0 ? '恢复随机推荐' : '最近3轮不出现',
-                    onPressed: _saving
+                    tooltip: '编辑菜谱',
+                    onPressed: () => editRecipe(context, recipe: recipe),
+                    icon: const MenuIcon(Icons.edit_outlined, size: 23),
+                  ),
+                  IconButton(
+                    tooltip: recipe.favorite ? '取消喜欢' : '我喜欢',
+                    isSelected: recipe.favorite,
+                    onPressed:
+                        _savingActions.contains((
+                          recipe.id,
+                          _RecipeAction.favorite,
+                        ))
                         ? null
-                        : () => _action(_RecipeAction.hide, recipe),
+                        : () => _action(_RecipeAction.favorite, recipe),
                     icon: MenuIcon(
-                      recipe.hiddenRounds > 0
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      color: recipe.hiddenRounds > 0
-                          ? scheme.primary
+                      recipe.favorite ? Icons.favorite : Icons.favorite_border,
+                      size: 23,
+                      color: recipe.favorite
+                          ? const Color(0xffef4762)
                           : scheme.onSurfaceVariant,
                     ),
                   ),
-                  IconButton(
-                    tooltip: '关闭',
-                    onPressed: () => Navigator.pop(context),
-                    icon: const MenuIcon(Icons.close),
+                  MenuPopupButton<String>(
+                    tooltip: '更多',
+                    icon: const MenuIcon(Icons.more_horiz),
+                    onSelected: (action) {
+                      if (action == 'share') {
+                        Navigator.push<void>(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => RecipeSharePage(
+                              recipe: recipe,
+                              coverPath: _selectedPath,
+                            ),
+                          ),
+                        );
+                      } else {
+                        _action(_RecipeAction.hide, recipe);
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      const MenuPopupItem(
+                        icon: Icons.ios_share_rounded,
+                        value: 'share',
+                        child: Text('分享菜谱'),
+                      ),
+                      MenuPopupItem(
+                        icon: recipe.hiddenRounds > 0
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        value: 'hide',
+                        enabled: !_savingActions.contains((
+                          recipe.id,
+                          _RecipeAction.hide,
+                        )),
+                        child: Text(
+                          recipe.hiddenRounds > 0
+                              ? '恢复抽取（剩余${recipe.hiddenRounds}轮）'
+                              : '最近3轮不出现',
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -164,6 +217,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
             Flexible(
               fit: FlexFit.loose,
               child: ListView(
+                controller: _scroll,
                 shrinkWrap: true,
                 padding: const EdgeInsets.only(bottom: 16),
                 children: [
@@ -174,47 +228,88 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                         height: recipe.imagePaths.isEmpty
                             ? 140
                             : math.min(260, constraints.maxWidth / 1.6),
-                        child: recipe.imagePaths.isEmpty
-                            ? ColoredBox(
-                                color: scheme.primary.withValues(alpha: .08),
-                                child: Center(
-                                  child: MenuIcon(
-                                    Icons.ramen_dining_outlined,
-                                    size: 64,
-                                    color: scheme.primary,
-                                  ),
-                                ),
-                              )
-                            : PageView.builder(
-                                controller: _photos,
-                                itemCount: recipe.imagePaths.length,
-                                onPageChanged: (index) => setState(() {
-                                  _photo = index;
-                                  _selectedPath = recipe.imagePaths[index];
-                                }),
-                                itemBuilder: (_, index) => Semantics(
-                                  label: '查看${recipe.name}照片 ${index + 1}',
-                                  button: true,
-                                  child: GestureDetector(
-                                    onTap: () => showRecipePhotos(
-                                      context,
-                                      recipe.imagePaths,
-                                      index,
-                                      onPageChanged: (next) {
-                                        setState(() {
-                                          _photo = next;
-                                          _selectedPath =
-                                              recipe.imagePaths[next];
-                                        });
-                                        _photos.jumpToPage(next);
-                                      },
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            recipe.imagePaths.isEmpty
+                                ? ColoredBox(
+                                    color: scheme.primary.withValues(
+                                      alpha: .08,
                                     ),
-                                    child: RecipePhoto(
-                                      path: recipe.imagePaths[index],
+                                    child: Center(
+                                      child: MenuIcon(
+                                        Icons.ramen_dining_outlined,
+                                        size: 64,
+                                        color: scheme.primary,
+                                      ),
+                                    ),
+                                  )
+                                : PageView.builder(
+                                    key: ValueKey(recipe.id),
+                                    controller: _photos,
+                                    itemCount: recipe.imagePaths.length,
+                                    onPageChanged: (index) => setState(() {
+                                      _photo = index;
+                                      _selectedPath = recipe.imagePaths[index];
+                                    }),
+                                    itemBuilder: (_, index) => Semantics(
+                                      label: '查看${recipe.name}照片 ${index + 1}',
+                                      button: true,
+                                      child: GestureDetector(
+                                        onTap: () => showRecipePhotos(
+                                          context,
+                                          recipe.imagePaths,
+                                          index,
+                                          heroTagForIndex: (i) =>
+                                              (this, recipe.id, i),
+                                          onReturnIndex: (next) {
+                                            setState(() {
+                                              _photo = next;
+                                              _selectedPath =
+                                                  recipe.imagePaths[next];
+                                            });
+                                            _photos.jumpToPage(next);
+                                          },
+                                        ),
+                                        child: Hero(
+                                          tag: (this, recipe.id, index),
+                                          child: RecipePhoto(
+                                            path: recipe.imagePaths[index],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                            if (recipe.imagePaths.length > 1)
+                              Positioned(
+                                right: 12,
+                                bottom: 12,
+                                child: IgnorePointer(
+                                  child: GlassSurface(
+                                    radius: 14,
+                                    blurSigma: 24,
+                                    color: const Color(0x25ffffff),
+                                    borderColor: const Color(0x48ffffff),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 5,
+                                      ),
+                                      child: Text(
+                                        '${_photo + 1}/${recipe.imagePaths.length}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          height: 1.2,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.white,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -241,22 +336,30 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                       runSpacing: 6,
                       children: [
                         for (final tag in recipe.tags)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: tagColors.background,
-                              border: Border.all(color: tagColors.border),
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: Text(
-                              tag,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: tagColors.foreground,
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => _openTag(tag),
+                            child: Semantics(
+                              button: true,
+                              label: '查看$tag菜谱',
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: tagColors.background,
+                                  border: Border.all(color: tagColors.border),
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                child: Text(
+                                  tag,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: tagColors.foreground,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -279,53 +382,6 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                         fontSize: 12,
                         color: scheme.onSurfaceVariant,
                       ),
-                    ),
-                  ),
-                  if (recipe.hiddenRounds > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Text(
-                        '暂时不参与抽取 · 剩余 ${recipe.hiddenRounds} 轮',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 12),
-              child: Row(
-                spacing: 10,
-                children: [
-                  SizedBox.square(
-                    dimension: 48,
-                    child: IconButton(
-                      tooltip: recipe.favorite ? '取消收藏' : '收藏',
-                      isSelected: recipe.favorite,
-                      onPressed: _saving
-                          ? null
-                          : () => _action(_RecipeAction.favorite, recipe),
-                      icon: MenuIcon(
-                        recipe.favorite
-                            ? Icons.favorite
-                            : Icons.favorite_border,
-                        size: 23,
-                        color: recipe.favorite
-                            ? const Color(0xffef4762)
-                            : scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _saving
-                          ? null
-                          : () => editRecipe(context, recipe: recipe),
-                      icon: const MenuIcon(Icons.edit_outlined, size: 19),
-                      label: const Text('编辑菜谱', style: TextStyle(fontSize: 15)),
                     ),
                   ),
                 ],

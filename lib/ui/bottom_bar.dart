@@ -6,14 +6,16 @@ class MenuBottomBar extends StatelessWidget {
   const MenuBottomBar({
     super.key,
     required this.selected,
+    required this.pages,
     required this.onSelected,
   });
   final int selected;
+  final PageController pages;
   final ValueChanged<int> onSelected;
   static const items = [
-    (Icons.shuffle, '随机'),
+    (Icons.casino_outlined, '随机'),
     (Icons.edit_note, '菜谱'),
-    (Icons.storefront_outlined, '餐厅'),
+    (Icons.restaurant, '餐厅'),
     (Icons.person_outline_rounded, '我的'),
   ];
   @override
@@ -35,46 +37,84 @@ class MenuBottomBar extends StatelessWidget {
                 type: MaterialType.transparency,
                 child: SizedBox(
                   height: 50 + labelHeight - 12,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                  child: Stack(
                     children: [
-                      for (var i = 0; i < items.length; i++)
-                        Expanded(
-                          child: Semantics(
-                            selected: selected == i,
-                            button: true,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(26),
-                              onTap: () => onSelected(i),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  MenuIcon(
-                                    items[i].$1,
-                                    size: 24,
-                                    color: selected == i
-                                        ? scheme.primary
-                                        : scheme.onSurfaceVariant,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    items[i].$2,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      height: 1.2,
-                                      color: selected == i
-                                          ? scheme.primary
-                                          : scheme.onSurfaceVariant,
-                                      fontWeight: selected == i
-                                          ? FontWeight.w600
-                                          : FontWeight.w400,
+                      Positioned.fill(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) => AnimatedBuilder(
+                            animation: pages,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: SizedBox(
+                                width: constraints.maxWidth / items.length,
+                                height: constraints.maxHeight,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: scheme.onSurface.withValues(
+                                      alpha: .08,
                                     ),
+                                    borderRadius: BorderRadius.circular(26),
                                   ),
-                                ],
+                                ),
                               ),
                             ),
+                            builder: (context, child) {
+                              final page = pages.hasClients
+                                  ? pages.page ?? pages.initialPage.toDouble()
+                                  : pages.initialPage.toDouble();
+                              return Transform.translate(
+                                offset: Offset(
+                                  page * constraints.maxWidth / items.length,
+                                  0,
+                                ),
+                                child: child,
+                              );
+                            },
                           ),
                         ),
+                      ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (var i = 0; i < items.length; i++)
+                            Expanded(
+                              child: Semantics(
+                                selected: selected == i,
+                                button: true,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(26),
+                                  onTap: () => onSelected(i),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      MenuIcon(
+                                        items[i].$1,
+                                        size: 24,
+                                        color: selected == i
+                                            ? scheme.primary
+                                            : scheme.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        items[i].$2,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          height: 1.2,
+                                          color: selected == i
+                                              ? scheme.primary
+                                              : scheme.onSurfaceVariant,
+                                          fontWeight: selected == i
+                                              ? FontWeight.w600
+                                              : FontWeight.w400,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ),

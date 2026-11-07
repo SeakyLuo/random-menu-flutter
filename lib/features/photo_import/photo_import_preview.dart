@@ -1,7 +1,10 @@
+import '../../ui/menu_popup.dart';
+import '../../ui/menu_dialog.dart';
 import '../../ui/menu_icon.dart';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
+import '../../core/geo_point.dart';
 import '../../ui/widgets.dart';
 import '../restaurants/restaurant_images.dart';
 import '../restaurants/visit_dish_editor.dart';
@@ -66,6 +69,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
       title: '合并同一道菜的照片？',
       message: '将“$name”的 ${same.length} 条明细合并为一条。下一步请确认实际单价和点单份数，份数不会按照片数相加。',
       confirmLabel: '核对合并明细',
+      destructive: false,
     )) {
       return;
     }
@@ -103,6 +107,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
       title: '按照片拆分菜品？',
       message: '每张照片将成为一条独立明细，初始数量为1份。拆分后请逐条核对实际单价和份数，避免重复计费。',
       confirmLabel: '拆分并核对',
+      destructive: false,
     )) {
       return;
     }
@@ -132,17 +137,35 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
         .toList();
     final target = await showDialog<ImportVisit>(
       context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('合并到哪次用餐？'),
-        children: [
-          for (final g in candidates)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, g),
-              child: Text(
-                '${dayLabel(g.date)} ${TimeOfDay.fromDateTime(g.date).format(context)} · ${g.photos.length} 张照片',
+      builder: (context) => MenuDialog(
+        title: '合并到哪次用餐？',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final g in candidates)
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                leading: const MenuIcon(
+                  Icons.calendar_today_outlined,
+                  size: 20,
+                ),
+                title: Text(
+                  '${dayLabel(g.date)} ${TimeOfDay.fromDateTime(g.date).format(context)}',
+                  style: const TextStyle(fontSize: 14, height: 1.4),
+                ),
+                subtitle: Text('${g.photos.length} 张照片'),
+                onTap: () => Navigator.pop(context, g),
               ),
-            ),
-        ],
+          ],
+        ),
+        actions: MenuDialogButton(
+          label: '取消',
+          role: MenuDialogRole.secondary,
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
     );
     if (target == null || !mounted) return;
@@ -155,6 +178,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
       title: '确认是同一次用餐？',
       message: '${crossesDay ? '这两组照片来自不同日期。' : ''}合并后使用较早的拍摄时间，保留全部环境照片和菜品明细。',
       confirmLabel: '合并为一次用餐',
+      destructive: false,
     )) {
       return;
     }
@@ -207,21 +231,17 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
           ...group.items.expand((i) => i.imagePaths),
         ],
       };
-      final kept = await Future.wait(
-        paths.map(
-          (path) async => MapEntry(
-            path,
-            path.startsWith('${store.directory.path}/images/')
-                ? path
-                : await store.keepImage(path),
-          ),
-        ),
-      );
-      final savedPaths = Map<String, String>.fromEntries(kept);
-      await store.update((draft) {
+      final savedPaths = <String, String>{};
+      for (final path in paths) {
+        savedPaths[path] = path.startsWith('${store.directory.path}/images/')
+            ? path
+            : await store.keepImage(path);
+      }
+      final savedRestaurantId = widget.restaurantId ?? newId();
+      await store.update(MenuWriteScope.restaurant(savedRestaurantId), (draft) {
         final restaurant = widget.restaurantId == null
             ? Restaurant(
-                id: newId(),
+                id: savedRestaurantId,
                 name: widget.name,
                 category: widget.category,
                 addressEntries: [...widget.addresses],
@@ -244,7 +264,24 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
         final dishIds = {
           for (final dish in restaurant.foods) dish.name: dish.id,
         };
+        final branches = {
+          for (final address in restaurant.addressEntries) address.id: address,
+        };
         for (final group in groups) {
+          final branch = branches[group.address.id]!;
+          if (branch.location == null) {
+            final located = group.photos
+                .where(
+                  (photo) => photo.latitude != null && photo.longitude != null,
+                )
+                .firstOrNull;
+            if (located != null) {
+              branch.location = GeoPoint(
+                latitude: located.latitude!,
+                longitude: located.longitude!,
+              );
+            }
+          }
           final items = <VisitDish>[];
           for (final item in group.items) {
             final photos = item.imagePaths
@@ -346,7 +383,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
               style: TextStyle(height: 1.6),
             ),
             const SizedBox(height: 12),
-            const Text('导入后可在用餐记录中补充同行人和用餐感受。'),
+            const Text('导入后可在用餐记录中补充饭搭子和用餐感受。'),
             const SizedBox(height: 20),
             for (final group in groups)
               Card(
@@ -370,7 +407,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
                                     g != group &&
                                     g.address.id == group.address.id,
                               ))
-                            PopupMenuButton<String>(
+                            MenuPopupButton<String>(
                               icon: const MenuIcon(Icons.more_horiz),
                               tooltip: '用餐分组操作',
                               onSelected: (value) {
@@ -386,12 +423,14 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
                                       g != group &&
                                       g.address.id == group.address.id,
                                 ))
-                                  const PopupMenuItem(
+                                  const MenuPopupItem(
+                                    icon: Icons.call_merge,
                                     value: 'merge',
                                     child: Text('合并到其他用餐记录'),
                                   ),
                                 if (group.photos.length > 1)
-                                  const PopupMenuItem(
+                                  const MenuPopupItem(
+                                    icon: Icons.call_split,
                                     value: 'split',
                                     child: Text('拆分用餐记录'),
                                   ),
@@ -416,7 +455,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
                             '¥${money(group.items[i].price)} × ${group.items[i].quantity} 份 = ¥${money(group.items[i].cost)} · ${group.items[i].imagePaths.length} 张照片',
                           ),
                           onTap: () => editItem(group, i),
-                          trailing: PopupMenuButton<String>(
+                          trailing: MenuPopupButton<String>(
                             icon: const MenuIcon(Icons.more_horiz),
                             tooltip: '菜品明细操作',
                             onSelected: (value) {
@@ -430,7 +469,8 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
                               }
                             },
                             itemBuilder: (_) => [
-                              const PopupMenuItem(
+                              const MenuPopupItem(
+                                icon: Icons.edit_outlined,
                                 value: 'edit',
                                 child: Text('核对单价与数量'),
                               ),
@@ -441,12 +481,14 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
                                       )
                                       .length >
                                   1)
-                                const PopupMenuItem(
+                                const MenuPopupItem(
+                                  icon: Icons.call_merge,
                                   value: 'merge',
                                   child: Text('合并同名菜品照片'),
                                 ),
                               if (group.items[i].imagePaths.length > 1)
-                                const PopupMenuItem(
+                                const MenuPopupItem(
+                                  icon: Icons.call_split,
                                   value: 'split',
                                   child: Text('按照片拆分明细'),
                                 ),

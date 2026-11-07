@@ -20,7 +20,7 @@ class _AppearancePageState extends State<AppearancePage> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
           child: ListView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
             children: [
               for (final item in [
                 ('system', '跟随系统', '随设备外观自动切换'),
@@ -40,8 +40,10 @@ class _AppearancePageState extends State<AppearancePage> {
                               setState(() => _saving = true);
                               await performAction(
                                 context,
-                                () =>
-                                    store.update((d) => d.themeMode = item.$1),
+                                () => store.update(
+                                  MenuWriteScope.settings,
+                                  (d) => d.themeMode = item.$1,
+                                ),
                               );
                               if (mounted) setState(() => _saving = false);
                             },

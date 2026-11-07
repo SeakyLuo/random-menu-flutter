@@ -77,6 +77,7 @@ class _AddressEditorState extends State<_AddressEditor> {
         city: city.text.trim(),
         county: county.text.trim(),
         detail: detail.text.trim(),
+        location: dirty ? null : widget.address?.location,
       ),
     );
   }
@@ -88,6 +89,7 @@ class _AddressEditorState extends State<_AddressEditor> {
       if (!didPop) leave();
     },
     child: Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: Text(widget.address == null ? '添加地址' : '编辑地址'),
         leading: IconButton(
@@ -105,23 +107,20 @@ class _AddressEditorState extends State<_AddressEditor> {
             textInputAction: TextInputAction.next,
             decoration: const InputDecoration(
               labelText: '省 / 自治区 / 直辖市',
-              hintText: '选填，用于地区筛选',
+              hintText: '用于地区筛选',
             ),
           ),
           const SizedBox(height: 20),
           TextField(
             controller: city,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(labelText: '城市', hintText: '选填'),
+            decoration: const InputDecoration(labelText: '城市'),
           ),
           const SizedBox(height: 20),
           TextField(
             controller: county,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: '区 / 县',
-              hintText: '选填',
-            ),
+            decoration: const InputDecoration(labelText: '区 / 县'),
           ),
           const SizedBox(height: 20),
           TextField(

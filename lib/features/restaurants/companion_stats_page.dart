@@ -44,7 +44,7 @@ class _CompanionStatsPageState extends State<CompanionStatsPage> {
           ? EmptyState(
               icon: Icons.people_outline,
               title: '还没有约饭记录',
-              message: '在餐厅详情记一笔用餐，留下同行人的名字。',
+              message: '在餐厅详情记一笔用餐，留下饭搭子的名字。',
               actionLabel: '返回餐厅',
               onAction: () => Navigator.pop(context),
             )

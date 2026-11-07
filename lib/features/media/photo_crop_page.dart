@@ -258,11 +258,15 @@ class _PhotoCropPageState extends State<_PhotoCropPage> {
       final bytes = await cropped.toByteData(format: ui.ImageByteFormat.png);
       cropped.dispose();
       final file = File(
-        '${store.directory.path}/images/${DateTime.now().microsecondsSinceEpoch}.png',
+        '${store.directory.path}/crop_${DateTime.now().microsecondsSinceEpoch}.png',
       );
       await file.parent.create(recursive: true);
       await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
-      result = file.path;
+      try {
+        result = await store.photos.keep(file.path, originalOf: widget.path);
+      } finally {
+        await file.delete();
+      }
     }, success: '裁剪已完成');
     if (!mounted) return;
     if (success) {

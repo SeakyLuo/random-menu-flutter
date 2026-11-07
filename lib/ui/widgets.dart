@@ -2,13 +2,14 @@ import 'menu_icon.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'glass_surface.dart';
+import 'menu_dialog.dart';
 
 class MenuAppBar extends StatelessWidget {
   const MenuAppBar({
     super.key,
     required this.title,
     this.actions = const [],
-    this.compact = false,
+    this.compact = true,
     this.actionsSpacing = 8,
   });
   final String title;
@@ -19,7 +20,7 @@ class MenuAppBar extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: EdgeInsets.only(bottom: compact ? 0 : 4),
     child: ConstrainedBox(
-      constraints: BoxConstraints(minHeight: compact ? 40 : 52),
+      constraints: BoxConstraints(minHeight: compact ? 48 : 52),
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: compact ? 0 : 4),
         child: Row(
@@ -51,21 +52,23 @@ class MenuPage extends StatelessWidget {
     super.key,
     required this.title,
     this.actions = const [],
-    this.compactHeader = false,
+    this.compactHeader = true,
     this.actionsSpacing = 8,
+    this.maxWidth = 600,
     required this.child,
   });
   final String title;
   final List<Widget> actions;
   final bool compactHeader;
   final double actionsSpacing;
+  final double maxWidth;
   final Widget child;
   @override
   Widget build(BuildContext context) => SafeArea(
     bottom: false,
     child: Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600),
+        constraints: BoxConstraints(maxWidth: maxWidth),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -210,22 +213,34 @@ Future<bool> confirmAction(
   required String title,
   required String message,
   String confirmLabel = '删除',
+  bool destructive = true,
 }) async =>
     await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(confirmLabel),
-          ),
-        ],
+      builder: (context) => MenuDialog(
+        title: title,
+        description: message,
+        actions: Row(
+          children: [
+            Expanded(
+              child: MenuDialogButton(
+                label: '取消',
+                role: MenuDialogRole.secondary,
+                onPressed: () => Navigator.pop(context, false),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: MenuDialogButton(
+                label: confirmLabel,
+                role: destructive
+                    ? MenuDialogRole.destructive
+                    : MenuDialogRole.primary,
+                onPressed: () => Navigator.pop(context, true),
+              ),
+            ),
+          ],
+        ),
       ),
     ) ==
     true;

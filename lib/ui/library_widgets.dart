@@ -1,4 +1,4 @@
-import 'menu_bottom_sheet.dart';
+import 'hero_sheet_route.dart';
 import 'dart:math' show min;
 import 'package:flutter/material.dart';
 import 'menu_icon.dart';
@@ -22,12 +22,8 @@ Future<T?> pushMenuEditor<T>(BuildContext context, Widget page) =>
     );
 
 Future<T?> showMenuDetail<T>(BuildContext context, Widget page) =>
-    showMenuBottomSheet<T>(
+    showHeroSheet<T>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      clipBehavior: Clip.antiAlias,
       builder: (context) => LayoutBuilder(
         builder: (context, constraints) {
           final keyboard = MediaQuery.viewInsetsOf(context).bottom;
@@ -67,7 +63,7 @@ class LibraryFab extends StatelessWidget {
     this.size = 58,
   });
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final double bottom;
   final double size;
   @override

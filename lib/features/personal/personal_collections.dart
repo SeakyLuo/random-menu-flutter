@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../ui/widgets.dart';
+import '../../ui/library_layout.dart';
+import '../restaurants/restaurant_grid.dart';
 import '../recipes/recipe_grid.dart';
 import '../restaurants/restaurants_page.dart';
 import '../restaurants/restaurant_filter.dart';
@@ -28,16 +30,16 @@ class FavoritesPage extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           titleSpacing: 0,
-          toolbarHeight: 60,
-          title: const Text('我的收藏', style: TextStyle(fontSize: 24)),
+          toolbarHeight: 48,
+          title: const Text('我的收藏'),
         ),
         body: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
+            constraints: const BoxConstraints(maxWidth: LibraryLayout.maxWidth),
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 16, 12),
+                  padding: const EdgeInsets.fromLTRB(12, 6, 16, 10),
                   child: TabBar(
                     isScrollable: true,
                     tabAlignment: TabAlignment.start,
@@ -103,21 +105,25 @@ class FavoritesPage extends StatelessWidget {
                                 onBrowseRestaurants();
                               },
                             )
-                          : ListView.separated(
+                          : CustomScrollView(
                               key: const PageStorageKey('favorite-restaurants'),
-                              padding: const EdgeInsets.fromLTRB(
-                                16,
-                                12,
-                                16,
-                                24,
-                              ),
-                              itemCount: restaurants.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(height: 18),
-                              itemBuilder: (_, index) => RestaurantCard(
-                                key: ValueKey(restaurants[index].id),
-                                restaurant: restaurants[index],
-                              ),
+                              slivers: [
+                                SliverPadding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    12,
+                                    16,
+                                    24,
+                                  ),
+                                  sliver: SliverRestaurantGrid(
+                                    itemCount: restaurants.length,
+                                    itemBuilder: (_, index) => RestaurantCard(
+                                      key: ValueKey(restaurants[index].id),
+                                      restaurant: restaurants[index],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                     ],
                   ),

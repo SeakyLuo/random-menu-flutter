@@ -3,6 +3,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/widgets.dart';
+import '../../ui/library_layout.dart';
 import '../random/random_recipe_card.dart';
 import 'recipe_detail_page.dart';
 import 'recipe_editor.dart';
@@ -15,21 +16,25 @@ class RecipeGrid extends StatelessWidget {
     this.scrollKey,
     this.showCount = false,
     this.controller,
+    this.onOpen,
+    this.captionBuilder,
+    this.titleBuilder,
   });
   final List<Recipe> recipes;
   final double bottom;
   final PageStorageKey<String>? scrollKey;
   final bool showCount;
   final ScrollController? controller;
+  final ValueChanged<Recipe>? onOpen;
+  final Widget? Function(Recipe)? captionBuilder;
+  final InlineSpan Function(Recipe)? titleBuilder;
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
-      final columns = constraints.maxWidth < 340 || scale > 1.8
-          ? 1
-          : constraints.maxWidth >= 600
-          ? 3
-          : 2;
+      final columns = LibraryLayout.recipeColumns(
+        context,
+        constraints.maxWidth - 32,
+      );
       return CustomScrollView(
         key: scrollKey,
         controller: controller,
@@ -60,10 +65,23 @@ class RecipeGrid extends StatelessWidget {
               crossAxisSpacing: 14,
               mainAxisSpacing: 14,
               childCount: recipes.length,
-              itemBuilder: (_, index) => RecipeLibraryCard(
-                key: ValueKey(recipes[index].id),
-                recipe: recipes[index],
-              ),
+              itemBuilder: (_, index) {
+                final recipe = recipes[index];
+                final card = RecipeLibraryCard(
+                  key: ValueKey(recipe.id),
+                  recipe: recipe,
+                  titleSpan: titleBuilder?.call(recipe),
+                  onOpen: onOpen == null ? null : () => onOpen!(recipe),
+                );
+                final caption = captionBuilder?.call(recipe);
+                if (caption == null) return card;
+                return Column(
+                  key: ValueKey(recipe.id),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [card, caption],
+                );
+              },
             ),
           ),
         ],
@@ -73,8 +91,15 @@ class RecipeGrid extends StatelessWidget {
 }
 
 class RecipeLibraryCard extends StatefulWidget {
-  const RecipeLibraryCard({super.key, required this.recipe});
+  const RecipeLibraryCard({
+    super.key,
+    required this.recipe,
+    this.onOpen,
+    this.titleSpan,
+  });
   final Recipe recipe;
+  final VoidCallback? onOpen;
+  final InlineSpan? titleSpan;
   @override
   State<RecipeLibraryCard> createState() => _RecipeLibraryCardState();
 }
@@ -86,9 +111,12 @@ class _RecipeLibraryCardState extends State<RecipeLibraryCard> {
     final recipe = widget.recipe;
     return RandomRecipeCard(
       recipe: recipe,
+      titleSpan: widget.titleSpan,
       compact: true,
-      onOpen: () => showRecipeDetail(context, recipe.id),
-      onLongPress: () => editRecipe(context, recipe: recipe),
+      onOpen: widget.onOpen ?? () => showRecipeDetail(context, recipe.id),
+      onLongPress: widget.onOpen == null
+          ? () => editRecipe(context, recipe: recipe)
+          : null,
       onFavorite: _saving
           ? null
           : () async {
@@ -96,6 +124,7 @@ class _RecipeLibraryCardState extends State<RecipeLibraryCard> {
               await performAction(
                 context,
                 () => MenuScope.of(context).update(
+                  MenuWriteScope.recipe(recipe.id),
                   (d) =>
                       d.recipes.firstWhere((r) => r.id == recipe.id).favorite =
                           false,

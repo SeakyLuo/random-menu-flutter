@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../ui/library_widgets.dart';
 import '../../ui/menu_icon.dart';
+import '../../ui/menu_tag_colors.dart';
 import '../../ui/widgets.dart';
 import 'tag_rule_editor.dart';
 
@@ -16,7 +17,6 @@ class _TagRulesPageState extends State<TagRulesPage> {
   final _scroll = ScrollController();
   int _visibleCount = 24;
   int _ruleCount = 0;
-  bool _saving = false;
 
   @override
   void initState() {
@@ -38,16 +38,6 @@ class _TagRulesPageState extends State<TagRulesPage> {
     }
   }
 
-  Future<void> _toggle(bool value) async {
-    setState(() => _saving = true);
-    await performAction(
-      context,
-      () => MenuScope.of(context).update((draft) => draft.autoTag = value),
-      success: value ? '自动标签已开启' : '自动标签已关闭',
-    );
-    if (mounted) setState(() => _saving = false);
-  }
-
   void _add() => showTagRuleEditor(context, mode: TagRuleMode.pattern);
 
   @override
@@ -58,14 +48,14 @@ class _TagRulesPageState extends State<TagRulesPage> {
         (
           mode: TagRuleMode.literal,
           key: rule.key,
-          keyword: rule.value.join('、'),
+          keywords: rule.value,
           tags: [rule.key],
         ),
       for (final rule in data.patternTagRules.entries)
         (
           mode: TagRuleMode.pattern,
           key: rule.key,
-          keyword: rule.key,
+          keywords: [rule.key],
           tags: rule.value,
         ),
     ];
@@ -73,103 +63,50 @@ class _TagRulesPageState extends State<TagRulesPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _loadMore();
     });
-    final colors = Theme.of(context).colorScheme;
     final visible = min(_visibleCount, rules.length);
     return Scaffold(
-      appBar: AppBar(titleSpacing: 0, title: const Text('自动标签')),
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: const Text('自动标签', maxLines: 1, overflow: TextOverflow.ellipsis),
+        actions: [
+          PageAddButton(label: '添加标签规则', onPressed: _add),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
-          child: Stack(
-            children: [
-              Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-                    child: Material(
-                      color: colors.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      clipBehavior: Clip.antiAlias,
-                      child: SwitchListTile(
-                        title: const Text(
-                          '自动添加标签',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                        value: data.autoTag,
-                        onChanged: _saving ? null : _toggle,
+          child: rules.isEmpty
+              ? EmptyState(
+                  icon: Icons.auto_awesome_outlined,
+                  title: '还没有标签规则',
+                  message: '添加一条菜名匹配规则，让整理菜谱更轻松。',
+                  actionLabel: '添加规则',
+                  onAction: _add,
+                )
+              : ListView.separated(
+                  controller: _scroll,
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    8,
+                    16,
+                    16 + MediaQuery.viewPaddingOf(context).bottom,
+                  ),
+                  itemCount: visible,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final rule = rules[index];
+                    return _RuleRow(
+                      keywords: rule.keywords,
+                      tags: rule.tags,
+                      onTap: () => showTagRuleEditor(
+                        context,
+                        mode: rule.mode,
+                        existingKey: rule.key,
                       ),
-                    ),
-                  ),
-                  Expanded(
-                    child: rules.isEmpty
-                        ? EmptyState(
-                            icon: Icons.auto_awesome_outlined,
-                            title: '还没有标签规则',
-                            message: '添加一条菜名匹配规则，让整理菜谱更轻松。',
-                            actionLabel: '添加规则',
-                            onAction: _add,
-                          )
-                        : ListView.builder(
-                            controller: _scroll,
-                            padding: EdgeInsets.fromLTRB(
-                              16,
-                              0,
-                              16,
-                              100 + MediaQuery.viewPaddingOf(context).bottom,
-                            ),
-                            itemCount: visible + 2,
-                            itemBuilder: (context, index) {
-                              if (index == 0) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: Text(
-                                    '共 ${rules.length} 条规则',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: colors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                );
-                              }
-                              if (index == visible + 1) {
-                                return visible == rules.length
-                                    ? Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 20,
-                                        ),
-                                        child: Text(
-                                          '已显示全部规则',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: colors.onSurfaceVariant,
-                                          ),
-                                        ),
-                                      )
-                                    : const SizedBox(height: 1);
-                              }
-                              final rule = rules[index - 1];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: _RuleRow(
-                                  keyword: rule.keyword,
-                                  tags: rule.tags,
-                                  onTap: () => showTagRuleEditor(
-                                    context,
-                                    mode: rule.mode,
-                                    existingKey: rule.key,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-              if (rules.isNotEmpty)
-                LibraryFab(label: '添加标签规则', bottom: 20, onPressed: _add),
-            ],
-          ),
+                    );
+                  },
+                ),
         ),
       ),
     );
@@ -178,17 +115,18 @@ class _TagRulesPageState extends State<TagRulesPage> {
 
 class _RuleRow extends StatelessWidget {
   const _RuleRow({
-    required this.keyword,
+    required this.keywords,
     required this.tags,
     required this.onTap,
   });
-  final String keyword;
+  final List<String> keywords;
   final List<String> tags;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final tagColors = MenuTagColors.of(context);
     Widget label(String text) => SizedBox(
       width: 48,
       child: Text(
@@ -219,7 +157,7 @@ class _RuleRow extends StatelessWidget {
                         label('关键词'),
                         Expanded(
                           child: Text(
-                            keyword,
+                            keywords.join('、'),
                             style: const TextStyle(
                               fontSize: 16,
                               height: 1.5,
@@ -240,26 +178,11 @@ class _RuleRow extends StatelessWidget {
                             runSpacing: 6,
                             children: [
                               for (final tag in tags)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 2,
-                                  ),
-                                  decoration: ShapeDecoration(
-                                    color: colors.primary.withValues(
-                                      alpha: .09,
-                                    ),
-                                    shape: const StadiumBorder(),
-                                  ),
-                                  child: Text(
-                                    tag,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      height: 1.65,
-                                      color: colors.primary,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
+                                _RuleChip(
+                                  text: tag,
+                                  background: tagColors.background,
+                                  foreground: tagColors.foreground,
+                                  border: tagColors.border,
                                 ),
                             ],
                           ),
@@ -281,4 +204,37 @@ class _RuleRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RuleChip extends StatelessWidget {
+  const _RuleChip({
+    required this.text,
+    required this.background,
+    required this.foreground,
+    required this.border,
+  });
+
+  final String text;
+  final Color background;
+  final Color foreground;
+  final Color border;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+    decoration: BoxDecoration(
+      color: background,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: border),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        height: 1.65,
+        fontWeight: FontWeight.w500,
+        color: foreground,
+      ),
+    ),
+  );
 }
