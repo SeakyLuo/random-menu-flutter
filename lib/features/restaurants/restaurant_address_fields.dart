@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/models.dart';
-import '../../ui/menu_icon.dart';
 import '../../ui/widgets.dart';
+import 'restaurant_filter_pickers.dart';
 
 bool validateRestaurantAddresses(
   BuildContext context,
@@ -14,7 +14,7 @@ bool validateRestaurantAddresses(
       return false;
     }
     if (!seen.add(address.fullAddress)) {
-      showToast(context, '分店地址重复，请修改或移除');
+      showToast(context, '地址重复，请修改或移除');
       return false;
     }
   }
@@ -40,43 +40,60 @@ class RestaurantAddressFields extends StatefulWidget {
 }
 
 class _RestaurantAddressFieldsState extends State<RestaurantAddressFields> {
-  late final _province = TextEditingController(text: widget.address.province);
-  late final _city = TextEditingController(text: widget.address.city);
-  late final _county = TextEditingController(text: widget.address.county);
   late final _detail = TextEditingController(text: widget.address.detail);
-  late bool _regionOpen =
-      widget.address.province.isEmpty &&
-      widget.address.city.isEmpty &&
-      widget.address.county.isEmpty;
 
-  void _changed(String _) => widget.onChanged(
-    RestaurantAddress(
-      id: widget.address.id,
-      province: _province.text.trim(),
-      city: _city.text.trim(),
-      county: _county.text.trim(),
-      detail: _detail.text.trim(),
-    ),
+  void _selectRegion() => showRestaurantRegionWheel(
+    context,
+    level: 3,
+    province: widget.address.province,
+    city: widget.address.city,
+    county: widget.address.county,
+    onConfirm: (province, city, county) {
+      if (!mounted) return;
+      final address = widget.address;
+      if (province == address.province &&
+          city == address.city &&
+          county == address.county) {
+        return;
+      }
+      widget.onChanged(
+        RestaurantAddress(
+          id: address.id,
+          province: province,
+          city: city,
+          county: county,
+          detail: address.detail,
+        ),
+      );
+    },
   );
+
+  void _changed(String value) {
+    final address = widget.address;
+    final detail = value.trim();
+    if (detail == address.detail) return;
+    widget.onChanged(
+      RestaurantAddress(
+        id: address.id,
+        province: address.province,
+        city: address.city,
+        county: address.county,
+        detail: detail,
+      ),
+    );
+  }
 
   @override
   void didUpdateWidget(covariant RestaurantAddressFields oldWidget) {
     super.didUpdateWidget(oldWidget);
-    for (final pair in [
-      (_province, widget.address.province),
-      (_city, widget.address.city),
-      (_county, widget.address.county),
-      (_detail, widget.address.detail),
-    ]) {
-      if (pair.$1.text.trim() != pair.$2) pair.$1.text = pair.$2;
+    if (_detail.text.trim() != widget.address.detail) {
+      _detail.text = widget.address.detail;
     }
   }
 
   @override
   void dispose() {
-    for (final controller in [_province, _city, _county, _detail]) {
-      controller.dispose();
-    }
+    _detail.dispose();
     super.dispose();
   }
 
@@ -87,69 +104,61 @@ class _RestaurantAddressFieldsState extends State<RestaurantAddressFields> {
       if (widget.address.city != widget.address.province) widget.address.city,
       widget.address.county,
     ].where((s) => s.isNotEmpty).join(' · ');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                region.isEmpty ? '省市区' : region,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            IconButton(
-              tooltip: _regionOpen ? '收起省市区' : '修改省市区',
-              onPressed: () => setState(() => _regionOpen = !_regionOpen),
-              icon: MenuIcon(
-                _regionOpen ? Icons.check : Icons.edit_outlined,
-                size: 18,
-              ),
-            ),
-            ?widget.trailing,
-          ],
-        ),
-        if (_regionOpen) ...[
-          LayoutBuilder(
-            builder: (context, constraints) => Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final field in [
-                  (_province, '省 / 直辖市'),
-                  (_city, '城市'),
-                  (_county, '区 / 县'),
-                ])
-                  SizedBox(
-                    width: constraints.maxWidth >= 360
-                        ? (constraints.maxWidth - 16) / 3
-                        : (constraints.maxWidth - 8) / 2,
-                    child: TextField(
-                      controller: field.$1,
-                      onChanged: _changed,
-                      style: const TextStyle(fontSize: 14),
-                      decoration: InputDecoration(hintText: field.$2),
-                      textInputAction: TextInputAction.next,
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    return Material(
+      color: theme.inputDecorationTheme.fillColor,
+      borderRadius: BorderRadius.circular(11),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: _selectRegion,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 44),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        region.isEmpty ? '选择省市区' : region,
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.4,
+                          color: muted,
+                        ),
+                      ),
                     ),
                   ),
-              ],
+                ),
+              ),
+              ?widget.trailing,
+            ],
+          ),
+          TextField(
+            controller: _detail,
+            autofocus: widget.autofocus,
+            onChanged: _changed,
+            minLines: 1,
+            maxLines: 3,
+            style: const TextStyle(fontSize: 15, height: 1.5),
+            decoration: const InputDecoration(
+              hintText: '街道、门牌号或商场楼层',
+              filled: false,
+              isDense: true,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: EdgeInsets.fromLTRB(16, 8, 16, 14),
             ),
           ),
-          const SizedBox(height: 10),
         ],
-        TextField(
-          controller: _detail,
-          autofocus: widget.autofocus,
-          onChanged: _changed,
-          minLines: 1,
-          maxLines: 3,
-          style: const TextStyle(fontSize: 15, height: 1.5),
-          decoration: const InputDecoration(hintText: '街道、门牌号或商场楼层'),
-        ),
-      ],
+      ),
     );
   }
 }

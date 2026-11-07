@@ -29,7 +29,6 @@ class _RestaurantSearchPageState extends State<RestaurantSearchPage> {
       RestaurantSearchField.all,
       RestaurantSearchField.restaurants,
       RestaurantSearchField.dishes,
-      RestaurantSearchField.reviews,
     ])
       scope: ScrollController(keepScrollOffset: false),
   };
@@ -44,7 +43,6 @@ class _RestaurantSearchPageState extends State<RestaurantSearchPage> {
     RestaurantSearchField.all: '全部',
     RestaurantSearchField.restaurants: '餐厅',
     RestaurantSearchField.dishes: '菜品',
-    RestaurantSearchField.reviews: '评价',
   };
 
   @override
@@ -139,7 +137,7 @@ class _RestaurantSearchPageState extends State<RestaurantSearchPage> {
     ),
   );
 
-  Future<void> _openReview(RestaurantReviewHit hit) => _openResult(
+  Future<void> _openContext(RestaurantSearchHit hit) => _openResult(
     hit.visit == null
         ? RestaurantDetailPage(restaurantId: hit.restaurant.id)
         : VisitDetailPage(
@@ -220,48 +218,34 @@ class _RestaurantSearchPageState extends State<RestaurantSearchPage> {
     final matches = searchRestaurantContents(data.restaurants, _query);
     return Scaffold(
       resizeToAvoidBottomInset: true,
+      appBar: AppBar(
+        leading: IconButton(
+          tooltip: '返回餐厅',
+          onPressed: () => Navigator.pop(context),
+          icon: const MenuIcon(Icons.arrow_back),
+        ),
+        titleSpacing: 8,
+        title: term.isEmpty
+            ? const Text(
+                '搜索餐厅',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              )
+            : ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: SearchScope(
+                  labels: _labels,
+                  selected: _scope,
+                  onChanged: _changeScope,
+                ),
+              ),
+        actions: const [SizedBox(width: 48)],
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: LibraryLayout.maxWidth),
             child: Column(
               children: [
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 600),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            tooltip: '返回餐厅',
-                            onPressed: () => Navigator.pop(context),
-                            icon: const MenuIcon(Icons.arrow_back),
-                          ),
-                          Expanded(
-                            child: term.isEmpty
-                                ? const Padding(
-                                    padding: EdgeInsets.only(left: 8),
-                                    child: Text(
-                                      '搜索餐厅',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  )
-                                : SearchScope(
-                                    labels: _labels,
-                                    selected: _scope,
-                                    onChanged: _changeScope,
-                                  ),
-                          ),
-                          const SizedBox(width: 48),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
                 Expanded(
                   child: Stack(
                     children: [
@@ -357,7 +341,7 @@ class _RestaurantSearchPageState extends State<RestaurantSearchPage> {
       controller: _resultsScroll[scope]!,
       onRestaurant: _openRestaurant,
       onDish: _openDish,
-      onReview: _openReview,
+      onContext: _openContext,
       onScope: _changeScope,
     );
   }

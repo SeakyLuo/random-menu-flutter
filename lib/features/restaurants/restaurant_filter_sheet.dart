@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../ui/menu_icon.dart';
-import '../../ui/menu_popup.dart';
+import 'restaurant_filter_pickers.dart';
 import '../../ui/menu_tag.dart';
 import '../../ui/menu_suggestion_input.dart';
 import 'restaurant_filter.dart';
@@ -27,22 +27,32 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
     super.dispose();
   }
 
-  Future<void> _dates() async {
-    final result = await showDateRangePicker(
-      context: context,
-      helpText: '消费日期',
-      firstDate: DateTime(1900),
-      lastDate: DateTime(2100),
-      initialDateRange: query.start == null
-          ? null
-          : DateTimeRange(start: query.start!, end: query.end!),
-    );
-    if (result == null || !mounted) return;
-    setState(() {
-      query.start = result.start;
-      query.end = result.end;
-    });
-  }
+  void _date(bool start) => showRestaurantDateWheel(
+    context,
+    start: start,
+    startDate: query.start,
+    endDate: query.end,
+    onConfirm: (date) => setState(() {
+      if (start) {
+        query.start = date;
+      } else {
+        query.end = date;
+      }
+    }),
+  );
+
+  void _regions(int level) => showRestaurantRegionWheel(
+    context,
+    level: level,
+    province: query.province,
+    city: query.city,
+    county: query.county,
+    onConfirm: (province, city, county) => setState(() {
+      query.province = province;
+      query.city = city;
+      query.county = county;
+    }),
+  );
 
   String _dateLabel(DateTime date) =>
       '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
@@ -62,53 +72,80 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
     ),
   );
 
-  Widget _region(
-    String label,
-    String value,
-    List<String> values,
-    ValueChanged<String> onChanged,
-  ) {
-    return MenuPopupButton<String>(
-      tooltip: '选择$label',
-      borderRadius: BorderRadius.circular(11),
-      onSelected: onChanged,
-      itemBuilder: (_) => [
-        MenuPopupItem(
-          value: '',
-          icon: Icons.location_on_outlined,
-          selected: value.isEmpty,
-          child: const Text('全部'),
+  Widget _region(String label, String value, int level) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: () => _regions(level),
+    child: InputDecorator(
+      decoration: InputDecoration(
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
         ),
-        for (final item in values)
-          MenuPopupItem(
-            value: item,
-            icon: Icons.location_on_outlined,
-            selected: value == item,
-            child: Text(item),
+        suffixIconConstraints: const BoxConstraints(
+          minWidth: 28,
+          minHeight: 20,
+        ),
+        suffixIcon: Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: MenuIcon(
+            Icons.expand_more,
+            size: 16,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-      ],
+        ),
+      ),
+      child: Text(
+        value.isEmpty ? label : value,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 15,
+          color: value.isEmpty
+              ? Theme.of(context).hintColor
+              : Theme.of(context).colorScheme.onSurface,
+        ),
+      ),
+    ),
+  );
+
+  Widget _dateField(bool start) {
+    final date = start ? query.start : query.end;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _date(start),
       child: InputDecorator(
         decoration: InputDecoration(
           suffixIconConstraints: const BoxConstraints(
-            minWidth: 28,
+            minWidth: 30,
             minHeight: 24,
           ),
-          suffixIcon: Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: MenuIcon(
-              Icons.expand_more,
-              size: 16,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
+          suffixIcon: date == null
+              ? Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: MenuIcon(
+                    Icons.date_range_outlined,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                )
+              : IconButton(
+                  tooltip: start ? '清除开始日期' : '清除结束日期',
+                  onPressed: () => setState(() {
+                    if (start) {
+                      query.start = null;
+                    } else {
+                      query.end = null;
+                    }
+                  }),
+                  icon: const MenuIcon(Icons.close, size: 18),
+                ),
         ),
         child: Text(
-          value.isEmpty ? label : value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          date == null ? (start ? '开始日期' : '结束日期') : _dateLabel(date),
           style: TextStyle(
-            fontSize: 15,
-            color: value.isEmpty
+            fontSize: 14,
+            color: date == null
                 ? Theme.of(context).hintColor
                 : Theme.of(context).colorScheme.onSurface,
           ),
@@ -126,24 +163,8 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
   Widget build(BuildContext context) {
     final restaurants = MenuScope.of(context).data.restaurants;
     final categories = restaurantCategoryNames(MenuScope.of(context).data);
-    final addresses = restaurants.expand((r) => r.addressEntries).toList();
     List<String> unique(Iterable<String> values) =>
         values.where((value) => value.isNotEmpty).toSet().toList()..sort();
-    final provinces = unique(addresses.map((a) => a.province));
-    final cities = unique(
-      addresses
-          .where((a) => query.province.isEmpty || a.province == query.province)
-          .map((a) => a.city),
-    );
-    final counties = unique(
-      addresses
-          .where(
-            (a) =>
-                (query.province.isEmpty || a.province == query.province) &&
-                (query.city.isEmpty || a.city == query.city),
-          )
-          .map((a) => a.county),
-    );
     final people = unique(
       restaurants.expand((r) => r.records).expand((visit) => visit.companions),
     );
@@ -183,7 +204,26 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _heading('城市'),
+                    _heading(
+                      '城市',
+                      action: query.hasRegion
+                          ? TextButton(
+                              onPressed: () => setState(() {
+                                query.province = '';
+                                query.city = '';
+                                query.county = '';
+                              }),
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(0, 32),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text(
+                                '清除',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            )
+                          : null,
+                    ),
                     const SizedBox(height: 6),
                     LayoutBuilder(
                       builder: (context, constraints) {
@@ -191,31 +231,9 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                             constraints.maxWidth < 280 ||
                             MediaQuery.textScalerOf(context).scale(13) > 22;
                         final controls = [
-                          _region(
-                            '省',
-                            query.province,
-                            provinces,
-                            (value) => setState(() {
-                              query.province = value;
-                              query.city = '';
-                              query.county = '';
-                            }),
-                          ),
-                          _region(
-                            '市',
-                            query.city,
-                            cities,
-                            (value) => setState(() {
-                              query.city = value;
-                              query.county = '';
-                            }),
-                          ),
-                          _region(
-                            '区',
-                            query.county,
-                            counties,
-                            (value) => setState(() => query.county = value),
-                          ),
+                          _region('省', query.province, 1),
+                          _region('市', query.city, 2),
+                          _region('区', query.county, 3),
                         ];
                         return stacked
                             ? Column(
@@ -235,77 +253,12 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                     const SizedBox(height: 18),
                     _heading('消费日期'),
                     const SizedBox(height: 6),
-                    Semantics(
-                      button: true,
-                      label: query.start == null
-                          ? '选择消费日期范围'
-                          : '消费日期 ${_dateLabel(query.start!)} 至 ${_dateLabel(query.end!)}，点击修改范围',
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: _dates,
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            suffixIcon: query.start == null
-                                ? Padding(
-                                    padding: const EdgeInsets.all(14),
-                                    child: MenuIcon(
-                                      Icons.date_range_outlined,
-                                      size: 18,
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                  )
-                                : IconButton(
-                                    tooltip: '清除日期',
-                                    onPressed: () => setState(() {
-                                      query.start = null;
-                                      query.end = null;
-                                    }),
-                                    icon: const MenuIcon(Icons.close, size: 18),
-                                  ),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  query.start == null
-                                      ? '开始日期'
-                                      : _dateLabel(query.start!),
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    color: query.start == null
-                                        ? Theme.of(context).hintColor
-                                        : scheme.onSurface,
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                                child: Text(
-                                  '—',
-                                  style: TextStyle(
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  query.end == null
-                                      ? '结束日期'
-                                      : _dateLabel(query.end!),
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    color: query.end == null
-                                        ? Theme.of(context).hintColor
-                                        : scheme.onSurface,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                    Row(
+                      spacing: 8,
+                      children: [
+                        Expanded(child: _dateField(true)),
+                        Expanded(child: _dateField(false)),
+                      ],
                     ),
                     const SizedBox(height: 18),
                     _heading('菜系'),
@@ -313,12 +266,14 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                     RestaurantCategoryInput(
                       controller: _category,
                       choices: categories,
+                      optionsViewOpenDirection: OptionsViewOpenDirection.up,
                     ),
                     const SizedBox(height: 18),
                     _heading('饭搭子'),
                     const SizedBox(height: 6),
                     MenuSuggestionInput(
                       controller: _companion,
+                      optionsViewOpenDirection: OptionsViewOpenDirection.up,
                       choices: people
                           .where((name) => !query.companions.contains(name))
                           .toList(),
@@ -326,10 +281,12 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                       showSuggestionsWhenEmpty: true,
                       emptyMessage: '没有找到这位饭搭子',
                       onSelected: (name) {
-                        _companion.clear();
                         setState(() {
                           query.companions.add(name);
                           query.companionsOnly = true;
+                        });
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) _companion.clear();
                         });
                       },
                     ),

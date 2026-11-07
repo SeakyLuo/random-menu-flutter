@@ -78,6 +78,7 @@ Future<MenuData> _read(
     rows['restaurant_visits']!,
     rows['restaurant_visit_items']!,
     rows['visit_companions']!,
+    rows['restaurant_visit_coupons']!,
     images,
   );
   final restaurants = [
@@ -211,6 +212,7 @@ Future<MapEntry<String, List<Map<String, Object?>>>> _readTable(
     'restaurant_dishes' ||
     'restaurant_visits' => 'restaurant_id, position',
     'restaurant_visit_items' ||
+    'restaurant_visit_coupons' ||
     'visit_companions' => 'restaurant_id, visit_id, position',
     'search_history' => 'search_type, position',
     'images' => 'kind, restaurant_id, owner_id, item_position, position',
@@ -252,6 +254,7 @@ Future<MapEntry<String, List<Map<String, Object?>>>> _readTable(
     'restaurant_dishes',
     'restaurant_visits',
     'restaurant_visit_items',
+    'restaurant_visit_coupons',
     'visit_companions',
   ].contains(table)) {
     return ids(

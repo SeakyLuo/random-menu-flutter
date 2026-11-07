@@ -14,6 +14,8 @@ import 'restaurant_card.dart';
 import 'restaurant_editor.dart';
 import 'restaurant_filter.dart';
 import 'restaurant_search_page.dart';
+import 'restaurant_quick_create.dart';
+import '../../ui/menu_popup.dart';
 export 'restaurant_editor.dart' show editRestaurant;
 export 'restaurant_card.dart' show RestaurantCard;
 
@@ -54,6 +56,7 @@ class RestaurantsPageState extends State<RestaurantsPage> {
   final _scroll = ScrollController();
   GeoPoint? _origin;
   bool _locating = false;
+  bool _creating = false;
   void scrollToTop() => scrollMenuToTop(context, _scroll);
   void _update(VoidCallback change) {
     setState(change);
@@ -64,6 +67,31 @@ class RestaurantsPageState extends State<RestaurantsPage> {
   void dispose() {
     _scroll.dispose();
     super.dispose();
+  }
+
+  Future<void> _quickCreate() async {
+    if (_creating) return;
+    final store = MenuScope.of(context);
+    setState(() => _creating = true);
+    await performAction(context, () async {
+      final paths = await store.photos.pick();
+      if (paths.isEmpty) return;
+      try {
+        final draft = await buildRestaurantFromPhotos(paths);
+        if (!mounted) return;
+        if (draft.missingDates) {
+          showToast(context, '部分照片没有拍摄时间，请核对消费日期');
+        }
+        await editRestaurant(
+          context,
+          initialAddresses: draft.addresses,
+          initialRecords: draft.records,
+        );
+      } finally {
+        await Future.wait(paths.map(store.photos.releaseSelection));
+      }
+    });
+    if (mounted) setState(() => _creating = false);
   }
 
   double _rankingOffset = 0;
@@ -207,7 +235,37 @@ class RestaurantsPageState extends State<RestaurantsPage> {
           label: '用餐统计',
           onPressed: _statistics,
         ),
-        PageAddButton(label: '添加餐厅', onPressed: () => editRestaurant(context)),
+        IgnorePointer(
+          ignoring: _creating,
+          child: MenuPopupButton<String>(
+            tooltip: '添加餐厅',
+            buttonBuilder: (open) => PageAddButton(
+              label: '添加餐厅，长按快捷创建',
+              busy: _creating,
+              onPressed: open,
+              onLongPress: _quickCreate,
+            ),
+            itemBuilder: (_) => const [
+              MenuPopupItem(
+                value: 'standard',
+                icon: Icons.edit_outlined,
+                child: Text('正常创建'),
+              ),
+              MenuPopupItem(
+                value: 'quick',
+                icon: Icons.photo_library_outlined,
+                child: Text('快捷创建'),
+              ),
+            ],
+            onSelected: (value) {
+              if (value == 'quick') {
+                _quickCreate();
+              } else {
+                editRestaurant(context);
+              }
+            },
+          ),
+        ),
       ],
       child: CustomScrollView(
         controller: _scroll,
@@ -304,6 +362,7 @@ class RestaurantsPageState extends State<RestaurantsPage> {
                 itemBuilder: (_, index) => RestaurantCard(
                   key: ValueKey(results[index].id),
                   restaurant: results[index],
+                  showReview: true,
                   distance: distances[results[index].id],
                   showDistance: _query.sort == RestaurantSort.nearest,
                 ),

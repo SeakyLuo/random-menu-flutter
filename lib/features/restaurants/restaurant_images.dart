@@ -1,6 +1,5 @@
 import '../../ui/menu_popup.dart';
 import '../../ui/menu_icon.dart';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../ui/widgets.dart';
@@ -102,16 +101,7 @@ class _RestaurantImagesState extends State<RestaurantImages> {
                           ),
                     child: Hero(
                       tag: (this, i),
-                      child: Image.file(
-                        File(widget.paths[i]),
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, error, stack) => ColoredBox(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHigh,
-                          child: const MenuIcon(Icons.broken_image_outlined),
-                        ),
-                      ),
+                      child: LocalPhoto(path: widget.paths[i]),
                     ),
                   ),
                 ),

@@ -11,6 +11,7 @@ class MenuSuggestionInput extends StatefulWidget {
     this.onSelected,
     this.showSuggestionsWhenEmpty = false,
     this.emptyMessage,
+    this.optionsViewOpenDirection = OptionsViewOpenDirection.down,
   });
   final TextEditingController controller;
   final List<String> choices;
@@ -18,6 +19,7 @@ class MenuSuggestionInput extends StatefulWidget {
   final ValueChanged<String>? onSelected;
   final bool showSuggestionsWhenEmpty;
   final String? emptyMessage;
+  final OptionsViewOpenDirection optionsViewOpenDirection;
 
   @override
   State<MenuSuggestionInput> createState() => _MenuSuggestionInputState();
@@ -36,10 +38,12 @@ class _MenuSuggestionInputState extends State<MenuSuggestionInput> {
     builder: (context, constraints) => Autocomplete<String>(
       textEditingController: widget.controller,
       focusNode: _focus,
+      optionsViewOpenDirection: widget.optionsViewOpenDirection,
       optionsBuilder: (value) {
         final query = value.text.trim().toLowerCase();
-        if (query.isEmpty && !widget.showSuggestionsWhenEmpty)
+        if (query.isEmpty && !widget.showSuggestionsWhenEmpty) {
           return const Iterable<String>.empty();
+        }
         return [
           ...widget.choices.where((name) => name.toLowerCase() == query),
           ...widget.choices.where(
@@ -62,6 +66,7 @@ class _MenuSuggestionInputState extends State<MenuSuggestionInput> {
               return TextField(
                 controller: controller,
                 focusNode: focus,
+                onTapOutside: (_) => focus.unfocus(),
                 style: const TextStyle(fontSize: 15),
                 textInputAction: widget.onSelected == null
                     ? TextInputAction.next
@@ -92,9 +97,17 @@ class _MenuSuggestionInputState extends State<MenuSuggestionInput> {
         final query = widget.controller.text.trim();
 
         return Align(
-          alignment: Alignment.topLeft,
+          widthFactor: 1,
+          heightFactor: 1,
+          alignment:
+              widget.optionsViewOpenDirection == OptionsViewOpenDirection.up
+              ? Alignment.bottomLeft
+              : Alignment.topLeft,
           child: Padding(
-            padding: const EdgeInsets.only(top: 4),
+            padding:
+                widget.optionsViewOpenDirection == OptionsViewOpenDirection.up
+                ? const EdgeInsets.only(bottom: 4)
+                : const EdgeInsets.only(top: 4),
             child: Material(
               color: Theme.of(context).colorScheme.surface,
               surfaceTintColor: Colors.transparent,

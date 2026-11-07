@@ -27,8 +27,20 @@ Map<String, List<Visit>> _visitGroups(
   List<Map<String, Object?>> visits,
   List<Map<String, Object?>> items,
   List<Map<String, Object?>> people,
+  List<Map<String, Object?>> couponRows,
   _Images images,
 ) {
+  final coupons = <(String, String), List<VisitCoupon>>{};
+  for (final row in couponRows) {
+    (coupons[(row['restaurant_id'] as String, row['visit_id'] as String)] ??=
+            [])
+        .add(
+          VisitCoupon(
+            threshold: (row['threshold'] as num?)?.toDouble(),
+            discount: (row['discount'] as num).toDouble(),
+          ),
+        );
+  }
   final companions = <(String, String), List<String>>{};
   for (final row in people) {
     (companions[(row['restaurant_id'] as String, row['visit_id'] as String)] ??=
@@ -61,6 +73,7 @@ Map<String, List<Visit>> _visitGroups(
         addressId: row['address_id'] as String,
         address: row['address'] as String,
         autoCost: row['auto_cost'] == 1,
+        coupons: coupons[(restaurant, id)] ?? [],
         note: row['note'] as String,
         dishes: List<String>.from(jsonDecode(row['dishes'] as String) as List),
         companions: companions[(restaurant, id)] ?? [],
@@ -73,6 +86,22 @@ Map<String, List<Visit>> _visitGroups(
 }
 
 List<_TableRows> _restaurantRows(List<Restaurant> restaurants) => [
+  _TableRows(
+    'restaurant_visit_coupons',
+    ['restaurant_id', 'visit_id', 'position'],
+    [
+      for (final restaurant in restaurants)
+        for (final visit in restaurant.records)
+          for (final (position, coupon) in visit.coupons.indexed)
+            {
+              'restaurant_id': restaurant.id,
+              'visit_id': visit.id,
+              'position': position,
+              'threshold': coupon.threshold,
+              'discount': coupon.discount,
+            },
+    ],
+  ),
   _TableRows(
     'restaurant_dishes',
     ['restaurant_id', 'id'],

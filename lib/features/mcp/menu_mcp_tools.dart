@@ -62,16 +62,31 @@ class MenuMcpTools {
       },
     },
     'visit' => {
-      'addressId': {
-        ..._text,
-        'description': '已有餐厅分店地址的 id，可由 get_restaurant 查询',
-      },
+      'addressId': {..._text, 'description': '已有餐厅地址的 id，可由 get_restaurant 查询'},
       'autoCost': _flag,
       'date': {..._text, 'description': 'ISO 8601 到店日期'},
       'totalCost': _number,
       'address': _text,
       'note': _text,
       'companions': _strings,
+      'coupons': {
+        'type': 'array',
+        'maxItems': 100,
+        'description':
+            '整体替换本次用券列表。discount 为优惠减额（必填），threshold 为使用门槛（选填，省略表示无门槛）。实付由 autoCost 决定是否自动扣券。',
+        'items': {
+          'type': 'object',
+          'properties': {
+            'threshold': {
+              'type': ['number', 'null'],
+              'minimum': 0.01,
+            },
+            'discount': {'type': 'number', 'minimum': 0.01},
+          },
+          'required': ['discount'],
+          'additionalProperties': false,
+        },
+      },
       'items': {
         'type': 'array',
         'items': _item,
@@ -362,11 +377,13 @@ class MenuMcpTools {
             if (args.containsKey('autoCost')) {
               visit.autoCost = args['autoCost'] as bool;
             }
+            if (args.containsKey('coupons')) {
+              visit.coupons = (args['coupons'] as List)
+                  .map((c) => VisitCoupon.fromJson(c as Map<String, dynamic>))
+                  .toList();
+            }
             if (visit.autoCost) {
-              visit.totalCost = visit.items.fold(
-                0.0,
-                (sum, item) => sum + item.cost,
-              );
+              visit.totalCost = visit.bill.total;
             }
             restaurant.records = [
               for (final r in restaurant.records)
@@ -475,6 +492,9 @@ class MenuMcpTools {
 
   static void _validate(Object? value, Map schema) {
     switch (schema['type']) {
+      case ['number', 'null']:
+        if (value == null) return;
+        _validate(value, {...schema, 'type': 'number'});
       case 'object':
         if (value is! Map) throw ArgumentError('Expected an object.');
         final fields = schema['properties'] as Map;

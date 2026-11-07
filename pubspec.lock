@@ -227,6 +227,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_pickers:
+    dependency: "direct main"
+    description:
+      name: flutter_pickers
+      sha256: "6dea0d88e2e98412742de3d8fe04718f5eaf74e31ca915d579d2d4b457307a9a"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
   flutter_plugin_android_lifecycle:
     dependency: transitive
     description:

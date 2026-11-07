@@ -53,65 +53,76 @@ class _CompanionStatsPageState extends State<CompanionStatsPage> {
                 constraints: const BoxConstraints(maxWidth: 600),
                 child: ListView.builder(
                   controller: _scroll,
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
                   itemCount: ranks.length,
                   itemBuilder: (context, index) {
                     final name = ranks[index];
                     final count = counts[name]!;
-                    return Container(
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(
-                            color: Theme.of(context).colorScheme.outlineVariant,
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Material(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(2),
+                        clipBehavior: Clip.antiAlias,
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
                           ),
-                        ),
-                      ),
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        minVerticalPadding: 16,
-                        leading: SizedBox(
-                          width: 28,
-                          child: Center(
-                            child: name.isEmpty
-                                ? const MenuIcon(Icons.person_outline, size: 18)
-                                : Text(
-                                    '$index',
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
+                          minTileHeight: 48,
+                          minVerticalPadding: 12,
+                          minLeadingWidth: 28,
+                          horizontalTitleGap: 12,
+                          leading: SizedBox(
+                            width: 28,
+                            child: Center(
+                              child: name.isEmpty
+                                  ? const MenuIcon(
+                                      Icons.person_outline,
+                                      size: 18,
+                                    )
+                                  : Text(
+                                      '$index',
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                      ),
                                     ),
-                                  ),
-                          ),
-                        ),
-                        title: Text(
-                          name.isEmpty ? '独自用餐' : name,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '$count',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
                             ),
-                            const Text(' 次', style: TextStyle(fontSize: 12)),
-                            if (count > 0)
-                              const MenuIcon(Icons.chevron_right, size: 17),
-                          ],
-                        ),
-                        onTap: count == 0
-                            ? null
-                            : () => Navigator.pop(
-                                context,
-                                RestaurantQuery(
-                                  alone: name.isEmpty,
-                                  companionsOnly: name.isNotEmpty,
-                                  companions: name.isEmpty ? {} : {name},
+                          ),
+                          title: Text(
+                            name.isEmpty ? '独自用餐' : name,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              height: 1.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$count',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
+                              const Text(' 次', style: TextStyle(fontSize: 12)),
+                              if (count > 0)
+                                const MenuIcon(Icons.chevron_right, size: 17),
+                            ],
+                          ),
+                          onTap: count == 0
+                              ? null
+                              : () => Navigator.pop(
+                                  context,
+                                  RestaurantQuery(
+                                    alone: name.isEmpty,
+                                    companionsOnly: name.isNotEmpty,
+                                    companions: name.isEmpty ? {} : {name},
+                                  ),
+                                ),
+                        ),
                       ),
                     );
                   },

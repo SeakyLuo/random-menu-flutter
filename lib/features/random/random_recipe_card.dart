@@ -16,6 +16,7 @@ class RandomRecipeCard extends StatelessWidget {
     this.coverPath,
     this.showFavorite = true,
     this.titleSpan,
+    this.fullResolutionPhoto = false,
   });
   final Recipe recipe;
   final double captionOpacity;
@@ -26,6 +27,7 @@ class RandomRecipeCard extends StatelessWidget {
   final String? coverPath;
   final bool showFavorite;
   final InlineSpan? titleSpan;
+  final bool fullResolutionPhoto;
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +90,11 @@ class RandomRecipeCard extends StatelessWidget {
             fit: compact ? StackFit.loose : StackFit.expand,
             children: [
               Positioned.fill(
-                child: RecipeCover(recipe: recipe, path: coverPath),
+                child: RecipeCover(
+                  recipe: recipe,
+                  path: coverPath,
+                  fullResolution: fullResolutionPhoto,
+                ),
               ),
               if (hasPhoto)
                 const Positioned.fill(
@@ -154,13 +160,22 @@ class RandomRecipeCard extends StatelessWidget {
 }
 
 class RecipeCover extends StatelessWidget {
-  const RecipeCover({super.key, required this.recipe, this.path});
+  const RecipeCover({
+    super.key,
+    required this.recipe,
+    this.path,
+    this.fullResolution = false,
+  });
   final Recipe recipe;
   final String? path;
+  final bool fullResolution;
   @override
   Widget build(BuildContext context) =>
       path != null || recipe.imagePaths.isNotEmpty
-      ? RetainedLocalPhoto(path: path ?? recipe.imagePaths.first)
+      ? RetainedLocalPhoto(
+          path: path ?? recipe.imagePaths.first,
+          fullResolution: fullResolution,
+        )
       : DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(

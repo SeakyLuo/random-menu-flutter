@@ -160,6 +160,7 @@ class _RecipeSharePageState extends State<RecipeSharePage> {
                                   recipe: widget.recipe,
                                   coverPath: _coverPath,
                                   showFavorite: false,
+                                  fullResolutionPhoto: true,
                                 ),
                               ),
                             ),

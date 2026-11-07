@@ -1,6 +1,7 @@
 part of 'menu_database.dart';
 
 const _schema = [
+  _couponSchema,
   '''CREATE TABLE recipes (id TEXT PRIMARY KEY, position INTEGER NOT NULL,
  name TEXT NOT NULL, note TEXT NOT NULL, hidden_rounds INTEGER NOT NULL, created_at TEXT NOT NULL)''',
   '''CREATE TABLE restaurants (id TEXT PRIMARY KEY, position INTEGER NOT NULL,

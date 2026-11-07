@@ -19,6 +19,7 @@ TextSpan highlightSearchText(
   Color color, {
   Color? backgroundColor,
 }) {
+  if (query.isEmpty) return TextSpan(text: text);
   final spans = <InlineSpan>[];
   final lower = text.toLowerCase();
   final term = query.toLowerCase();

@@ -29,6 +29,7 @@ class MenuPopupButton<T> extends StatelessWidget {
     required this.tooltip,
     this.icon = const MenuIcon(Icons.more_horiz),
     this.child,
+    this.buttonBuilder,
     this.enabled = true,
     this.borderRadius = const BorderRadius.all(Radius.circular(16)),
   });
@@ -38,6 +39,7 @@ class MenuPopupButton<T> extends StatelessWidget {
   final String tooltip;
   final Widget icon;
   final Widget? child;
+  final Widget Function(VoidCallback open)? buttonBuilder;
   final bool enabled;
   final BorderRadius borderRadius;
 
@@ -117,7 +119,9 @@ class MenuPopupButton<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Builder(
-    builder: (context) => child == null
+    builder: (context) => buttonBuilder != null
+        ? buttonBuilder!(() => _open(context))
+        : child == null
         ? IconButton(
             tooltip: tooltip,
             onPressed: enabled ? () => _open(context) : null,

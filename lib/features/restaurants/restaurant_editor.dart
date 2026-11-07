@@ -19,18 +19,30 @@ import '../photo_import/import_models.dart';
 Future<bool> editRestaurant(
   BuildContext context, {
   Restaurant? restaurant,
+  List<RestaurantAddress> initialAddresses = const [],
+  List<Visit> initialRecords = const [],
 }) async =>
     await Navigator.push<bool>(
       context,
       MaterialPageRoute<bool>(
-        builder: (_) => _RestaurantEditor(restaurant: restaurant),
+        builder: (_) => _RestaurantEditor(
+          restaurant: restaurant,
+          initialAddresses: initialAddresses,
+          initialRecords: initialRecords,
+        ),
       ),
     ) ==
     true;
 
 class _RestaurantEditor extends StatefulWidget {
-  const _RestaurantEditor({this.restaurant});
+  const _RestaurantEditor({
+    this.restaurant,
+    required this.initialAddresses,
+    required this.initialRecords,
+  });
   final Restaurant? restaurant;
+  final List<RestaurantAddress> initialAddresses;
+  final List<Visit> initialRecords;
   @override
   State<_RestaurantEditor> createState() => _RestaurantEditorState();
 }
@@ -43,12 +55,12 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
   late final note = TextEditingController(text: widget.restaurant?.note ?? '');
   late final link = TextEditingController(text: widget.restaurant?.link ?? '');
   late List<RestaurantAddress> addresses =
-      (widget.restaurant?.addressEntries ?? <RestaurantAddress>[])
+      (widget.restaurant?.addressEntries ?? widget.initialAddresses)
           .map((entry) => RestaurantAddress.fromJson(entry.toJson()))
           .toList();
   late final recordDraft = RestaurantRecordDraft(
     widget.restaurant?.records ?? [],
-  );
+  )..records.addAll(widget.initialRecords);
   late final draftId = widget.restaurant?.id ?? newId();
   late bool favorite = widget.restaurant?.favorite ?? false;
   late String _storedCategory = widget.restaurant?.category ?? '';
@@ -223,7 +235,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
       visit.items[index] = dish;
       visit.dishes = visit.items.map((item) => item.name).toList();
       if (visit.autoCost) {
-        visit.totalCost = visit.items.fold(0.0, (sum, item) => sum + item.cost);
+        visit.totalCost = visit.bill.total;
       }
     });
   }
@@ -404,7 +416,8 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                   const MenuFieldLabel(
                     '餐厅名称',
                     isRequired: true,
-                    icon: Icons.storefront_outlined,
+                    minHeight: 44,
+                    bottomSpacing: 4,
                   ),
                   TextField(
                     controller: name,
@@ -412,20 +425,19 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(hintText: '记下一家值得再去的店'),
                   ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: MenuFieldLabel('菜系', icon: Icons.restaurant),
+                  const SizedBox(height: 16),
+                  MenuFieldLabel(
+                    '菜系',
+                    minHeight: 44,
+                    bottomSpacing: 4,
+                    trailing: TextButton(
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 44),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: TextButton(
-                          onPressed: manageCategories,
-                          child: const Text('管理'),
-                        ),
-                      ),
-                    ],
+                      onPressed: manageCategories,
+                      child: const Text('管理'),
+                    ),
                   ),
                   RestaurantCategoryInput(
                     controller: category,
@@ -433,12 +445,21 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                       MenuScope.of(context).data,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   MenuFieldLabel(
-                    '分店地址',
+                    '地址',
+                    minHeight: 44,
+                    bottomSpacing: 4,
                     icon: Icons.place_outlined,
                     trailing: IconButton(
-                      tooltip: '添加分店地址',
+                      tooltip: '添加地址',
+                      constraints: const BoxConstraints.tightFor(
+                        width: 44,
+                        height: 44,
+                      ),
+                      style: IconButton.styleFrom(
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                       onPressed: addAddress,
                       icon: const MenuIcon(Icons.add, size: 20),
                     ),
@@ -446,7 +467,9 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                   for (var i = 0; i < addresses.length; i++)
                     Padding(
                       key: ValueKey(addresses[i].id),
-                      padding: const EdgeInsets.only(bottom: 12),
+                      padding: EdgeInsets.only(
+                        bottom: i == addresses.length - 1 ? 0 : 12,
+                      ),
                       child: RestaurantAddressFields(
                         address: addresses[i],
                         autofocus: addresses[i].id == _newAddressId,
@@ -494,17 +517,13 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                         ),
                       ),
                     ),
-                  const SizedBox(height: 24),
-                  RestaurantRecordSection(
-                    records: recordDraft.records,
-                    onAdd: () => editRecord(),
-                    onPhotos: addRecordPhotos,
-                    onEdit: editRecord,
-                    onDish: editRecordDish,
-                    onRemove: removeRecord,
+                  const SizedBox(height: 16),
+                  const MenuFieldLabel(
+                    '评价',
+                    icon: Icons.edit_note,
+                    minHeight: 44,
+                    bottomSpacing: 4,
                   ),
-                  const SizedBox(height: 24),
-                  const MenuFieldLabel('评价', icon: Icons.edit_note),
                   TextField(
                     controller: note,
                     style: const TextStyle(fontSize: 15, height: 1.6),
@@ -514,13 +533,27 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                       hintText: '口味、推荐理由或需要注意的事',
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  const MenuFieldLabel('相关链接', icon: Icons.link),
+                  const SizedBox(height: 16),
+                  const MenuFieldLabel(
+                    '相关链接',
+                    icon: Icons.link,
+                    minHeight: 44,
+                    bottomSpacing: 4,
+                  ),
                   TextField(
                     controller: link,
                     style: const TextStyle(fontSize: 15),
                     keyboardType: TextInputType.url,
                     decoration: const InputDecoration(hintText: '店铺或地图链接'),
+                  ),
+                  const SizedBox(height: 16),
+                  RestaurantRecordSection(
+                    records: recordDraft.records,
+                    onAdd: () => editRecord(),
+                    onPhotos: addRecordPhotos,
+                    onEdit: editRecord,
+                    onDish: editRecordDish,
+                    onRemove: removeRecord,
                   ),
                 ],
               ),

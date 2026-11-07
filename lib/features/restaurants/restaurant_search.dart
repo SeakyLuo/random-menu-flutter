@@ -13,6 +13,10 @@ int _textScore(String text, String query, [int offset = 0]) {
   } else if (text.contains(query)) {
     score = 85;
   } else {
+    final length = max(text.length, query.length);
+    if ((text.length - query.length).abs() * 100 ~/ length > 60) {
+      return max(offset, 0);
+    }
     var previous = List.generate(query.length + 1, (i) => i);
     for (var i = 1; i <= text.length; i++) {
       final current = List.filled(query.length + 1, 0)..[0] = i;
@@ -33,16 +37,7 @@ int _textScore(String text, String query, [int offset = 0]) {
 int restaurantSearchScore(Restaurant restaurant, String query) {
   int score(String value, [int offset = 0]) =>
       _textScore(value.toLowerCase(), query.toLowerCase(), offset);
-  var total =
-      score(restaurant.name) +
-      score(restaurant.note, -10) +
-      score(restaurant.category, -10);
-  for (final address in restaurant.addresses) {
-    total += score(address, -15);
-  }
-  for (final food in restaurant.foods) {
-    total += score(food.name, -15) + score(food.note, -20);
-  }
+  var total = score(restaurant.name) + score(restaurant.note, -10);
   for (final record in restaurant.records) {
     total += score(record.note, -15);
     for (final food in record.items) {
@@ -50,4 +45,17 @@ int restaurantSearchScore(Restaurant restaurant, String query) {
     }
   }
   return total;
+}
+
+int restaurantDishSearchScore(
+  String name,
+  Iterable<String> notes,
+  String query,
+) {
+  final term = query.toLowerCase();
+  return _textScore(name.toLowerCase(), term, -15) +
+      notes.fold(
+        0,
+        (sum, note) => sum + _textScore(note.toLowerCase(), term, -20),
+      );
 }

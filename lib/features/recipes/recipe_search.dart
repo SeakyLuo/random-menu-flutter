@@ -15,6 +15,10 @@ int _textScore(String text, String query, [int offset = 0]) {
   } else if (text.contains(query)) {
     score = 85;
   } else {
+    final length = max(text.length, query.length);
+    if ((text.length - query.length).abs() * 100 ~/ length > 60) {
+      return max(offset, 0);
+    }
     var previous = List.generate(query.length + 1, (i) => i);
     for (var i = 1; i <= text.length; i++) {
       final current = List.filled(query.length + 1, 0)..[0] = i;
@@ -33,12 +37,13 @@ int _textScore(String text, String query, [int offset = 0]) {
 }
 
 int recipeSearchScore(Recipe recipe, String query, RecipeSearchField field) {
-  final name = _textScore(recipe.name, query);
+  query = query.toLowerCase();
+  final name = _textScore(recipe.name.toLowerCase(), query);
   final tags = recipe.tags.fold(
     0,
-    (score, tag) => max(score, _textScore(tag, query, -15)),
+    (score, tag) => max(score, _textScore(tag.toLowerCase(), query, -15)),
   );
-  var note = _textScore(recipe.note, query, -30);
+  var note = _textScore(recipe.note.toLowerCase(), query, -30);
   if (note == 70) note = 120;
   final score = switch (field) {
     RecipeSearchField.all => name + tags + note,
@@ -47,7 +52,7 @@ int recipeSearchScore(Recipe recipe, String query, RecipeSearchField field) {
     RecipeSearchField.note => note,
   };
   if (score == 0) return 0;
-  return max(1, score + (recipe.favorite ? 10 : 0) - recipe.hiddenRounds);
+  return score + (recipe.favorite ? 10 : 0) - recipe.hiddenRounds;
 }
 
 void mergeRecipe(Recipe target, Recipe incoming) {

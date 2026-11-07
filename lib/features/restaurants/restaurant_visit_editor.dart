@@ -11,6 +11,7 @@ import '../../ui/library_widgets.dart';
 import 'restaurant_address_editor.dart';
 import 'restaurant_images.dart';
 import 'visit_dish_editor.dart';
+import 'visit_coupon_fields.dart';
 import 'restaurant_record_draft.dart';
 import '../photo_import/import_models.dart';
 import '../media/photo_widget.dart';
@@ -43,6 +44,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
       widget.visit?.items.map((i) => VisitDish.fromJson(i.toJson())).toList() ??
       [];
   late List<String> images = [...?widget.visit?.imagePaths];
+  late List<VisitCoupon> coupons = [...?widget.visit?.coupons];
   late bool autoCost = widget.visit?.autoCost ?? true;
   late String addressId =
       widget.visit?.addressId ??
@@ -73,6 +75,10 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
       companions.text != (widget.visit?.companions.join('，') ?? '') ||
       note.text != (widget.visit?.note ?? '') ||
       autoCost != (widget.visit?.autoCost ?? true) ||
+      jsonEncode(coupons.map((c) => c.toJson()).toList()) !=
+          jsonEncode(
+            widget.visit?.coupons.map((c) => c.toJson()).toList() ?? [],
+          ) ||
       addressId !=
           (widget.visit?.addressId ??
               (widget.restaurant.addressEntries.length == 1
@@ -101,6 +107,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
       .where((v) => v.isNotEmpty)
       .toList();
   double get subtotal => items.fold(0.0, (sum, item) => sum + item.cost);
+  VisitBill get bill => VisitBill(subtotal, coupons);
   @override
   void initState() {
     super.initState();
@@ -246,17 +253,18 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
   }
 
   void recalculate() {
-    if (autoCost) total.text = money(subtotal);
+    if (autoCost) total.text = money(bill.total);
   }
 
   Future<void> changeAutoCost(bool selected) async {
     if (selected &&
-        double.tryParse(total.text) != subtotal &&
+        double.tryParse(total.text) != bill.total &&
         !await confirmAction(
           context,
           title: '按菜品重新计算？',
-          message: '消费总额将替换为菜品合计 ¥${money(subtotal)}。',
-          confirmLabel: '使用菜品合计',
+          message:
+              '菜品合计 ¥${money(bill.subtotal)}，用券抵扣 ¥${money(bill.discount)}，实付将改为 ¥${money(bill.total)}。',
+          confirmLabel: '使用自动计算',
           destructive: false,
         )) {
       return;
@@ -364,6 +372,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
         companions: people,
         note: note.text.trim(),
         items: items,
+        coupons: coupons,
         dishes: items.map((item) => item.name).toList(),
         autoCost: autoCost,
         addressId: addressId,
@@ -421,6 +430,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
           note: note.text.trim(),
           dishes: savedItems.map((i) => i.name).toList(),
           items: savedItems,
+          coupons: coupons,
           autoCost: autoCost,
           addressId: addressId,
           address: address,
@@ -545,24 +555,20 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
                     ],
                   ),
                 ),
-              if (widget.draftOnly)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: addPhotoItems,
-                    icon: const MenuIcon(
-                      Icons.add_photo_alternate_outlined,
-                      size: 18,
-                    ),
-                    label: const Text('批量添加照片'),
-                  ),
-                ),
               SectionTitle(
                 '本次菜品 · ${items.length}',
-                trailing: TextButton.icon(
-                  onPressed: addItem,
-                  icon: const MenuIcon(Icons.add, size: 18),
-                  label: const Text('添加菜品'),
+                trailing: Tooltip(
+                  message: widget.draftOnly ? '添加菜品，长按从照片快速添加' : '添加菜品',
+                  triggerMode: widget.draftOnly
+                      ? TooltipTriggerMode.manual
+                      : TooltipTriggerMode.longPress,
+                  child: GestureDetector(
+                    onLongPress: widget.draftOnly ? addPhotoItems : null,
+                    child: IconButton(
+                      onPressed: addItem,
+                      icon: const MenuIcon(Icons.add, size: 20),
+                    ),
+                  ),
                 ),
               ),
               if (items.isEmpty) const Text('可先记录饭搭子和环境，也可以添加本次吃过的菜。'),
@@ -625,11 +631,22 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
                     ],
                   ),
                 ),
+              VisitCouponFields(
+                coupons: coupons,
+                subtotal: subtotal,
+                autoCost: autoCost,
+                onChanged: (value) => setState(() {
+                  coupons = value;
+                  recalculate();
+                }),
+              ),
               const SectionTitle('消费'),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('按菜品自动计算'),
-                subtitle: Text('菜品合计 ¥${money(subtotal)}'),
+                subtitle: Text(
+                  '菜品合计 ¥${money(bill.subtotal)}${autoCost && coupons.isNotEmpty ? ' − 用券 ¥${money(bill.discount)}' : ''}',
+                ),
                 value: autoCost,
                 onChanged: changeAutoCost,
               ),
@@ -641,11 +658,11 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
                   decimal: true,
                 ),
                 decoration: InputDecoration(
-                  labelText: '消费总额',
+                  labelText: '实际支付',
                   prefixText: '¥ ',
                   helperText: autoCost
-                      ? '修改本次菜品的单价或数量可调整总额'
-                      : '包含优惠、服务费等实际支付金额',
+                      ? '按菜品合计扣除用券优惠，修改菜品或用券会重新计算'
+                      : '填写券后实付金额，不会再次扣除用券优惠',
                 ),
               ),
               Padding(

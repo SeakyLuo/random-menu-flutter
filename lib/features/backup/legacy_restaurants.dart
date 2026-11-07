@@ -1,4 +1,5 @@
 import '../../core/models.dart';
+import '../../core/visit_coupon_migration.dart';
 import 'legacy_reader.dart';
 
 List<Restaurant> parseLegacyRestaurants(
@@ -134,7 +135,7 @@ class _LegacyRestaurant {
     }).toList();
     final total = visit.number('totalCost');
     if (total < 0) visit.fail();
-    return Visit(
+    final result = Visit(
       id: 'android-visit-$id',
       date: DateTime.fromMillisecondsSinceEpoch(visit.integer('consumeTime')),
       addressId: address.id,
@@ -149,6 +150,14 @@ class _LegacyRestaurant {
         legacyStrings(visit.list('environmentPictures', omitted: true)),
       ),
     );
+    final extracted = extractVisitCoupons(result.note);
+    result.note = extracted.note;
+    result.coupons = extracted.coupons;
+    if (result.coupons.isNotEmpty &&
+        (result.bill.total * 100).round() != (result.totalCost * 100).round()) {
+      result.autoCost = false;
+    }
+    return result;
   }
 
   _Dish _dish(Object? raw, {int? visitId}) {

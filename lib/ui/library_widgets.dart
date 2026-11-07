@@ -127,18 +127,22 @@ class PageAddButton extends StatelessWidget {
     super.key,
     required this.label,
     required this.onPressed,
+    this.onLongPress,
+    this.busy = false,
   });
 
   final String label;
   final VoidCallback onPressed;
+  final VoidCallback? onLongPress;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return SizedBox.square(
+    final button = SizedBox.square(
       dimension: 48,
       child: IconButton(
-        tooltip: label,
+        tooltip: onLongPress == null ? label : null,
         onPressed: onPressed,
         iconSize: 36,
         padding: const EdgeInsets.all(6),
@@ -155,10 +159,24 @@ class PageAddButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(11),
           ),
           child: Center(
-            child: MenuIcon(Icons.add, size: 22, color: scheme.onPrimary),
+            child: busy
+                ? SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: scheme.onPrimary,
+                    ),
+                  )
+                : MenuIcon(Icons.add, size: 22, color: scheme.onPrimary),
           ),
         ),
       ),
+    );
+    if (onLongPress == null) return button;
+    return Tooltip(
+      message: label,
+      triggerMode: TooltipTriggerMode.manual,
+      child: GestureDetector(onLongPress: onLongPress, child: button),
     );
   }
 }

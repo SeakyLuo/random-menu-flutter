@@ -8,6 +8,7 @@ class RestaurantPhoto {
     required this.note,
     required this.date,
     this.price,
+    this.isEnvironment = false,
   });
   final String key;
   final String path;
@@ -15,6 +16,7 @@ class RestaurantPhoto {
   final String note;
   final DateTime? date;
   final double? price;
+  final bool isEnvironment;
 }
 
 List<RestaurantPhoto> restaurantGallery(Restaurant restaurant) {
@@ -70,6 +72,7 @@ List<RestaurantPhoto> restaurantGallery(Restaurant restaurant) {
           key: '${visit.id}:environment:$i',
           path: visit.imagePaths[i],
           name: '用餐环境',
+          isEnvironment: true,
           note: '',
           date: visit.date,
         ),

@@ -5,6 +5,7 @@ import '../../ui/favorite_glass_button.dart';
 import '../../ui/glass_surface.dart';
 import '../../ui/menu_icon.dart';
 import '../../ui/widgets.dart';
+import '../../ui/search_match.dart';
 import '../media/photo_widget.dart';
 import 'restaurant_detail_page.dart';
 import 'restaurant_gallery_data.dart';
@@ -17,11 +18,13 @@ class RestaurantCard extends StatefulWidget {
     required this.restaurant,
     this.distance,
     this.showDistance = false,
+    this.showReview = false,
     this.onOpen,
     this.titleBuilder,
   });
   final RestaurantDistance? distance;
   final bool showDistance;
+  final bool showReview;
   final Restaurant restaurant;
   final VoidCallback? onOpen;
   final InlineSpan Function(bool hasPhoto)? titleBuilder;
@@ -205,6 +208,8 @@ class _RestaurantCardState extends State<RestaurantCard> {
               ),
             ),
           ),
+          if (widget.showReview && r.note.isNotEmpty)
+            SearchMatchCaption(text: '“${r.note}”', query: '', onTap: _open),
         ],
       ),
     );
@@ -216,6 +221,7 @@ class _RestaurantCardState extends State<RestaurantCard> {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
       decoration: BoxDecoration(
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(14),
         boxShadow: const [
           BoxShadow(

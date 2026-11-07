@@ -150,6 +150,7 @@ class MenuSqlStatement {
     'restaurant_dishes',
     'restaurant_visits',
     'restaurant_visit_items',
+    'restaurant_visit_coupons',
     'restaurant_categories',
     'visit_companions',
     'search_history',

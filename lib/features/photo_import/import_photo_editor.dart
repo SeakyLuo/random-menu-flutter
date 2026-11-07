@@ -167,7 +167,7 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
     setState(() => busy = false);
     if (!success) return;
     if (suggestion == null) {
-      showToast(context, '未能识别地点，请手动填写分店地址');
+      showToast(context, '未能识别地点，请手动填写地址');
       return;
     }
     addAddress(suggestion: suggestion);

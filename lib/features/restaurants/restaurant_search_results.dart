@@ -20,7 +20,7 @@ class RestaurantSearchResults extends StatelessWidget {
     required this.controller,
     required this.onRestaurant,
     required this.onDish,
-    required this.onReview,
+    required this.onContext,
     required this.onScope,
   });
   final RestaurantSearchMatches matches;
@@ -30,7 +30,7 @@ class RestaurantSearchResults extends StatelessWidget {
   final ScrollController controller;
   final ValueChanged<Restaurant> onRestaurant;
   final ValueChanged<RestaurantDishHit> onDish;
-  final ValueChanged<RestaurantReviewHit> onReview;
+  final ValueChanged<RestaurantSearchHit> onContext;
   final ValueChanged<RestaurantSearchField> onScope;
 
   Widget _restaurant(BuildContext context, RestaurantSearchHit hit) {
@@ -50,9 +50,11 @@ class RestaurantSearchResults extends StatelessWidget {
         ),
         if (hit.context case final text?)
           SearchMatchCaption(
-            text: searchMatchExcerpt(text, query),
+            text: hit.visit != null || text == hit.restaurant.note
+                ? '“${searchMatchExcerpt(text, query)}”'
+                : searchMatchExcerpt(text, query),
             query: query,
-            onTap: () => onRestaurant(hit.restaurant),
+            onTap: () => onContext(hit),
           ),
       ],
     );
@@ -149,7 +151,6 @@ class RestaurantSearchResults extends StatelessWidget {
             child: Text(
               '${matches.count(scope)} ${switch (scope) {
                 RestaurantSearchField.dishes => '道菜',
-                RestaurantSearchField.reviews => '条评价',
                 _ => '家餐厅',
               }}',
               style: TextStyle(
@@ -169,7 +170,7 @@ class RestaurantSearchResults extends StatelessWidget {
             context,
             '餐厅',
             matches.restaurants.length,
-            3,
+            4,
             RestaurantSearchField.restaurants,
           ),
         );
@@ -177,7 +178,7 @@ class RestaurantSearchResults extends StatelessWidget {
       slivers.add(
         SliverRestaurantGrid(
           itemCount: all
-              ? math.min(3, matches.restaurants.length)
+              ? math.min(4, matches.restaurants.length)
               : matches.restaurants.length,
           itemBuilder: (_, index) =>
               _restaurant(context, matches.restaurants[index]),
@@ -195,7 +196,7 @@ class RestaurantSearchResults extends StatelessWidget {
             context,
             '菜品',
             matches.dishes.length,
-            6,
+            8,
             RestaurantSearchField.dishes,
           ),
         );
@@ -203,51 +204,12 @@ class RestaurantSearchResults extends StatelessWidget {
       slivers.add(
         _dishes(
           context,
-          all ? math.min(6, matches.dishes.length) : matches.dishes.length,
+          all ? math.min(8, matches.dishes.length) : matches.dishes.length,
         ),
       );
       if (all) {
         slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 28)));
       }
-    }
-    if ((all || scope == RestaurantSearchField.reviews) &&
-        matches.reviews.isNotEmpty) {
-      if (all) {
-        slivers.add(
-          _header(
-            context,
-            '评价',
-            matches.reviews.length,
-            3,
-            RestaurantSearchField.reviews,
-          ),
-        );
-      }
-      slivers.add(
-        SliverList.builder(
-          itemCount: all
-              ? math.min(3, matches.reviews.length)
-              : matches.reviews.length,
-          itemBuilder: (_, index) {
-            final hit = matches.reviews[index];
-            return Padding(
-              key: ValueKey(hit.key),
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: SearchReviewCard(
-                    hit: hit,
-                    query: query,
-                    showPhotos: !all,
-                    onOpen: () => onReview(hit),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      );
     }
     return CustomScrollView(
       controller: controller,

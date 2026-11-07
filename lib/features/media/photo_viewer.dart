@@ -400,7 +400,11 @@ class _ZoomPhotoState extends State<_ZoomPhoto> {
           onInteractionEnd: (_) => _reportZoom(),
           child: Center(
             child: widget.heroTag == null
-                ? LocalPhoto(path: widget.path, fit: BoxFit.contain)
+                ? LocalPhoto(
+                    path: widget.path,
+                    fit: BoxFit.contain,
+                    fullResolution: true,
+                  )
                 : HeroMode(
                     enabled: widget.heroEnabled,
                     child: Hero(
@@ -412,10 +416,17 @@ class _ZoomPhotoState extends State<_ZoomPhoto> {
                               borderRadius: BorderRadius.circular(
                                 14 * (1 - animation.value),
                               ),
-                              child: LocalPhoto(path: widget.path),
+                              child: LocalPhoto(
+                                path: widget.path,
+                                fullResolution: true,
+                              ),
                             ),
                           ),
-                      child: LocalPhoto(path: widget.path, fit: BoxFit.contain),
+                      child: LocalPhoto(
+                        path: widget.path,
+                        fit: BoxFit.contain,
+                        fullResolution: true,
+                      ),
                     ),
                   ),
           ),

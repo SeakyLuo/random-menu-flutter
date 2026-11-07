@@ -30,37 +30,32 @@ class RestaurantRecordSection extends StatelessWidget {
       children: [
         MenuFieldLabel(
           '消费记录',
+          minHeight: 44,
+          bottomSpacing: 4,
           icon: Icons.receipt_long_outlined,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                tooltip: '从照片快速创建消费记录',
-                onPressed: onPhotos,
-                icon: const MenuIcon(
-                  Icons.add_photo_alternate_outlined,
-                  size: 20,
+          trailing: Tooltip(
+            message: '添加消费记录，长按从照片快速创建',
+            triggerMode: TooltipTriggerMode.manual,
+            child: GestureDetector(
+              onLongPress: onPhotos,
+              child: IconButton(
+                constraints: const BoxConstraints.tightFor(
+                  width: 44,
+                  height: 44,
                 ),
-              ),
-              Tooltip(
-                message: '添加消费记录，长按从照片快速创建',
-                triggerMode: TooltipTriggerMode.manual,
-                child: GestureDetector(
-                  onLongPress: onPhotos,
-                  child: IconButton(
-                    onPressed: onAdd,
-                    icon: const MenuIcon(Icons.add, size: 20),
-                  ),
+                style: IconButton.styleFrom(
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
+                onPressed: onAdd,
+                icon: const MenuIcon(Icons.add, size: 20),
               ),
-            ],
+            ),
           ),
         ),
         if (sorted.isEmpty)
-          TextButton.icon(
-            onPressed: onAdd,
-            icon: const MenuIcon(Icons.add, size: 18),
-            label: const Text('添加一次消费记录'),
+          Text(
+            '暂无消费记录',
+            style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
           ),
         for (final visit in sorted)
           Padding(

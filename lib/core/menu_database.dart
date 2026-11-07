@@ -4,12 +4,14 @@ import 'package:sqflite/sqflite.dart';
 import 'models.dart';
 import 'menu_sql_statement.dart';
 import 'menu_write_scope.dart';
+import 'visit_coupon_migration.dart';
 
 part 'menu_database_sql.dart';
 part 'menu_database_schema.dart';
 part 'menu_database_restaurant_rows.dart';
 part 'menu_database_read.dart';
 part 'menu_database_write.dart';
+part 'menu_database_coupon_upgrade.dart';
 
 class MenuDatabase {
   MenuDatabase._(this._database);
@@ -18,12 +20,13 @@ class MenuDatabase {
   static Future<MenuDatabase> open(Directory directory) async {
     final database = await openDatabase(
       '${directory.path}/menu.db',
-      version: 1,
+      version: 2,
       onCreate: (db, _) async {
         for (final statement in _schema) {
           await db.execute(statement);
         }
       },
+      onUpgrade: (db, oldVersion, newVersion) => _upgradeVisitCoupons(db),
     );
     final result = MenuDatabase._(database);
     await database.transaction((txn) async {

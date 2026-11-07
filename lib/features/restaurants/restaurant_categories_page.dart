@@ -109,7 +109,6 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
     }
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(title: const Text('菜系管理')),
       body: Center(
         child: ConstrainedBox(

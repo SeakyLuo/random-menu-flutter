@@ -470,7 +470,7 @@ class _RandomPageState extends State<RandomPage> {
           const SizedBox(height: 7),
           LayoutBuilder(
             builder: (context, constraints) {
-              final size = (constraints.maxWidth - 32) / 5;
+              final size = min(64.0, (constraints.maxWidth - 32) / 5);
               return SizedBox(
                 height: size,
                 child: Stack(

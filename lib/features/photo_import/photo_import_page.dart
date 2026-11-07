@@ -155,7 +155,7 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
 
   Future<void> batchAddress() async {
     if (addresses.isEmpty) {
-      showToast(context, '请先添加照片对应的分店地址');
+      showToast(context, '请先添加照片对应的地址');
       return;
     }
     final address = await choosePhotoBranch(context, addresses);
@@ -304,7 +304,7 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
                 style: TextStyle(height: 1.6),
               ),
               SectionTitle(
-                '分店地址 · ${addresses.length}',
+                '地址 · ${addresses.length}',
                 trailing: TextButton.icon(
                   onPressed: addAddress,
                   icon: const MenuIcon(Icons.add, size: 18),

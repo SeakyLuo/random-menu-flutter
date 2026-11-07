@@ -2,6 +2,7 @@ import '../../ui/menu_icon.dart';
 import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../ui/widgets.dart';
+import 'restaurant_address_fields.dart';
 
 Future<RestaurantAddress?> editRestaurantAddress(
   BuildContext context, {
@@ -19,34 +20,15 @@ class _AddressEditor extends StatefulWidget {
 }
 
 class _AddressEditorState extends State<_AddressEditor> {
-  late final province = TextEditingController(
-    text: widget.address?.province ?? '',
-  );
-  late final city = TextEditingController(text: widget.address?.city ?? '');
-  late final county = TextEditingController(text: widget.address?.county ?? '');
-  late final detail = TextEditingController(text: widget.address?.detail ?? '');
+  late RestaurantAddress address = widget.address == null
+      ? RestaurantAddress(id: newId())
+      : RestaurantAddress.fromJson(widget.address!.toJson());
   bool leaving = false;
   bool get dirty =>
-      province.text != (widget.address?.province ?? '') ||
-      city.text != (widget.address?.city ?? '') ||
-      county.text != (widget.address?.county ?? '') ||
-      detail.text != (widget.address?.detail ?? '');
-  @override
-  void initState() {
-    super.initState();
-    for (final controller in [province, city, county, detail]) {
-      controller.addListener(changed);
-    }
-  }
-
-  void changed() => setState(() {});
-  @override
-  void dispose() {
-    for (final controller in [province, city, county, detail]) {
-      controller.dispose();
-    }
-    super.dispose();
-  }
+      address.province != (widget.address?.province ?? '') ||
+      address.city != (widget.address?.city ?? '') ||
+      address.county != (widget.address?.county ?? '') ||
+      address.detail != (widget.address?.detail ?? '');
 
   Future<void> leave() async {
     if (dirty &&
@@ -64,22 +46,13 @@ class _AddressEditorState extends State<_AddressEditor> {
   }
 
   void save() {
-    if (detail.text.trim().isEmpty) {
+    if (address.detail.isEmpty) {
       showToast(context, '请填写详细地址');
       return;
     }
+    if (!dirty) address.location = widget.address?.location;
     setState(() => leaving = true);
-    Navigator.pop(
-      context,
-      RestaurantAddress(
-        id: widget.address?.id ?? newId(),
-        province: province.text.trim(),
-        city: city.text.trim(),
-        county: county.text.trim(),
-        detail: detail.text.trim(),
-        location: dirty ? null : widget.address?.location,
-      ),
-    );
+    Navigator.pop(context, address);
   }
 
   @override
@@ -102,35 +75,10 @@ class _AddressEditorState extends State<_AddressEditor> {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          TextField(
-            controller: province,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: '省 / 自治区 / 直辖市',
-              hintText: '用于地区筛选',
-            ),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: city,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(labelText: '城市'),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: county,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(labelText: '区 / 县'),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: detail,
-            minLines: 2,
-            maxLines: 5,
-            decoration: const InputDecoration(
-              labelText: '详细地址',
-              hintText: '街道、门牌号或商场楼层',
-            ),
+          RestaurantAddressFields(
+            address: address,
+            autofocus: widget.address != null,
+            onChanged: (value) => setState(() => address = value),
           ),
         ],
       ),

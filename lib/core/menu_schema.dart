@@ -1,4 +1,30 @@
 import 'models.dart';
+import 'visit_coupon_migration.dart';
+
+Map<String, dynamic> upgradeMenuV3(Map<String, dynamic> source) {
+  for (final restaurant in source['restaurants'] as List) {
+    for (final visit in restaurant['records'] as List) {
+      final extracted = extractVisitCoupons(visit['note'] as String);
+      visit['coupons'] = extracted.coupons.map((c) => c.toJson()).toList();
+      visit['note'] = extracted.note;
+      if (extracted.coupons.isNotEmpty) {
+        final bill = VisitBill(
+          (visit['items'] as List).fold(
+            0.0,
+            (sum, item) =>
+                sum + (item['price'] as num) * (item['quantity'] as int),
+          ),
+          extracted.coupons,
+        );
+        if ((bill.total * 100).round() !=
+            ((visit['totalCost'] as num) * 100).round()) {
+          visit['autoCost'] = false;
+        }
+      }
+    }
+  }
+  return {...source, 'version': 4};
+}
 
 Map<String, dynamic> upgradeMenuV2(Map<String, dynamic> source) => {
   ...source,

@@ -2,6 +2,8 @@ import 'tag_patterns.dart';
 import 'geo_point.dart';
 import 'menu_schema.dart';
 import 'package:uuid/uuid.dart';
+import 'visit_coupon.dart';
+export 'visit_coupon.dart';
 
 String newId() => const Uuid().v4();
 
@@ -160,6 +162,7 @@ class Visit {
     this.address = '',
     this.autoCost = false,
     this.items = const [],
+    this.coupons = const [],
     this.companions = const [],
     this.note = '',
     this.dishes = const [],
@@ -172,6 +175,9 @@ class Visit {
   String address;
   bool autoCost;
   List<VisitDish> items;
+  List<VisitCoupon> coupons;
+  VisitBill get bill =>
+      VisitBill(items.fold(0.0, (sum, item) => sum + item.cost), coupons);
   List<String> companions;
   String note;
   List<String> dishes;
@@ -183,6 +189,9 @@ class Visit {
     addressId: j['addressId'] as String,
     address: j['address'] as String,
     autoCost: j['autoCost'] as bool,
+    coupons: (j['coupons'] as List)
+        .map((e) => VisitCoupon.fromJson(e as Map<String, dynamic>))
+        .toList(),
     items: (j['items'] as List)
         .map((e) => VisitDish.fromJson(e as Map<String, dynamic>))
         .toList(),
@@ -198,6 +207,7 @@ class Visit {
     'addressId': addressId,
     'address': address,
     'autoCost': autoCost,
+    'coupons': coupons.map((coupon) => coupon.toJson()).toList(),
     'items': items.map((e) => e.toJson()).toList(),
     'companions': companions,
     'note': note,
@@ -332,7 +342,8 @@ class MenuData {
   factory MenuData.fromJson(Map<String, dynamic> j) {
     if (j['version'] == 1) j = upgradeMenuV1(j);
     if (j['version'] == 2) j = upgradeMenuV2(j);
-    if (j['version'] != 3) {
+    if (j['version'] == 3) j = upgradeMenuV3(j);
+    if (j['version'] != 4) {
       throw const FormatException('Unsupported menu format');
     }
     return MenuData(
@@ -372,7 +383,7 @@ class MenuData {
     );
   }
   Map<String, dynamic> toJson() => {
-    'version': 3,
+    'version': 4,
     'recipes': recipes.map((e) => e.toJson()).toList(),
     'restaurants': restaurants.map((e) => e.toJson()).toList(),
     'toCook': toCook,

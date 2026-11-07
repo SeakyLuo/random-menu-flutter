@@ -194,48 +194,34 @@ class _RecipeSearchPageState extends State<RecipeSearchPage> {
     final results = _resultsFor(data, _scope);
     return Scaffold(
       resizeToAvoidBottomInset: true,
+      appBar: AppBar(
+        leading: IconButton(
+          tooltip: '返回菜谱',
+          onPressed: () => Navigator.pop(context),
+          icon: const MenuIcon(Icons.arrow_back),
+        ),
+        titleSpacing: 8,
+        title: term.isEmpty
+            ? const Text(
+                '搜索菜谱',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              )
+            : ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: SearchScope(
+                  labels: _labels,
+                  selected: _scope,
+                  onChanged: _changeScope,
+                ),
+              ),
+        actions: const [SizedBox(width: 48)],
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: LibraryLayout.maxWidth),
             child: Column(
               children: [
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 600),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            tooltip: '返回菜谱',
-                            onPressed: () => Navigator.pop(context),
-                            icon: const MenuIcon(Icons.arrow_back),
-                          ),
-                          Expanded(
-                            child: term.isEmpty
-                                ? const Padding(
-                                    padding: EdgeInsets.only(left: 8),
-                                    child: Text(
-                                      '搜索菜谱',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  )
-                                : SearchScope(
-                                    labels: _labels,
-                                    selected: _scope,
-                                    onChanged: _changeScope,
-                                  ),
-                          ),
-                          const SizedBox(width: 48),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
                 if (results.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -329,12 +315,24 @@ class _RecipeSearchPageState extends State<RecipeSearchPage> {
   List<Recipe> _resultsFor(MenuData data, RecipeSearchField scope) {
     final term = _query.toLowerCase();
     if (term.isEmpty) return [];
-    return data.recipes.where((recipe) {
+    final results = data.recipes.where((recipe) {
       return (scope != RecipeSearchField.note &&
               recipe.name.toLowerCase().contains(term)) ||
           (scope != RecipeSearchField.name &&
               recipe.note.toLowerCase().contains(term));
-    }).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }).toList();
+    final scores = {
+      for (final recipe in results)
+        recipe.id: recipeSearchScore(recipe, _query, scope),
+    };
+    final positions = {for (final (i, recipe) in results.indexed) recipe.id: i};
+    results.sort((a, b) {
+      final relevance = scores[b.id]!.compareTo(scores[a.id]!);
+      if (relevance != 0) return relevance;
+      final added = b.createdAt.compareTo(a.createdAt);
+      return added != 0 ? added : positions[a.id]!.compareTo(positions[b.id]!);
+    });
+    return results;
   }
 
   Widget _resultsPage(MenuData data, RecipeSearchField scope, double bottom) {

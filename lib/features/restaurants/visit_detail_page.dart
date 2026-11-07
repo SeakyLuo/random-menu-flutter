@@ -6,6 +6,7 @@ import '../../core/models.dart';
 import '../../ui/widgets.dart';
 import 'restaurant_entries.dart';
 import 'restaurant_images.dart';
+import 'visit_coupon_fields.dart';
 
 Future<bool> removeRestaurantVisit(
   BuildContext context,
@@ -132,6 +133,16 @@ class VisitDetailPage extends StatelessWidget {
                     ? '独自用餐'
                     : '饭搭子：${visit.companions.join('、')}',
               ),
+              if (visit.coupons.isNotEmpty) ...[
+                const SectionTitle('用券'),
+                for (final coupon in visit.coupons)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      '${visitCouponLabel(coupon)}${visit.autoCost && !coupon.appliesTo(visit.bill.subtotal) ? ' · 未达门槛，未抵扣' : ''}',
+                    ),
+                  ),
+              ],
               if (visit.note.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 20),

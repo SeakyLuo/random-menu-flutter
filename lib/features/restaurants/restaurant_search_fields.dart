@@ -1,14 +1,16 @@
 import '../../core/models.dart';
 import 'restaurant_dish_summary.dart';
 import 'restaurant_filter.dart';
+import 'restaurant_search.dart';
 import 'restaurants_page.dart' show orderedRestaurants;
 
-enum RestaurantSearchField { all, restaurants, dishes, reviews }
+enum RestaurantSearchField { all, restaurants, dishes }
 
 class RestaurantSearchHit {
-  const RestaurantSearchHit(this.restaurant, this.context);
+  const RestaurantSearchHit(this.restaurant, this.context, {this.visit});
   final Restaurant restaurant;
   final String? context;
+  final Visit? visit;
 }
 
 class RestaurantDishHit {
@@ -18,35 +20,14 @@ class RestaurantDishHit {
   final String? note;
 }
 
-class RestaurantReviewHit {
-  const RestaurantReviewHit({
-    required this.restaurant,
-    required this.key,
-    required this.text,
-    required this.source,
-    required this.photos,
-    this.visit,
-    this.dishName,
-  });
-  final Restaurant restaurant;
-  final String text, source;
-  final List<String> photos;
-  final Visit? visit;
-  final String? dishName;
-  final Object key;
-}
-
 class RestaurantSearchMatches {
   final restaurants = <RestaurantSearchHit>[];
   final dishes = <RestaurantDishHit>[];
-  final reviews = <RestaurantReviewHit>[];
 
   int count(RestaurantSearchField field) => switch (field) {
-    RestaurantSearchField.all =>
-      restaurants.length + dishes.length + reviews.length,
+    RestaurantSearchField.all => restaurants.length + dishes.length,
     RestaurantSearchField.restaurants => restaurants.length,
     RestaurantSearchField.dishes => dishes.length,
-    RestaurantSearchField.reviews => reviews.length,
   };
 }
 
@@ -69,16 +50,23 @@ RestaurantSearchMatches searchRestaurantContents(
       ...restaurant.records.map((visit) => visit.address),
       restaurant.note,
     ];
-    final context = fields.where(matches).firstOrNull;
+    final visits =
+        restaurant.records.where((visit) => matches(visit.note)).toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
+    final reviewVisit = visits.firstOrNull;
+    final context = matches(restaurant.note)
+        ? restaurant.note
+        : reviewVisit != null
+        ? reviewVisit.note
+        : matches(restaurant.name)
+        ? null
+        : fields.where(matches).firstOrNull;
     if (matches(restaurant.name) || context != null) {
       result.restaurants.add(
         RestaurantSearchHit(
           restaurant,
-          matches(restaurant.note)
-              ? restaurant.note
-              : matches(restaurant.name)
-              ? null
-              : context,
+          context,
+          visit: matches(restaurant.note) ? null : reviewVisit,
         ),
       );
     }
@@ -92,55 +80,31 @@ RestaurantSearchMatches searchRestaurantContents(
         result.dishes.add(RestaurantDishHit(restaurant, dish, note));
       }
     }
-    if (matches(restaurant.note)) {
-      result.reviews.add(
-        RestaurantReviewHit(
-          restaurant: restaurant,
-          key: (restaurant.id, 'note'),
-          text: restaurant.note,
-          source: '餐厅备注',
-          photos: const [],
-        ),
-      );
-    }
-    for (final visit in restaurant.records) {
-      if (matches(visit.note)) {
-        result.reviews.add(
-          RestaurantReviewHit(
-            restaurant: restaurant,
-            visit: visit,
-            key: (restaurant.id, visit.id),
-            text: visit.note,
-            source: '到店评价',
-            photos: {
-              ...visit.imagePaths,
-              ...visit.items.expand((dish) => dish.imagePaths),
-            }.toList(),
-          ),
-        );
-      }
-      for (final (index, dish) in visit.items.indexed) {
-        if (matches(dish.note)) {
-          result.reviews.add(
-            RestaurantReviewHit(
-              restaurant: restaurant,
-              visit: visit,
-              dishName: dish.name,
-              key: (restaurant.id, visit.id, index),
-              text: dish.note,
-              source: '菜品评价 · ${dish.name}',
-              photos: dish.imagePaths,
-            ),
-          );
-        }
-      }
-    }
   }
-  result.reviews.sort((a, b) {
-    if (a.visit == null && b.visit == null) return 0;
-    if (a.visit == null) return 1;
-    if (b.visit == null) return -1;
-    return b.visit!.date.compareTo(a.visit!.date);
-  });
+  _rank(
+    result.restaurants,
+    (hit) => restaurantSearchScore(hit.restaurant, query),
+  );
+  _rank(
+    result.dishes,
+    (hit) => restaurantDishSearchScore(hit.dish.name, [
+      if (hit.dish.saved case final saved?) saved.note,
+      ...hit.dish.history.map((entry) => entry.dish.note),
+    ], query),
+  );
   return result;
+}
+
+void _rank<T>(List<T> values, int Function(T) score) {
+  final ranked = [
+    for (final (i, value) in values.indexed)
+      (value: value, score: score(value), position: i),
+  ];
+  ranked.sort((a, b) {
+    final relevance = b.score.compareTo(a.score);
+    return relevance != 0 ? relevance : a.position.compareTo(b.position);
+  });
+  values
+    ..clear()
+    ..addAll(ranked.map((entry) => entry.value));
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/menu_bottom_sheet.dart';
 import 'restaurant_filter_sheet.dart';
@@ -84,34 +83,8 @@ Future<RestaurantQuery?> editRestaurantFilter(
     ..alone = false
     ..favorite = false
     ..companionsOnly = query.companions.isNotEmpty;
-  final addresses = MenuScope.of(
-    context,
-  ).data.restaurants.expand((r) => r.addressEntries).toList();
   // Address edits can remove a region that was selected by the previous filter.
-  if (current.province.isNotEmpty &&
-      !addresses.any((a) => a.province == current.province)) {
-    current.province = '';
-    current.city = '';
-    current.county = '';
-  }
-  if (current.city.isNotEmpty &&
-      !addresses.any(
-        (a) =>
-            (current.province.isEmpty || a.province == current.province) &&
-            a.city == current.city,
-      )) {
-    current.city = '';
-    current.county = '';
-  }
-  if (current.county.isNotEmpty &&
-      !addresses.any(
-        (a) =>
-            (current.province.isEmpty || a.province == current.province) &&
-            (current.city.isEmpty || a.city == current.city) &&
-            a.county == current.county,
-      )) {
-    current.county = '';
-  }
+  // Nationwide picker data now keeps that region selectable independently.
   return showMenuBottomSheet<RestaurantQuery>(
     context: context,
     isScrollControlled: true,

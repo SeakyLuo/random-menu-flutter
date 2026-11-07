@@ -18,19 +18,37 @@ class SearchScope<T> extends StatefulWidget {
 }
 
 class _SearchScopeState<T> extends State<SearchScope<T>> {
-  final _selectedKey = GlobalKey();
+  final _scrollController = ScrollController();
 
   void _revealSelected() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      Scrollable.ensureVisible(
-        _selectedKey.currentContext!,
-        alignment: .5,
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 220),
-      );
+      final position = _scrollController.position;
+      final contentWidth =
+          position.viewportDimension + position.maxScrollExtent;
+      final itemWidth = (contentWidth - 8) / widget.labels.length;
+      final index = widget.labels.keys.toList().indexOf(widget.selected);
+      final offset =
+          (4 + itemWidth * (index + .5) - position.viewportDimension / 2).clamp(
+            0.0,
+            position.maxScrollExtent,
+          );
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _scrollController.jumpTo(offset);
+      } else {
+        _scrollController.animateTo(
+          offset,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -66,6 +84,7 @@ class _SearchScopeState<T> extends State<SearchScope<T>> {
     final minWidth = itemWidth * widget.labels.length + 8;
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
+        controller: _scrollController,
         scrollDirection: Axis.horizontal,
         child: Container(
           width: math.max(constraints.maxWidth, minWidth),
@@ -111,7 +130,6 @@ class _SearchScopeState<T> extends State<SearchScope<T>> {
                   for (final scope in widget.labels.keys)
                     Expanded(
                       child: Semantics(
-                        key: scope == widget.selected ? _selectedKey : null,
                         selected: scope == widget.selected,
                         inMutuallyExclusiveGroup: true,
                         child: Material(
