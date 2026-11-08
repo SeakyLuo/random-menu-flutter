@@ -13,7 +13,7 @@ import 'restaurant_search_results.dart';
 import 'restaurant_search_fields.dart';
 import '../../ui/search_discovery.dart';
 import '../../ui/search_field_bar.dart';
-import '../../ui/search_scope.dart';
+import '../../ui/menu_segmented.dart';
 
 class RestaurantSearchPage extends StatefulWidget {
   const RestaurantSearchPage({super.key});
@@ -130,11 +130,7 @@ class _RestaurantSearchPageState extends State<RestaurantSearchPage> {
       _openResult(RestaurantDetailPage(restaurantId: restaurant.id));
 
   Future<void> _openDish(RestaurantDishHit hit) => _openResult(
-    RestaurantDishPage(
-      restaurantId: hit.restaurant.id,
-      name: hit.dish.name,
-      savedDishId: hit.dish.saved?.id,
-    ),
+    RestaurantDishPage(restaurantId: hit.restaurant.id, name: hit.dish.name),
   );
 
   Future<void> _openContext(RestaurantSearchHit hit) => _openResult(
@@ -232,7 +228,7 @@ class _RestaurantSearchPageState extends State<RestaurantSearchPage> {
               )
             : ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 600),
-                child: SearchScope(
+                child: MenuSegmented(
                   labels: _labels,
                   selected: _scope,
                   onChanged: _changeScope,

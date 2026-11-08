@@ -10,6 +10,11 @@ const _locationChannel = MethodChannel(
 Future<RestaurantAddress?> resolvePhotoAddress(
   double latitude,
   double longitude,
+) => resolveAddressAt(latitude, longitude);
+
+Future<RestaurantAddress?> resolveAddressAt(
+  double latitude,
+  double longitude,
 ) async {
   final address = await _locationChannel.invokeMapMethod<String, dynamic>(
     'reverseGeocode',

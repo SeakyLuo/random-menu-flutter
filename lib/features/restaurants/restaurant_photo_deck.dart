@@ -27,28 +27,34 @@ class _RestaurantPhotoDeckState extends State<RestaurantPhotoDeck>
     with SingleTickerProviderStateMixin {
   static const _angle = 2 * math.pi / 180;
   static const _ratio = 1.65;
-  late final AnimationController _motion = AnimationController(vsync: this)
-    ..addListener(() {
-      setState(() {
-        _progress = lerpDouble(
-          _from,
-          _to,
-          Curves.easeInOutCubic.transform(_motion.value),
-        )!;
-      });
-    })
-    ..addStatusListener((status) {
-      if (status != AnimationStatus.completed) return;
-      if (_to != 0) {
-        widget.onChanged(
-          (widget.index + (_to < 0 ? 1 : -1)) % widget.itemCount,
-        );
-      }
-      setState(() => _progress = 0);
-    });
+  late final AnimationController _motion;
   double _progress = 0;
   double _from = 0;
   double _to = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _motion = AnimationController(vsync: this)
+      ..addListener(() {
+        setState(() {
+          _progress = lerpDouble(
+            _from,
+            _to,
+            Curves.easeInOutCubic.transform(_motion.value),
+          )!;
+        });
+      })
+      ..addStatusListener((status) {
+        if (status != AnimationStatus.completed) return;
+        if (_to != 0) {
+          widget.onChanged(
+            (widget.index + (_to < 0 ? 1 : -1)) % widget.itemCount,
+          );
+        }
+        setState(() => _progress = 0);
+      });
+  }
 
   @override
   void dispose() {

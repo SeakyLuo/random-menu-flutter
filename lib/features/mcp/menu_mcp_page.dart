@@ -140,6 +140,21 @@ class _MenuMcpPageState extends State<MenuMcpPage> {
         ),
       );
 
+  InputDecoration _portDecoration(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return InputDecoration(
+      hintText: '52147',
+      filled: dark,
+      border: dark ? null : InputBorder.none,
+      enabledBorder: dark ? null : InputBorder.none,
+      focusedBorder: dark ? null : InputBorder.none,
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: dark ? 12 : 0,
+        vertical: 14,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: _leaving || (!_dirty && !_saving),
@@ -235,16 +250,7 @@ class _MenuMcpPageState extends State<MenuMcpPage> {
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
                               ],
-                              decoration: const InputDecoration(
-                                hintText: '52147',
-                                filled: false,
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                              ),
+                              decoration: _portDecoration(context),
                             ),
                           ),
                         ),

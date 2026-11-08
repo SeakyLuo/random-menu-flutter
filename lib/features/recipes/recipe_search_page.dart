@@ -11,7 +11,7 @@ import 'recipe_search_results.dart';
 import 'recipe_search.dart';
 import '../../ui/search_discovery.dart';
 import '../../ui/search_field_bar.dart';
-import '../../ui/search_scope.dart';
+import '../../ui/menu_segmented.dart';
 
 class RecipeSearchPage extends StatefulWidget {
   const RecipeSearchPage({super.key});
@@ -208,7 +208,7 @@ class _RecipeSearchPageState extends State<RecipeSearchPage> {
               )
             : ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 600),
-                child: SearchScope(
+                child: MenuSegmented(
                   labels: _labels,
                   selected: _scope,
                   onChanged: _changeScope,

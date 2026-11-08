@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../ui/menu_dialog.dart';
 import '../../ui/menu_icon.dart';
-import '../../ui/menu_popup.dart';
+import '../../ui/menu_field_label.dart';
 import '../../ui/widgets.dart';
+import '../../ui/menu_numeric_fields.dart';
+import 'visit_coupon_card.dart';
 
 String visitCouponLabel(VisitCoupon coupon) =>
     '${coupon.threshold == null ? '' : '满 ¥${money(coupon.threshold!)} '}'
-    '减 ¥${money(coupon.discount)}';
+    '减 ¥${money(coupon.discount)}${coupon.quantity > 1 ? ' × ${coupon.quantity} 张' : ''}';
 
 class VisitCouponFields extends StatelessWidget {
   const VisitCouponFields({
@@ -43,34 +45,30 @@ class VisitCouponFields extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      SectionTitle(
+      MenuFieldLabel(
         '用券',
-        trailing: TextButton.icon(
+        minHeight: 44,
+        bottomSpacing: 4,
+        trailing: IconButton(
+          tooltip: '添加用券',
+          constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+          style: IconButton.styleFrom(
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
           onPressed: () => edit(context),
-          icon: const MenuIcon(Icons.add, size: 18),
-          label: const Text('添加用券'),
+          icon: const MenuIcon(Icons.add, size: 20),
         ),
       ),
       for (final (index, coupon) in coupons.indexed)
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(visitCouponLabel(coupon)),
-          subtitle: autoCost && !coupon.appliesTo(subtotal)
-              ? const Text('未达门槛，本次不抵扣')
-              : null,
-          onTap: () => edit(context, index),
-          trailing: MenuPopupButton<String>(
-            tooltip: '用券操作',
-            icon: const MenuIcon(Icons.more_horiz),
-            onSelected: (_) => onChanged([...coupons]..removeAt(index)),
-            itemBuilder: (_) => const [
-              MenuPopupItem(
-                value: 'remove',
-                icon: Icons.delete_outline,
-                destructive: true,
-                child: Text('移除用券'),
-              ),
-            ],
+        Padding(
+          padding: EdgeInsets.only(
+            bottom: index == coupons.length - 1 ? 0 : 10,
+          ),
+          child: VisitCouponCard(
+            coupon: coupon,
+            notApplied: autoCost && !coupon.appliesTo(subtotal),
+            onEdit: () => edit(context, index),
+            onRemove: () => onChanged([...coupons]..removeAt(index)),
           ),
         ),
     ],
@@ -94,10 +92,15 @@ class _CouponDialogState extends State<_CouponDialog> {
     text: widget.coupon == null ? '' : money(widget.coupon!.discount),
   );
 
+  late final quantity = TextEditingController(
+    text: '${widget.coupon?.quantity ?? 1}',
+  );
+
   @override
   void dispose() {
     threshold.dispose();
     discount.dispose();
+    quantity.dispose();
     super.dispose();
   }
 
@@ -119,9 +122,14 @@ class _CouponDialogState extends State<_CouponDialog> {
       showToast(context, '请填写减多少，金额至少 0.01 元、最多两位小数');
       return;
     }
+    final count = int.tryParse(quantity.text.trim());
+    if (count == null || count < 1 || count > 100) {
+      showToast(context, '用券数量应为 1 到 100 张');
+      return;
+    }
     Navigator.pop(
       context,
-      VisitCoupon(threshold: minimum, discount: reduction!),
+      VisitCoupon(threshold: minimum, discount: reduction!, quantity: count),
     );
   }
 
@@ -130,24 +138,16 @@ class _CouponDialogState extends State<_CouponDialog> {
     title: widget.coupon == null ? '添加用券' : '编辑用券',
     content: Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(
-          controller: threshold,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          textInputAction: TextInputAction.next,
-          decoration: const InputDecoration(
-            labelText: '满多少（选填）',
-            prefixText: '¥ ',
-          ),
-        ),
+        const MenuFieldLabel('使用门槛', hint: '选填'),
+        MenuPriceField(controller: threshold, hintText: '无门槛可留空'),
         const SizedBox(height: 16),
-        TextField(
-          controller: discount,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => save(),
-          decoration: const InputDecoration(labelText: '减多少', prefixText: '¥ '),
-        ),
+        const MenuFieldLabel('单张减额', isRequired: true),
+        MenuPriceField(controller: discount, hintText: '填写单张优惠金额'),
+        const SizedBox(height: 16),
+        const MenuFieldLabel('使用数量', hint: '张'),
+        MenuQuantityField(controller: quantity, unit: '张'),
       ],
     ),
     actions: Row(

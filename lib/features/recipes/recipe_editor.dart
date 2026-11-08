@@ -518,11 +518,15 @@ class _RecipeEditorState extends State<_RecipeEditor> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                RecipePhotoFields(
+                EditorPhotoFields(
                   paths: _images,
                   busy: busy,
                   onPick: (camera) => _pickImages(camera: camera),
                   onAction: _photoAction,
+                  onReorder: (from, to) => setState(() {
+                    final path = _images.removeAt(from);
+                    _images.insert(to, path);
+                  }),
                   onOpen: (index) => showRecipePhotos(
                     context,
                     _images,

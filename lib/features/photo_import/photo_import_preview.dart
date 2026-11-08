@@ -246,7 +246,6 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
                 category: widget.category,
                 addressEntries: [...widget.addresses],
                 addresses: widget.addresses.map((a) => a.fullAddress).toList(),
-                foods: [],
                 records: [],
               )
             : draft.restaurants.firstWhere((r) => r.id == widget.restaurantId);
@@ -261,9 +260,6 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
               .map((a) => a.fullAddress)
               .toList();
         }
-        final dishIds = {
-          for (final dish in restaurant.foods) dish.name: dish.id,
-        };
         final branches = {
           for (final address in restaurant.addressEntries) address.id: address,
         };
@@ -287,21 +283,9 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
             final photos = item.imagePaths
                 .map((path) => savedPaths[path]!)
                 .toList();
-            final id = dishIds.putIfAbsent(item.name, () {
-              final dish = RestaurantDish(
-                id: newId(),
-                name: item.name,
-                price: item.price,
-                quantity: item.quantity,
-                note: item.note,
-                imagePaths: photos,
-              );
-              restaurant.foods.add(dish);
-              return dish.id;
-            });
             items.add(
               VisitDish(
-                dishId: id,
+                dishId: newId(),
                 name: item.name,
                 price: item.price,
                 quantity: item.quantity,
@@ -333,7 +317,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
     if (success) {
       showToast(
         context,
-        '${widget.restaurantId == null ? '已创建餐厅并导入' : '已导入'} ${groups.length} 次用餐记录',
+        '${widget.restaurantId == null ? '已创建餐厅并导入' : '已导入'} ${groups.length} 条消费记录',
       );
       setState(() => leaving = true);
       Navigator.pop(context, true);
@@ -374,7 +358,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
             ),
             const SizedBox(height: 12),
             Text(
-              '${groups.length} 次用餐记录',
+              '${groups.length} 条消费记录',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 12),
@@ -383,7 +367,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
               style: TextStyle(height: 1.6),
             ),
             const SizedBox(height: 12),
-            const Text('导入后可在用餐记录中补充饭搭子和用餐感受。'),
+            const Text('导入后可在消费记录中补充饭搭子和用餐感受。'),
             const SizedBox(height: 20),
             for (final group in groups)
               Card(
@@ -426,13 +410,13 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
                                   const MenuPopupItem(
                                     icon: Icons.call_merge,
                                     value: 'merge',
-                                    child: Text('合并到其他用餐记录'),
+                                    child: Text('合并到其他消费记录'),
                                   ),
                                 if (group.photos.length > 1)
                                   const MenuPopupItem(
                                     icon: Icons.call_split,
                                     value: 'split',
-                                    child: Text('拆分用餐记录'),
+                                    child: Text('拆分消费记录'),
                                   ),
                               ],
                             ),

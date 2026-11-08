@@ -148,15 +148,16 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
     final address = addresses[index];
     final records = recordDraft.records;
     if (records.any((r) => r.addressId == address.id)) {
-      showToast(context, '已有用餐记录使用这个地址，请保留该分店');
+      showToast(context, '已有消费记录使用这个地址，请保留该分店');
       return;
     }
-    if (!await confirmAction(
-      context,
-      title: '移除地址？',
-      message: address.fullAddress,
-      confirmLabel: '移除',
-    )) {
+    if (address.fullAddress.trim().isNotEmpty &&
+        !await confirmAction(
+          context,
+          title: '移除地址？',
+          message: address.fullAddress,
+          confirmLabel: '移除',
+        )) {
       return;
     }
     if (mounted) setState(() => addresses.removeAt(index));
@@ -229,7 +230,11 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
   }
 
   Future<void> editRecordDish(Visit visit, int index) async {
-    final dish = await editVisitDish(context, visit.items[index]);
+    final dish = await editVisitDish(
+      context,
+      visit.items[index],
+      packages: visit.packages,
+    );
     if (dish == null || !mounted) return;
     setState(() {
       visit.items[index] = dish;
@@ -301,7 +306,6 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                 ?.toJson(),
             ignored: {
               'records',
-              'foods',
               if (favorite == widget.restaurant!.favorite) 'favorite',
             },
           );
@@ -317,7 +321,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
               v.addressId.isNotEmpty &&
               !addresses.any((a) => a.id == v.addressId),
         )) {
-          throw StateError('已有用餐记录使用这个地址，请保留该分店');
+          throw StateError('已有消费记录使用这个地址，请保留该分店');
         }
         restaurant.records = records;
         restaurant.name = name.text.trim();

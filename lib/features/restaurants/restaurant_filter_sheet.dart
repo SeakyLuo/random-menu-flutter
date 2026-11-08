@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../ui/menu_icon.dart';
+import '../../ui/menu_numeric_fields.dart';
+import '../../ui/widgets.dart';
 import 'restaurant_filter_pickers.dart';
 import '../../ui/menu_tag.dart';
 import '../../ui/menu_suggestion_input.dart';
@@ -19,11 +21,19 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
   late RestaurantQuery query = widget.query.copy();
   late final _category = TextEditingController(text: widget.query.category);
   final _companion = TextEditingController();
+  late final _minPrice = TextEditingController(
+    text: query.minPrice == null ? '' : money(query.minPrice!),
+  );
+  late final _maxPrice = TextEditingController(
+    text: query.maxPrice == null ? '' : money(query.maxPrice!),
+  );
 
   @override
   void dispose() {
     _category.dispose();
     _companion.dispose();
+    _minPrice.dispose();
+    _maxPrice.dispose();
     super.dispose();
   }
 
@@ -269,6 +279,30 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                       optionsViewOpenDirection: OptionsViewOpenDirection.up,
                     ),
                     const SizedBox(height: 18),
+                    _heading('人均价格'),
+                    const SizedBox(height: 6),
+                    Row(
+                      spacing: 8,
+                      children: [
+                        Expanded(
+                          child: MenuPriceField(
+                            controller: _minPrice,
+                            hintText: '最低价',
+                          ),
+                        ),
+                        Text(
+                          '—',
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        ),
+                        Expanded(
+                          child: MenuPriceField(
+                            controller: _maxPrice,
+                            hintText: '最高价',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
                     _heading('饭搭子'),
                     const SizedBox(height: 6),
                     MenuSuggestionInput(
@@ -320,10 +354,9 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                       tooltip: '重置筛选',
                       onPressed: () {
                         FocusScope.of(context).unfocus();
-                        _category.clear();
-                        _companion.clear();
-                        setState(
-                          () => query = RestaurantQuery(sort: query.sort),
+                        Navigator.pop(
+                          context,
+                          RestaurantQuery(sort: query.sort),
                         );
                       },
                       icon: MenuIcon(
@@ -342,7 +375,24 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                         ),
                       ),
                       onPressed: () {
+                        final minText = _minPrice.text.trim();
+                        final maxText = _maxPrice.text.trim();
+                        final min = double.tryParse(minText);
+                        final max = double.tryParse(maxText);
+                        if ((minText.isNotEmpty &&
+                                (min == null || !min.isFinite || min < 0)) ||
+                            (maxText.isNotEmpty &&
+                                (max == null || !max.isFinite || max < 0))) {
+                          showToast(context, '请输入有效的人均价格');
+                          return;
+                        }
+                        if (min != null && max != null && min > max) {
+                          showToast(context, '最低价不能高于最高价');
+                          return;
+                        }
                         FocusScope.of(context).unfocus();
+                        query.minPrice = min;
+                        query.maxPrice = max;
                         query.category = _category.text.trim();
                         Navigator.pop(context, query);
                       },

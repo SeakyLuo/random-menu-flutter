@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/menu_icon.dart';
-import '../../ui/search_scope.dart';
+import '../../ui/menu_segmented.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets.dart';
 import '../media/media_actions.dart';
@@ -113,7 +113,7 @@ class _RecipeSharePageState extends State<RecipeSharePage> {
         padding: const EdgeInsets.only(right: 56),
         child: IgnorePointer(
           ignoring: _sharing,
-          child: SearchScope<bool>(
+          child: MenuSegmented<bool>(
             labels: const {true: '原图', false: '卡片'},
             selected: _original,
             onChanged: (value) => setState(() => _original = value),

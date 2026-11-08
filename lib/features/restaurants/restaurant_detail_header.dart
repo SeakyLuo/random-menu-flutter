@@ -1,42 +1,94 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../core/models.dart';
 import '../../ui/menu_icon.dart';
 import '../../ui/menu_tag.dart';
-import '../../ui/widgets.dart';
 import 'restaurant_gallery_data.dart';
+import 'restaurant_price.dart';
+import '../../ui/menu_bottom_sheet.dart';
 
 class RestaurantDetailInfo extends StatefulWidget {
-  const RestaurantDetailInfo({super.key, required this.restaurant});
+  const RestaurantDetailInfo({
+    super.key,
+    required this.restaurant,
+    required this.currentCity,
+  });
   final Restaurant restaurant;
+  final String? currentCity;
   @override
   State<RestaurantDetailInfo> createState() => _RestaurantDetailInfoState();
 }
 
 class _RestaurantDetailInfoState extends State<RestaurantDetailInfo> {
-  bool _addressesOpen = false;
   bool _reviewOpen = false;
-  Future<void> _copy(String address) => performAction(
-    context,
-    () => Clipboard.setData(ClipboardData(text: address)),
-    success: '地址已复制',
-  );
+  Future<void> _showAddresses(List<String> addresses) =>
+      showMenuBottomSheet<void>(
+        context: context,
+        useSafeArea: true,
+        isScrollControlled: true,
+        builder: (sheetContext) => SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  '分店地址',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(sheetContext).height * .6,
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: addresses.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (_, index) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: MenuIcon(
+                        Icons.place_outlined,
+                        size: 18,
+                        color: Theme.of(
+                          sheetContext,
+                        ).colorScheme.onSurfaceVariant,
+                      ),
+                      title: Text(
+                        addresses[index],
+                        style: const TextStyle(fontSize: 14, height: 1.5),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final restaurant = widget.restaurant;
     final colors = Theme.of(context).colorScheme;
     final addresses = {
-      ...restaurant.addressEntries.map((a) => a.fullAddress),
-      ...restaurant.addresses,
-    }.toList();
+      for (final address in restaurant.addresses) address: address,
+      for (final address in restaurant.addressEntries)
+        address.fullAddress: restaurantDetailAddress(
+          restaurant,
+          address,
+          currentCity: widget.currentCity,
+        ),
+    };
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
       child: Material(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
         clipBehavior: Clip.antiAlias,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -51,153 +103,134 @@ class _RestaurantDetailInfoState extends State<RestaurantDetailInfo> {
               if (restaurant.category.isNotEmpty || restaurant.averageCost > 0)
                 const SizedBox(height: 10),
               if (restaurant.category.isNotEmpty || restaurant.averageCost > 0)
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+                Row(
                   children: [
-                    if (restaurant.category.isNotEmpty)
-                      MenuTag(restaurant.category),
-                    if (restaurant.averageCost > 0)
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: '¥${money(restaurant.averageCost)}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            TextSpan(
-                              text: ' /人',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
+                    Expanded(
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: restaurant.category.isNotEmpty
+                            ? MenuTag(
+                                restaurant.category,
+                                selected: true,
+                                compact: true,
+                              )
+                            : const SizedBox.shrink(),
                       ),
+                    ),
+                    if (restaurant.averageCost > 0) ...[
+                      const SizedBox(width: 12),
+                      RestaurantPrice(restaurant.averageCost),
+                    ],
                   ],
                 ),
               if (addresses.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () => setState(() => _addressesOpen = !_addressesOpen),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
-                      children: [
-                        MenuIcon(
-                          Icons.place_outlined,
-                          size: 19,
-                          color: colors.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 9),
-                        if (addresses.length > 1) ...[
-                          Text(
-                            '${addresses.length} 个分店',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                        ],
-                        Expanded(
-                          child: Text(
-                            addresses.map(localAddressText).join('、'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: colors.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        RotatedBox(
-                          quarterTurns: _addressesOpen ? 1 : 0,
-                          child: MenuIcon(
-                            Icons.chevron_right,
-                            size: 18,
+                const SizedBox(height: 4),
+                Semantics(
+                  button: true,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _showAddresses(addresses.keys.toList()),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 32),
+                      child: Row(
+                        children: [
+                          MenuIcon(
+                            Icons.place_outlined,
+                            size: 17,
                             color: colors.onSurfaceVariant,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          if (addresses.length > 1) ...[
+                            Text(
+                              '${addresses.length} 个分店',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                          ],
+                          Expanded(
+                            child: Text(
+                              addresses.values.join('、'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          MenuIcon(
+                            Icons.chevron_right,
+                            size: 16,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-                if (_addressesOpen)
-                  for (final address in addresses)
-                    InkWell(
-                      onLongPress: () => _copy(address),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(28, 6, 0, 6),
-                        child: Text(
-                          address,
-                          style: const TextStyle(fontSize: 14, height: 1.5),
-                        ),
-                      ),
-                    ),
               ],
               if (restaurant.note.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: MenuIcon(
-                        Icons.edit_note,
-                        size: 19,
-                        color: colors.onSurfaceVariant,
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: MenuIcon(
+                          Icons.edit_note,
+                          size: 17,
+                          color: colors.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final text = '“${restaurant.note}”';
-                          final style = TextStyle(
-                            fontSize: 14,
-                            height: 1.6,
-                            color: colors.onSurface,
-                          );
-                          final painter = TextPainter(
-                            text: TextSpan(text: text, style: style),
-                            maxLines: 2,
-                            textDirection: Directionality.of(context),
-                            textScaler: MediaQuery.textScalerOf(context),
-                          )..layout(maxWidth: constraints.maxWidth);
-                          final overflow = painter.didExceedMaxLines;
-                          painter.dispose();
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                text,
-                                style: style,
-                                maxLines: _reviewOpen ? null : 2,
-                                overflow: _reviewOpen
-                                    ? TextOverflow.visible
-                                    : TextOverflow.ellipsis,
-                              ),
-                              if (overflow)
-                                TextButton(
-                                  onPressed: () => setState(
-                                    () => _reviewOpen = !_reviewOpen,
-                                  ),
-                                  child: Text(_reviewOpen ? '收起' : '展开'),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final text = '“${restaurant.note}”';
+                            final style = TextStyle(
+                              fontSize: 13,
+                              height: 1.5,
+                              color: colors.onSurface,
+                            );
+                            final painter = TextPainter(
+                              text: TextSpan(text: text, style: style),
+                              maxLines: 2,
+                              textDirection: Directionality.of(context),
+                              textScaler: MediaQuery.textScalerOf(context),
+                            )..layout(maxWidth: constraints.maxWidth);
+                            final overflow = painter.didExceedMaxLines;
+                            painter.dispose();
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  text,
+                                  style: style,
+                                  maxLines: _reviewOpen ? null : 2,
+                                  overflow: _reviewOpen
+                                      ? TextOverflow.visible
+                                      : TextOverflow.ellipsis,
                                 ),
-                            ],
-                          );
-                        },
+                                if (overflow)
+                                  TextButton(
+                                    onPressed: () => setState(
+                                      () => _reviewOpen = !_reviewOpen,
+                                    ),
+                                    child: Text(_reviewOpen ? '收起' : '展开'),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ],

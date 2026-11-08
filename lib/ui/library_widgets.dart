@@ -182,16 +182,29 @@ class PageAddButton extends StatelessWidget {
 }
 
 class FixedPageActions extends StatelessWidget {
-  const FixedPageActions({super.key, required this.children});
+  const FixedPageActions({
+    super.key,
+    required this.children,
+    this.maxWidth = double.infinity,
+    this.padding = const EdgeInsets.fromLTRB(24, 12, 24, 16),
+  });
   final List<Widget> children;
+  final double maxWidth;
+  final EdgeInsetsGeometry padding;
   @override
   Widget build(BuildContext context) => ColoredBox(
     color: Theme.of(context).colorScheme.surface,
     child: SafeArea(
       top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-        child: Row(spacing: 12, children: children),
+      child: Center(
+        heightFactor: 1,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: Padding(
+            padding: padding,
+            child: Row(spacing: 12, children: children),
+          ),
+        ),
       ),
     ),
   );

@@ -44,7 +44,7 @@ LegacyImportResult parseLegacyArchive(Archive archive) {
     photos: files.photos,
     summary:
         '${current ? 'Android 版' : '早期 Android 版'}备份：${data.recipes.length} 道菜谱、'
-        '${data.restaurants.length} 家餐厅、$recordCount 次用餐记录、${files.photos.length} 张照片，'
+        '${data.restaurants.length} 家餐厅、$recordCount 条消费记录、${files.photos.length} 张照片，'
         '${data.recipeDraft == null ? '无' : '含一份'}菜谱草稿。'
         '原标签、标签规则、清单、随手记及可用搜索历史会一并恢复；未引用照片也完整保留。',
   );

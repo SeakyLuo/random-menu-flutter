@@ -5,6 +5,8 @@ import '../../ui/menu_icon.dart';
 import '../../ui/menu_popup.dart';
 import '../../ui/widgets.dart';
 import '../media/photo_widget.dart';
+import 'restaurant_food_summary.dart';
+import 'restaurant_gallery_data.dart';
 
 class RestaurantRecordSection extends StatelessWidget {
   const RestaurantRecordSection({
@@ -24,6 +26,45 @@ class RestaurantRecordSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final nameStyle = const TextStyle(fontSize: 14, height: 1.4);
+    final summaryStyle = TextStyle(
+      fontSize: 12,
+      height: 1.5,
+      color: scheme.onSurfaceVariant,
+    );
+    double textHeight(String text, TextStyle style) {
+      final painter = TextPainter(
+        text: TextSpan(
+          text: text,
+          style: DefaultTextStyle.of(context).style.merge(style),
+        ),
+        maxLines: 1,
+        ellipsis: '…',
+        textScaler: MediaQuery.textScalerOf(context),
+        textDirection: Directionality.of(context),
+      )..layout(maxWidth: 124);
+      final height = painter.height.ceilToDouble();
+      painter.dispose();
+      return height;
+    }
+
+    double foodHeight(Visit visit) {
+      var height = 0.0;
+      for (final dish in visit.items) {
+        final summary = restaurantFoodSummary(
+          dish,
+          package: visit.packageFor(dish),
+        );
+        final measured =
+            84 +
+            5 +
+            textHeight(dish.name.isEmpty ? '填写菜名' : dish.name, nameStyle) +
+            (summary.isEmpty ? 0 : 2 + textHeight(summary, summaryStyle));
+        if (measured > height) height = measured;
+      }
+      return height;
+    }
+
     final sorted = [...records]..sort((a, b) => b.date.compareTo(a.date));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -60,30 +101,48 @@ class RestaurantRecordSection extends StatelessWidget {
         for (final visit in sorted)
           Padding(
             key: ValueKey(visit.id),
-            padding: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.only(bottom: 12),
             child: Material(
-              type: MaterialType.transparency,
+              color: Theme.of(context).inputDecorationTheme.fillColor,
+              borderRadius: BorderRadius.circular(12),
+              clipBehavior: Clip.antiAlias,
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
                 onTap: () => onEdit(visit),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Expanded(
                             child: Text(
                               '${dayLabel(visit.date)} ${TimeOfDay.fromDateTime(visit.date).format(context)}',
                               style: const TextStyle(
                                 fontSize: 15,
+                                height: 1.4,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
                           MenuPopupButton<String>(
                             tooltip: '消费记录操作',
+                            buttonBuilder: (open) => IconButton(
+                              tooltip: '消费记录操作',
+                              alignment: Alignment.bottomCenter,
+                              padding: const EdgeInsets.only(bottom: 2),
+                              constraints: const BoxConstraints.tightFor(
+                                width: 32,
+                                height: 32,
+                              ),
+                              style: IconButton.styleFrom(
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: open,
+                              icon: const MenuIcon(Icons.more_horiz, size: 18),
+                            ),
                             icon: const MenuIcon(Icons.more_horiz, size: 20),
                             onSelected: (action) => action == 'edit'
                                 ? onEdit(visit)
@@ -104,33 +163,54 @@ class RestaurantRecordSection extends StatelessWidget {
                           ),
                         ],
                       ),
-                      Text(
-                        '${visit.address.isEmpty ? '' : '${visit.address} · '}${visit.items.length} 道菜 · ¥${money(visit.totalCost)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.5,
-                          color: scheme.onSurfaceVariant,
-                        ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          if (visit.address.isNotEmpty) ...[
+                            MenuIcon(
+                              Icons.place_outlined,
+                              size: 15,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Expanded(
+                            child: Text(
+                              '${visit.address.isEmpty ? '' : '${localAddressText(visit.address)} · '}¥${money(visit.totalCost)}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: summaryStyle,
+                            ),
+                          ),
+                        ],
                       ),
                       if (visit.companions.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            '同行 · ${visit.companions.join('、')}',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              height: 1.5,
-                              color: scheme.onSurfaceVariant,
-                            ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              MenuIcon(
+                                Icons.people_outline,
+                                size: 15,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  visit.companions.join('、'),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: summaryStyle,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       if (visit.items.isNotEmpty) ...[
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
                         SizedBox(
-                          height:
-                              120 + MediaQuery.textScalerOf(context).scale(28),
+                          height: foodHeight(visit),
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: visit.items.length,
@@ -138,6 +218,10 @@ class RestaurantRecordSection extends StatelessWidget {
                                 const SizedBox(width: 10),
                             itemBuilder: (_, index) {
                               final dish = visit.items[index];
+                              final summary = restaurantFoodSummary(
+                                dish,
+                                package: visit.packageFor(dish),
+                              );
                               return SizedBox(
                                 width: 124,
                                 child: InkWell(
@@ -174,21 +258,17 @@ class RestaurantRecordSection extends StatelessWidget {
                                         dish.name.isEmpty ? '填写菜名' : dish.name,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          height: 1.4,
-                                        ),
+                                        style: nameStyle,
                                       ),
-                                      Text(
-                                        '¥${money(dish.price)} × ${dish.quantity} 份',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          height: 1.4,
-                                          color: scheme.onSurfaceVariant,
+                                      if (summary.isNotEmpty) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          summary,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: summaryStyle,
                                         ),
-                                      ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -197,20 +277,6 @@ class RestaurantRecordSection extends StatelessWidget {
                           ),
                         ),
                       ],
-                      if (visit.note.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(
-                            visit.note,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              height: 1.5,
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),

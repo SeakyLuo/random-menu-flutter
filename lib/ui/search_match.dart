@@ -50,9 +50,11 @@ class SearchMatchCaption extends StatelessWidget {
     required this.text,
     required this.query,
     required this.onTap,
+    this.padding = const EdgeInsets.fromLTRB(4, 8, 4, 2),
   });
   final String text, query;
   final VoidCallback onTap;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +65,7 @@ class SearchMatchCaption extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 4, 2),
+          padding: padding,
           child: Container(
             padding: const EdgeInsets.only(left: 8),
             decoration: BoxDecoration(

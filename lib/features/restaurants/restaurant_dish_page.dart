@@ -7,43 +7,53 @@ import '../../ui/menu_icon.dart';
 import '../../ui/widgets.dart';
 import '../media/media_actions.dart';
 import 'restaurant_dish_summary.dart';
-import 'restaurant_entries.dart';
 import 'visit_detail_page.dart';
+import 'restaurant_food_summary.dart';
 
 class RestaurantDishPage extends StatefulWidget {
   const RestaurantDishPage({
     super.key,
     required this.restaurantId,
     required this.name,
-    this.savedDishId,
-  });
+  }) : previewDish = null,
+       previewPackage = null;
+  RestaurantDishPage.preview({
+    super.key,
+    required VisitDish dish,
+    required VisitPackage package,
+  }) : restaurantId = '',
+       name = dish.name,
+       previewDish = dish,
+       previewPackage = package;
   final String restaurantId;
   final String name;
-  final String? savedDishId;
+  final VisitDish? previewDish;
+  final VisitPackage? previewPackage;
   @override
   State<RestaurantDishPage> createState() => _RestaurantDishPageState();
 }
 
 class _RestaurantDishPageState extends State<RestaurantDishPage> {
-  late String? _savedId = widget.savedDishId;
   final _photos = PageController();
   int _photo = 0;
-  late Restaurant _restaurant;
   RestaurantDishSummary? _dish;
   List<String> _paths = [];
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _restaurant = MenuScope.of(
-      context,
-    ).data.restaurants.firstWhere((r) => r.id == widget.restaurantId);
-    final name = _savedId == null
-        ? widget.name
-        : _restaurant.foods.firstWhere((dish) => dish.id == _savedId).name;
-    _dish = restaurantDishSummaries(
-      _restaurant,
-    ).where((dish) => dish.name == name).firstOrNull;
+    final preview = widget.previewDish;
+    if (preview != null) {
+      _dish = RestaurantDishSummary(preview.name)
+        ..paths.addAll(preview.imagePaths);
+    } else {
+      final restaurant = MenuScope.of(
+        context,
+      ).data.restaurants.firstWhere((r) => r.id == widget.restaurantId);
+      _dish = restaurantDishSummaries(
+        restaurant,
+      ).where((dish) => dish.name == widget.name).firstOrNull;
+    }
     final paths = _dish?.paths ?? const <String>[];
     if (!listEquals(_paths, paths)) {
       _paths = List.of(paths);
@@ -62,7 +72,6 @@ class _RestaurantDishPageState extends State<RestaurantDishPage> {
 
   @override
   Widget build(BuildContext context) {
-    final restaurant = _restaurant;
     final dish = _dish;
     if (dish == null) {
       return Scaffold(
@@ -84,6 +93,10 @@ class _RestaurantDishPageState extends State<RestaurantDishPage> {
         ),
       );
     }
+    final preview = widget.previewDish;
+    final package = preview == null ? dish.package : widget.previewPackage;
+    final price = preview == null ? dish.price : 0.0;
+    final note = preview == null ? dish.note : preview.note;
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -95,19 +108,6 @@ class _RestaurantDishPageState extends State<RestaurantDishPage> {
           onPressed: () => Navigator.pop(context),
           icon: const MenuIcon(Icons.arrow_back),
         ),
-        actions: [
-          if (dish.saved != null)
-            IconButton(
-              tooltip: '编辑菜品资料',
-              icon: const MenuIcon(Icons.edit_outlined),
-              onPressed: () {
-                _savedId = dish.saved!.id;
-                setState(() => _photo = 0);
-                if (_photos.hasClients) _photos.jumpToPage(0);
-                editRestaurantDish(context, restaurant, dish: dish.saved);
-              },
-            ),
-        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -161,10 +161,12 @@ class _RestaurantDishPageState extends State<RestaurantDishPage> {
                   ),
                 const SizedBox(height: 20),
               ],
-              if (dish.price > 0 || dish.visits > 0)
+              if (price > 0 || dish.visits > 0 || package != null)
                 Text(
                   [
-                    if (dish.price > 0) '¥${money(dish.price)}',
+                    if (price > 0) '¥${money(price)}',
+                    if (note.isEmpty && package != null)
+                      visitPackageLabel(package),
                     if (dish.visits > 0) '吃过 ${dish.visits} 次',
                   ].join(' · '),
                   style: TextStyle(
@@ -173,34 +175,16 @@ class _RestaurantDishPageState extends State<RestaurantDishPage> {
                     color: scheme.primary,
                   ),
                 ),
-              if (dish.note.isNotEmpty)
+              if (note.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
                   child: Text(
-                    dish.note,
-                    maxLines:
-                        dish.history.any((entry) => entry.dish.note.isNotEmpty)
-                        ? 2
-                        : null,
-                    overflow: TextOverflow.ellipsis,
+                    note,
                     style: TextStyle(
                       fontSize: 14,
                       height: 1.6,
                       color: scheme.onSurfaceVariant,
                     ),
-                  ),
-                ),
-              if (dish.saved == null)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: () => editRestaurantDish(
-                      context,
-                      restaurant,
-                      initialName: dish.name,
-                    ),
-                    icon: const MenuIcon(Icons.add, size: 18),
-                    label: const Text('添加菜品资料'),
                   ),
                 ),
               if (dish.history.isNotEmpty) ...[
@@ -217,19 +201,12 @@ class _RestaurantDishPageState extends State<RestaurantDishPage> {
                       dayLabel(entry.visit.date),
                       style: const TextStyle(fontSize: 14),
                     ),
-                    subtitle: Text(
-                      [
-                        if (entry.dish.price > 0) '¥${money(entry.dish.price)}',
-                        if (entry.dish.note.isNotEmpty) entry.dish.note,
-                      ].join(' · '),
-                      style: const TextStyle(height: 1.6),
-                    ),
                     trailing: const MenuIcon(Icons.chevron_right, size: 18),
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute<void>(
                         builder: (_) => VisitDetailPage(
-                          restaurantId: restaurant.id,
+                          restaurantId: widget.restaurantId,
                           visitId: entry.visit.id,
                         ),
                       ),

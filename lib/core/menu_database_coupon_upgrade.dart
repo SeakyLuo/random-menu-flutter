@@ -4,6 +4,7 @@ const _couponSchema = '''CREATE TABLE restaurant_visit_coupons (
  restaurant_id TEXT NOT NULL, visit_id TEXT NOT NULL, position INTEGER NOT NULL,
  threshold REAL CHECK (threshold IS NULL OR threshold > 0),
  discount REAL NOT NULL CHECK (discount > 0),
+ quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 100),
  PRIMARY KEY (restaurant_id,visit_id,position))''';
 
 Future<void> _upgradeVisitCoupons(DatabaseExecutor db) async {
@@ -48,6 +49,7 @@ Future<void> _upgradeVisitCoupons(DatabaseExecutor db) async {
         'position': position,
         'threshold': coupon.threshold,
         'discount': coupon.discount,
+        'quantity': coupon.quantity,
       });
     }
   }

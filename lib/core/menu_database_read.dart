@@ -73,12 +73,12 @@ Future<MenuData> _read(
       }),
     );
   }
-  final dishes = _dishGroups(rows['restaurant_dishes']!, images);
   final visits = _visitGroups(
     rows['restaurant_visits']!,
     rows['restaurant_visit_items']!,
     rows['visit_companions']!,
     rows['restaurant_visit_coupons']!,
+    rows['restaurant_visit_packages']!,
     images,
   );
   final restaurants = [
@@ -95,7 +95,6 @@ Future<MenuData> _read(
           jsonDecode(row['addresses'] as String) as List,
         ),
         addressEntries: branches[row['id']] ?? [],
-        foods: dishes[row['id']] ?? [],
         records: visits[row['id']] ?? [],
         favorite: favorites.contains(('restaurant', row['id'])),
       ),
@@ -208,11 +207,10 @@ Future<MapEntry<String, List<Map<String, Object?>>>> _readTable(
     'auto_tag_rules' => 'mode, position',
     'auto_tag_rule_values' => 'mode, rule_key, position',
     'recipe_tag_links' => 'recipe_id, position',
-    'restaurant_addresses' ||
-    'restaurant_dishes' ||
-    'restaurant_visits' => 'restaurant_id, position',
+    'restaurant_addresses' || 'restaurant_visits' => 'restaurant_id, position',
     'restaurant_visit_items' ||
     'restaurant_visit_coupons' ||
+    'restaurant_visit_packages' ||
     'visit_companions' => 'restaurant_id, visit_id, position',
     'search_history' => 'search_type, position',
     'images' => 'kind, restaurant_id, owner_id, item_position, position',
@@ -251,10 +249,10 @@ Future<MapEntry<String, List<Map<String, Object?>>>> _readTable(
   if ([
     'restaurants',
     'restaurant_addresses',
-    'restaurant_dishes',
     'restaurant_visits',
     'restaurant_visit_items',
     'restaurant_visit_coupons',
+    'restaurant_visit_packages',
     'visit_companions',
   ].contains(table)) {
     return ids(

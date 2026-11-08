@@ -31,6 +31,7 @@ class MenuPopupButton<T> extends StatelessWidget {
     this.child,
     this.buttonBuilder,
     this.enabled = true,
+    this.matchAnchorWidth = false,
     this.borderRadius = const BorderRadius.all(Radius.circular(16)),
   });
 
@@ -41,6 +42,7 @@ class MenuPopupButton<T> extends StatelessWidget {
   final Widget? child;
   final Widget Function(VoidCallback open)? buttonBuilder;
   final bool enabled;
+  final bool matchAnchorWidth;
   final BorderRadius borderRadius;
 
   Future<void> _open(BuildContext context) async {
@@ -53,7 +55,7 @@ class MenuPopupButton<T> extends StatelessWidget {
     final media = MediaQuery.of(navigator.context).copyWith(size: overlay.size);
     final themes = InheritedTheme.capture(from: context, to: navigator.context);
     final width = math.min(
-      236.0,
+      matchAnchorWidth ? anchor.width : 236.0,
       overlay.size.width - media.padding.horizontal - 16,
     );
     final left = (anchor.right - width).clamp(

@@ -55,7 +55,7 @@ class _BackupPageState extends State<BackupPage> {
         title: '使用此备份覆盖当前数据？',
         message:
             '${backup.summary}\n\n'
-            '将覆盖当前菜谱、餐厅、菜品、用餐记录、收藏、所有清单、草稿、标签规则、'
+            '将覆盖当前菜谱、餐厅、菜品、消费记录、收藏、所有清单、草稿、标签规则、'
             '搜索历史、随手记、设置、本次菜单和照片。\n\n'
             '当前内容将被替换。建议先导出当前数据。',
         confirmLabel: '覆盖并恢复',
@@ -90,7 +90,7 @@ class _BackupPageState extends State<BackupPage> {
         padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
         children: [
           const Text(
-            '导入菜谱、餐厅、用餐记录和照片，或导出一份完整备份。',
+            '导入菜谱、餐厅、消费记录和照片，或导出一份完整备份。',
             style: TextStyle(height: 1.6),
           ),
           const SizedBox(height: 28),

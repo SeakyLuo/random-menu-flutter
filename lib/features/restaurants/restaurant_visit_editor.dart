@@ -1,6 +1,6 @@
-import '../../ui/menu_popup.dart';
 import '../../ui/menu_bottom_sheet.dart';
 import '../../ui/menu_icon.dart';
+import '../../ui/menu_field_label.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
@@ -9,12 +9,16 @@ import '../../core/models.dart';
 import '../../ui/widgets.dart';
 import '../../ui/library_widgets.dart';
 import 'restaurant_address_editor.dart';
+import 'restaurant_companion_field.dart';
 import 'restaurant_images.dart';
 import 'visit_dish_editor.dart';
 import 'visit_coupon_fields.dart';
+import 'visit_package_fields.dart';
+import 'visit_dish_editor_row.dart';
 import 'restaurant_record_draft.dart';
 import '../photo_import/import_models.dart';
-import '../media/photo_widget.dart';
+
+part 'restaurant_visit_editor_form.dart';
 
 class RestaurantVisitEditor extends StatefulWidget {
   const RestaurantVisitEditor({
@@ -45,6 +49,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
       [];
   late List<String> images = [...?widget.visit?.imagePaths];
   late List<VisitCoupon> coupons = [...?widget.visit?.coupons];
+  late List<VisitPackage> packages = [...?widget.visit?.packages];
   late bool autoCost = widget.visit?.autoCost ?? true;
   late String addressId =
       widget.visit?.addressId ??
@@ -69,6 +74,10 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
   bool get busy => saving || picking;
   bool leaving = false;
   bool get dirty =>
+      jsonEncode(packages.map((p) => p.toJson()).toList()) !=
+          jsonEncode(
+            widget.visit?.packages.map((p) => p.toJson()).toList() ?? [],
+          ) ||
       date != initialDate ||
       total.text !=
           (widget.visit == null ? '0' : money(widget.visit!.totalCost)) ||
@@ -106,7 +115,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
       .map((v) => v.trim())
       .where((v) => v.isNotEmpty)
       .toList();
-  double get subtotal => items.fold(0.0, (sum, item) => sum + item.cost);
+  double get subtotal => visitSubtotal(items, packages);
   VisitBill get bill => VisitBill(subtotal, coupons);
   @override
   void initState() {
@@ -277,9 +286,11 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
   }
 
   Future<void> addItem() async {
-    final item = widget.draftOnly
-        ? await editVisitDish(context, VisitDish(dishId: '', name: ''))
-        : await pickVisitDish(context, widget.restaurant.id);
+    final item = await editVisitDish(
+      context,
+      VisitDish(dishId: newId(), name: ''),
+      packages: packages,
+    );
     if (item != null && mounted) {
       setState(() {
         items.add(item);
@@ -289,10 +300,11 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
   }
 
   Future<void> editItem(int index) async {
-    final item = await editVisitDish(context, items[index]);
+    final original = items[index];
+    final item = await editVisitDish(context, original, packages: packages);
     if (item != null && mounted) {
       setState(() {
-        items[index] = item;
+        items[items.indexOf(original)] = item;
         recalculate();
       });
     }
@@ -331,22 +343,37 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
     final item = items.removeAt(from);
     items.insert(to, item);
   });
-  Future<void> removeItem(int index) async {
+  Future<void> removePackage(VisitPackage package) async {
+    final count = items.where((i) => i.packageId == package.id).length;
+    final remaining = packages.where((p) => p.id != package.id).toList();
+    final unbound = items.map((i) {
+      final item = VisitDish.fromJson(i.toJson());
+      if (item.packageId == package.id) item.packageId = null;
+      return item;
+    }).toList();
+    final after = VisitBill(visitSubtotal(unbound, remaining), coupons);
     if (!await confirmAction(
       context,
-      title: '移除本次菜品？',
-      message: '从本次点单中移除“${items[index].name}”，餐厅菜单会保留。',
-      confirmLabel: '移除',
+      title: '移除“${package.name}”？',
+      message:
+          '${count > 0 ? '保留 $count 道菜并改为单点，恢复各自单价。' : '套餐总价将不再计入消费。'}'
+          '${autoCost ? '自动实付将从 ¥${money(bill.total)} 改为 ¥${money(after.total)}。' : '手填实付金额保持不变。'}',
+      confirmLabel: '移除套餐',
     )) {
       return;
     }
-    if (mounted) {
-      setState(() {
-        items.removeAt(index);
-        recalculate();
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      packages = remaining;
+      items = unbound;
+      recalculate();
+    });
   }
+
+  void removeItem(VisitDish dish) => setState(() {
+    items.remove(dish);
+    recalculate();
+  });
 
   Future<void> save() async {
     if (address.isEmpty) {
@@ -373,6 +400,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
         note: note.text.trim(),
         items: items,
         coupons: coupons,
+        packages: packages,
         dishes: items.map((item) => item.name).toList(),
         autoCost: autoCost,
         addressId: addressId,
@@ -395,6 +423,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
         items.map(
           (i) async => VisitDish(
             dishId: i.dishId,
+            packageId: i.packageId,
             name: i.name,
             price: i.price,
             quantity: i.quantity,
@@ -431,6 +460,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
           dishes: savedItems.map((i) => i.name).toList(),
           items: savedItems,
           coupons: coupons,
+          packages: packages,
           autoCost: autoCost,
           addressId: addressId,
           address: address,
@@ -446,7 +476,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
     });
     if (!mounted) return;
     if (success) {
-      showToast(context, '用餐记录已保存');
+      showToast(context, '消费记录已保存');
       setState(() => leaving = true);
       Navigator.pop(context);
     } else {
@@ -454,248 +484,8 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
     }
   }
 
+  void updateForm(VoidCallback update) => setState(update);
+
   @override
-  Widget build(BuildContext context) {
-    final allPeople =
-        MenuScope.of(context).data.restaurants
-            .expand((r) => r.records)
-            .expand((r) => r.companions)
-            .toSet()
-            .toList()
-          ..sort();
-    final value = double.tryParse(total.text) ?? 0;
-    return PopScope(
-      canPop: leaving || (!dirty && !busy),
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) leave();
-      },
-      child: Scaffold(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        appBar: AppBar(
-          title: Text(widget.visit == null ? '记录一次用餐' : '编辑用餐记录'),
-          leading: IconButton(
-            tooltip: '返回',
-            onPressed: busy ? null : leave,
-            icon: const MenuIcon(Icons.arrow_back),
-          ),
-        ),
-        bottomNavigationBar: FixedPageActions(
-          children: [
-            Expanded(
-              child: FilledButton(
-                onPressed: busy ? null : save,
-                child: Text(
-                  saving
-                      ? '保存中…'
-                      : widget.draftOnly
-                      ? '完成'
-                      : '保存记录',
-                ),
-              ),
-            ),
-          ],
-        ),
-        body: AbsorbPointer(
-          absorbing: busy,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
-            children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('用餐时间'),
-                subtitle: Text(
-                  '${dayLabel(date)} ${TimeOfDay.fromDateTime(date).format(context)}',
-                ),
-                trailing: const MenuIcon(Icons.calendar_month_outlined),
-                onTap: selectDate,
-              ),
-              SectionTitle(
-                '用餐分店',
-                trailing: TextButton.icon(
-                  onPressed: addAddress,
-                  icon: const MenuIcon(Icons.add, size: 18),
-                  label: const Text('添加地址'),
-                ),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(address.isEmpty ? '选择本次用餐的分店' : address),
-                trailing: const MenuIcon(Icons.chevron_right),
-                onTap: chooseAddress,
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: companions,
-                decoration: const InputDecoration(
-                  labelText: '饭搭子',
-                  hintText: '姓名用逗号分隔，独自用餐可留空',
-                ),
-              ),
-              if (allPeople.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      for (final person in allPeople)
-                        FilterChip(
-                          label: Text(person),
-                          selected: people.contains(person),
-                          onSelected: (selected) {
-                            final list = people;
-                            if (selected) {
-                              list.add(person);
-                            } else {
-                              list.removeWhere((p) => p == person);
-                            }
-                            companions.text = list.join('，');
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-              SectionTitle(
-                '本次菜品 · ${items.length}',
-                trailing: Tooltip(
-                  message: widget.draftOnly ? '添加菜品，长按从照片快速添加' : '添加菜品',
-                  triggerMode: widget.draftOnly
-                      ? TooltipTriggerMode.manual
-                      : TooltipTriggerMode.longPress,
-                  child: GestureDetector(
-                    onLongPress: widget.draftOnly ? addPhotoItems : null,
-                    child: IconButton(
-                      onPressed: addItem,
-                      icon: const MenuIcon(Icons.add, size: 20),
-                    ),
-                  ),
-                ),
-              ),
-              if (items.isEmpty) const Text('可先记录饭搭子和环境，也可以添加本次吃过的菜。'),
-              for (var i = 0; i < items.length; i++)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: widget.draftOnly && items[i].imagePaths.isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: SizedBox.square(
-                            dimension: 48,
-                            child: LocalPhoto(path: items[i].imagePaths.first),
-                          ),
-                        )
-                      : null,
-                  title: Text(items[i].name.isEmpty ? '填写菜名' : items[i].name),
-                  subtitle: Text(
-                    '¥${money(items[i].price)} × ${items[i].quantity} 份 = ¥${money(items[i].cost)}',
-                  ),
-                  onTap: () => editItem(i),
-                  trailing: MenuPopupButton<String>(
-                    icon: const MenuIcon(Icons.more_horiz),
-                    tooltip: '本次菜品操作',
-                    onSelected: (action) {
-                      switch (action) {
-                        case 'edit':
-                          editItem(i);
-                        case 'up':
-                          moveItem(i, i - 1);
-                        case 'down':
-                          moveItem(i, i + 1);
-                        case 'remove':
-                          removeItem(i);
-                      }
-                    },
-                    itemBuilder: (_) => [
-                      const MenuPopupItem(
-                        icon: Icons.edit_outlined,
-                        value: 'edit',
-                        child: Text('编辑本次点单'),
-                      ),
-                      if (i > 0)
-                        const MenuPopupItem(
-                          icon: Icons.arrow_upward,
-                          value: 'up',
-                          child: Text('上移'),
-                        ),
-                      if (i < items.length - 1)
-                        const MenuPopupItem(
-                          icon: Icons.arrow_downward,
-                          value: 'down',
-                          child: Text('下移'),
-                        ),
-                      const MenuPopupItem(
-                        icon: Icons.delete_outline,
-                        destructive: true,
-                        value: 'remove',
-                        child: Text('移除'),
-                      ),
-                    ],
-                  ),
-                ),
-              VisitCouponFields(
-                coupons: coupons,
-                subtotal: subtotal,
-                autoCost: autoCost,
-                onChanged: (value) => setState(() {
-                  coupons = value;
-                  recalculate();
-                }),
-              ),
-              const SectionTitle('消费'),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('按菜品自动计算'),
-                subtitle: Text(
-                  '菜品合计 ¥${money(bill.subtotal)}${autoCost && coupons.isNotEmpty ? ' − 用券 ¥${money(bill.discount)}' : ''}',
-                ),
-                value: autoCost,
-                onChanged: changeAutoCost,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: total,
-                readOnly: autoCost,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(
-                  labelText: '实际支付',
-                  prefixText: '¥ ',
-                  helperText: autoCost
-                      ? '按菜品合计扣除用券优惠，修改菜品或用券会重新计算'
-                      : '填写券后实付金额，不会再次扣除用券优惠',
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Text(
-                  '共 ${people.length + 1} 人（含自己）${value > 0 && value.isFinite ? ' · 人均 ¥${money(value / (people.length + 1))}' : ''}',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: note,
-                minLines: 3,
-                maxLines: 6,
-                decoration: const InputDecoration(
-                  labelText: '用餐感受',
-                  hintText: '记下这次用餐的小细节',
-                ),
-              ),
-              const SectionTitle('环境照片'),
-              RestaurantImages(
-                paths: images,
-                onBusyChanged: (value) => setState(() => picking = value),
-                onChanged: (v) {
-                  if (mounted) setState(() => images = v);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _buildEditor(context);
 }

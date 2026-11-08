@@ -77,28 +77,13 @@ List<RestaurantPhoto> restaurantGallery(Restaurant restaurant) {
           date: visit.date,
         ),
   ];
-  final recorded = result.map((p) => p.path).toSet();
-  for (final dish in restaurant.foods) {
-    for (var i = 0; i < dish.imagePaths.length; i++) {
-      if (!recorded.contains(dish.imagePaths[i])) {
-        result.add(
-          RestaurantPhoto(
-            key: 'dish:${dish.id}:$i',
-            path: dish.imagePaths[i],
-            name: dish.name,
-            note: dish.note,
-            date: null,
-            price: dish.price,
-          ),
-        );
-      }
-    }
-  }
   return result;
 }
 
 String localAddressText(String value) => value.replaceFirst(
-  RegExp(r'^(?:[一-鿿]{2,}?(?:省|自治区|特别行政区)\s*)?(?:[一-鿿]{2,}?市\s*)?'),
+  RegExp(
+    r'^(?:(?:(?![市区县])[一-鿿]){2,}?(?:省|自治区|特别行政区)\s*)?(?:(?:(?![区县])[一-鿿]){2,}?市\s*)?',
+  ),
   '',
 );
 String restaurantDisplayAddress(
@@ -115,4 +100,14 @@ String restaurantDisplayAddress(
   return restaurant.addresses.isEmpty
       ? '地址待补充'
       : localAddressText(restaurant.addresses.first);
+}
+
+String restaurantDetailAddress(
+  Restaurant restaurant,
+  RestaurantAddress address, {
+  required String? currentCity,
+}) {
+  if (address.city.isEmpty) return address.fullAddress;
+  final local = restaurantDisplayAddress(restaurant, address: address);
+  return address.city == currentCity ? local : '${address.city} $local';
 }

@@ -185,12 +185,13 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
   }
 
   Future<void> removeLocalAddress(RestaurantAddress address) async {
-    if (!await confirmAction(
-      context,
-      title: '移除这个地址？',
-      message: address.fullAddress,
-      confirmLabel: '移除',
-    )) {
+    if (address.fullAddress.trim().isNotEmpty &&
+        !await confirmAction(
+          context,
+          title: '移除这个地址？',
+          message: address.fullAddress,
+          confirmLabel: '移除',
+        )) {
       return;
     }
     if (!mounted) return;

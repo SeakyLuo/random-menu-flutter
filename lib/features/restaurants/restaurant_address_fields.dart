@@ -108,7 +108,9 @@ class _RestaurantAddressFieldsState extends State<RestaurantAddressFields> {
     final muted = theme.colorScheme.onSurfaceVariant;
     return Material(
       color: theme.inputDecorationTheme.fillColor,
-      borderRadius: BorderRadius.circular(11),
+      shape: theme.brightness == Brightness.dark
+          ? theme.inputDecorationTheme.enabledBorder
+          : theme.inputDecorationTheme.border,
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -125,12 +127,16 @@ class _RestaurantAddressFieldsState extends State<RestaurantAddressFields> {
                         horizontal: 16,
                         vertical: 8,
                       ),
-                      child: Text(
-                        region.isEmpty ? '选择省市区' : region,
-                        style: TextStyle(
-                          fontSize: 13,
-                          height: 1.4,
-                          color: muted,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        heightFactor: 1,
+                        child: Text(
+                          region.isEmpty ? '选择省市区' : region,
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.4,
+                            color: muted,
+                          ),
                         ),
                       ),
                     ),

@@ -1,6 +1,29 @@
 import 'models.dart';
 import 'visit_coupon_migration.dart';
 
+Map<String, dynamic> upgradeMenuV5(Map<String, dynamic> source) {
+  for (final restaurant in source['restaurants'] as List) {
+    for (final visit in restaurant['records'] as List) {
+      for (final coupon in visit['coupons'] as List) {
+        coupon['quantity'] = 1;
+      }
+    }
+  }
+  return {...source, 'version': 6};
+}
+
+Map<String, dynamic> upgradeMenuV4(Map<String, dynamic> source) {
+  for (final restaurant in source['restaurants'] as List) {
+    for (final visit in restaurant['records'] as List) {
+      visit['packages'] = <Map<String, dynamic>>[];
+      for (final item in visit['items'] as List) {
+        item['packageId'] = null;
+      }
+    }
+  }
+  return {...source, 'version': 5};
+}
+
 Map<String, dynamic> upgradeMenuV3(Map<String, dynamic> source) {
   for (final restaurant in source['restaurants'] as List) {
     for (final visit in restaurant['records'] as List) {
@@ -51,9 +74,6 @@ Map<String, dynamic> upgradeMenuV1(Map<String, dynamic> source) {
       for (final address in restaurant['addresses'] as List)
         RestaurantAddress(id: newId(), detail: address as String).toJson(),
     ];
-    for (final rawDish in restaurant['foods'] as List) {
-      (rawDish as Map<String, dynamic>)['quantity'] = 1;
-    }
     for (final rawVisit in restaurant['records'] as List) {
       final visit = rawVisit as Map<String, dynamic>;
       visit.addAll({

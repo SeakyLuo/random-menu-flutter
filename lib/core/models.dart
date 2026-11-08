@@ -3,7 +3,9 @@ import 'geo_point.dart';
 import 'menu_schema.dart';
 import 'package:uuid/uuid.dart';
 import 'visit_coupon.dart';
+import 'visit_package.dart';
 export 'visit_coupon.dart';
+export 'visit_package.dart';
 
 String newId() => const Uuid().v4();
 
@@ -45,39 +47,6 @@ class Recipe {
     'favorite': favorite,
     'hiddenRounds': hiddenRounds,
     'createdAt': createdAt.toIso8601String(),
-  };
-}
-
-class RestaurantDish {
-  RestaurantDish({
-    required this.id,
-    required this.name,
-    this.price = 0,
-    this.quantity = 1,
-    this.note = '',
-    this.imagePaths = const [],
-  });
-  String id;
-  String name;
-  double price;
-  int quantity;
-  String note;
-  List<String> imagePaths;
-  factory RestaurantDish.fromJson(Map<String, dynamic> j) => RestaurantDish(
-    id: j['id'] as String,
-    name: j['name'] as String,
-    price: (j['price'] as num).toDouble(),
-    quantity: j['quantity'] as int,
-    note: j['note'] as String,
-    imagePaths: List<String>.from(j['imagePaths'] as List),
-  );
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'price': price,
-    'quantity': quantity,
-    'note': note,
-    'imagePaths': imagePaths,
   };
 }
 
@@ -123,12 +92,14 @@ class VisitDish {
   VisitDish({
     required this.dishId,
     required this.name,
+    this.packageId,
     this.price = 0,
     this.quantity = 1,
     this.note = '',
     this.imagePaths = const [],
   });
   String dishId;
+  String? packageId;
   String name;
   double price;
   int quantity;
@@ -137,6 +108,7 @@ class VisitDish {
   double get cost => price * quantity;
   factory VisitDish.fromJson(Map<String, dynamic> j) => VisitDish(
     dishId: j['dishId'] as String,
+    packageId: j['packageId'] as String?,
     name: j['name'] as String,
     price: (j['price'] as num).toDouble(),
     quantity: j['quantity'] as int,
@@ -145,6 +117,7 @@ class VisitDish {
   );
   Map<String, dynamic> toJson() => {
     'dishId': dishId,
+    'packageId': packageId,
     'name': name,
     'price': price,
     'quantity': quantity,
@@ -152,6 +125,12 @@ class VisitDish {
     'imagePaths': imagePaths,
   };
 }
+
+double visitSubtotal(List<VisitDish> items, List<VisitPackage> packages) =>
+    items
+        .where((i) => i.packageId == null)
+        .fold(0.0, (sum, i) => sum + i.cost) +
+    packages.fold(0.0, (sum, p) => sum + p.totalPrice);
 
 class Visit {
   Visit({
@@ -163,6 +142,7 @@ class Visit {
     this.autoCost = false,
     this.items = const [],
     this.coupons = const [],
+    this.packages = const [],
     this.companions = const [],
     this.note = '',
     this.dishes = const [],
@@ -176,8 +156,19 @@ class Visit {
   bool autoCost;
   List<VisitDish> items;
   List<VisitCoupon> coupons;
-  VisitBill get bill =>
-      VisitBill(items.fold(0.0, (sum, item) => sum + item.cost), coupons);
+  List<VisitPackage> packages;
+  VisitPackage? packageFor(VisitDish dish) => dish.packageId == null
+      ? null
+      : packages.firstWhere((p) => p.id == dish.packageId);
+  void validatePackages() {
+    final ids = packages.map((p) => p.id).toSet();
+    if (ids.length != packages.length ||
+        items.any((i) => i.packageId != null && !ids.contains(i.packageId))) {
+      throw const FormatException('菜品与套餐关联不完整');
+    }
+  }
+
+  VisitBill get bill => VisitBill(visitSubtotal(items, packages), coupons);
   List<String> companions;
   String note;
   List<String> dishes;
@@ -189,6 +180,9 @@ class Visit {
     addressId: j['addressId'] as String,
     address: j['address'] as String,
     autoCost: j['autoCost'] as bool,
+    packages: (j['packages'] as List)
+        .map((e) => VisitPackage.fromJson(e as Map<String, dynamic>))
+        .toList(),
     coupons: (j['coupons'] as List)
         .map((e) => VisitCoupon.fromJson(e as Map<String, dynamic>))
         .toList(),
@@ -207,6 +201,7 @@ class Visit {
     'addressId': addressId,
     'address': address,
     'autoCost': autoCost,
+    'packages': packages.map((p) => p.toJson()).toList(),
     'coupons': coupons.map((coupon) => coupon.toJson()).toList(),
     'items': items.map((e) => e.toJson()).toList(),
     'companions': companions,
@@ -226,7 +221,6 @@ class Restaurant {
     this.note = '',
     this.link = '',
     this.favorite = false,
-    this.foods = const [],
     this.records = const [],
   });
   String id;
@@ -237,7 +231,6 @@ class Restaurant {
   String note;
   String link;
   bool favorite;
-  List<RestaurantDish> foods;
   List<Visit> records;
   double get averageCost {
     final paid = records.where((v) => v.totalCost > 0);
@@ -256,9 +249,6 @@ class Restaurant {
     addressEntries: (j['addressEntries'] as List)
         .map((e) => RestaurantAddress.fromJson(e as Map<String, dynamic>))
         .toList(),
-    foods: (j['foods'] as List)
-        .map((e) => RestaurantDish.fromJson(e as Map<String, dynamic>))
-        .toList(),
     records: (j['records'] as List)
         .map((e) => Visit.fromJson(e as Map<String, dynamic>))
         .toList(),
@@ -272,7 +262,6 @@ class Restaurant {
     'note': note,
     'link': link,
     'favorite': favorite,
-    'foods': foods.map((e) => e.toJson()).toList(),
     'records': records.map((e) => e.toJson()).toList(),
   };
 }
@@ -343,7 +332,9 @@ class MenuData {
     if (j['version'] == 1) j = upgradeMenuV1(j);
     if (j['version'] == 2) j = upgradeMenuV2(j);
     if (j['version'] == 3) j = upgradeMenuV3(j);
-    if (j['version'] != 4) {
+    if (j['version'] == 4) j = upgradeMenuV4(j);
+    if (j['version'] == 5) j = upgradeMenuV5(j);
+    if (j['version'] != 6) {
       throw const FormatException('Unsupported menu format');
     }
     return MenuData(
@@ -383,7 +374,7 @@ class MenuData {
     );
   }
   Map<String, dynamic> toJson() => {
-    'version': 4,
+    'version': 6,
     'recipes': recipes.map((e) => e.toJson()).toList(),
     'restaurants': restaurants.map((e) => e.toJson()).toList(),
     'toCook': toCook,

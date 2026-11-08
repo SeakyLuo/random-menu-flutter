@@ -40,6 +40,7 @@ Future<bool?> choosePhotoSource(BuildContext context) async {
 Future<String?> showPhotoEditMenu(
   BuildContext context, {
   required bool isCover,
+  bool allowCover = true,
   bool hasOriginal = false,
 }) => showMenuBottomSheet<String>(
   context: context,
@@ -59,7 +60,7 @@ Future<String?> showPhotoEditMenu(
           title: const Text('编辑图片'),
           onTap: () => Navigator.pop(context, 'crop'),
         ),
-        if (!isCover)
+        if (allowCover && !isCover)
           ListTile(
             leading: const MenuIcon(Icons.photo_outlined),
             title: const Text('设为封面'),

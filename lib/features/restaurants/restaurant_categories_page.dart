@@ -76,7 +76,7 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
     if (!await confirmAction(
       context,
       title: '删除菜系“$name”？',
-      message: count == 0 ? '删除后不再出现在菜系建议中。' : '会清空 $count 家餐厅的菜系，餐厅和用餐记录仍然保留。',
+      message: count == 0 ? '删除后不再出现在菜系建议中。' : '会清空 $count 家餐厅的菜系，餐厅和消费记录仍然保留。',
     )) {
       return;
     }

@@ -63,7 +63,22 @@ ThemeData menuTheme(Brightness brightness) {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: dark ? scheme.surface : const Color(0xfff6f7f8),
+      fillColor: dark ? const Color(0xff293c31) : const Color(0xfff6f7f8),
+      hintStyle: dark ? TextStyle(color: scheme.onSurfaceVariant) : null,
+      enabledBorder: dark
+          ? OutlineInputBorder(
+              borderRadius: BorderRadius.circular(11),
+              borderSide: BorderSide(
+                color: scheme.onSurfaceVariant.withValues(alpha: .35),
+              ),
+            )
+          : null,
+      focusedBorder: dark
+          ? OutlineInputBorder(
+              borderRadius: BorderRadius.circular(11),
+              borderSide: BorderSide(color: scheme.primary, width: 1.5),
+            )
+          : null,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(11),
         borderSide: BorderSide.none,

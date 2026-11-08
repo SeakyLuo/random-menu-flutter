@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../ui/favorite_glass_button.dart';
 import '../../ui/menu_icon.dart';
+import '../../ui/library_photo_card.dart';
 import '../media/photo_widget.dart';
 
 class RandomRecipeCard extends StatelessWidget {
@@ -67,6 +68,28 @@ class RandomRecipeCard extends StatelessWidget {
         ],
       ),
     );
+    if (compact) {
+      return LibraryPhotoCard(
+        cover: RecipeCover(
+          recipe: recipe,
+          path: coverPath,
+          fullResolution: fullResolutionPhoto,
+        ),
+        caption: caption,
+        hasPhoto: hasPhoto,
+        label: '查看${recipe.name}详情',
+        onTap: onOpen,
+        onLongPress: onLongPress,
+        trailing: showFavorite && recipe.favorite
+            ? FavoriteGlassButton(
+                size: 34,
+                iconSize: 21,
+                tooltip: '取消收藏${recipe.name}',
+                onPressed: onFavorite,
+              )
+            : null,
+      );
+    }
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),

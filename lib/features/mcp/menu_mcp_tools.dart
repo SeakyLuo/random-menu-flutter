@@ -34,6 +34,11 @@ class MenuMcpTools {
       },
       'name': _text,
       'price': _number,
+      'packageId': {
+        'type': ['string', 'null'],
+        'description':
+            '本次套餐 id；null 表示单点。套餐由 create/update_visit 的 packages 创建后取得。',
+      },
       'quantity': {'type': 'integer', 'minimum': 1},
       'note': _text,
     },
@@ -69,11 +74,23 @@ class MenuMcpTools {
       'address': _text,
       'note': _text,
       'companions': _strings,
+      'packages': {
+        'type': 'array',
+        'maxItems': 100,
+        'description':
+            '整体替换本次套餐。新增省略 id，修改保留原 id；删除时同时解除其 items.packageId。每个套餐总价仅计一次，不重复计算成员菜价。',
+        'items': {
+          'type': 'object',
+          'properties': {'id': _text, 'name': _text, 'totalPrice': _number},
+          'required': ['name', 'totalPrice'],
+          'additionalProperties': false,
+        },
+      },
       'coupons': {
         'type': 'array',
         'maxItems': 100,
         'description':
-            '整体替换本次用券列表。discount 为优惠减额（必填），threshold 为使用门槛（选填，省略表示无门槛）。实付由 autoCost 决定是否自动扣券。',
+            '整体替换本次用券列表。discount 为单张优惠减额、quantity 为使用张数（1–100），两者必填；threshold 为使用门槛（选填，省略表示无门槛）。实付由 autoCost 决定是否自动扣券。',
         'items': {
           'type': 'object',
           'properties': {
@@ -82,8 +99,9 @@ class MenuMcpTools {
               'minimum': 0.01,
             },
             'discount': {'type': 'number', 'minimum': 0.01},
+            'quantity': {'type': 'integer', 'minimum': 1, 'maximum': 100},
           },
-          'required': ['discount'],
+          'required': ['discount', 'quantity'],
           'additionalProperties': false,
         },
       },
@@ -374,6 +392,20 @@ class MenuMcpTools {
               visit.items = _items(visit, args['items'] as List);
               visit.dishes = visit.items.map((i) => i.name).toList();
             }
+            if (args.containsKey('packages')) {
+              visit.packages = (args['packages'] as List).map((value) {
+                final id = value['id'] as String?;
+                if (id != null && !visit.packages.any((p) => p.id == id)) {
+                  throw ArgumentError('Package does not belong to this visit.');
+                }
+                return VisitPackage(
+                  id: id ?? newId(),
+                  name: _name(value['name']),
+                  totalPrice: (value['totalPrice'] as num).toDouble(),
+                );
+              }).toList();
+            }
+            visit.validatePackages();
             if (args.containsKey('autoCost')) {
               visit.autoCost = args['autoCost'] as bool;
             }
@@ -463,6 +495,9 @@ class MenuMcpTools {
         item.quantity = value['quantity'] as int;
       }
       if (value.containsKey('note')) item.note = value['note'] as String;
+      if (value.containsKey('packageId')) {
+        item.packageId = value['packageId'] as String?;
+      }
       if (result.any((i) => i.dishId == item.dishId)) {
         throw ArgumentError('Duplicate dish.');
       }
@@ -495,6 +530,9 @@ class MenuMcpTools {
       case ['number', 'null']:
         if (value == null) return;
         _validate(value, {...schema, 'type': 'number'});
+      case ['string', 'null']:
+        if (value == null) return;
+        _validate(value, {...schema, 'type': 'string'});
       case 'object':
         if (value is! Map) throw ArgumentError('Expected an object.');
         final fields = schema['properties'] as Map;

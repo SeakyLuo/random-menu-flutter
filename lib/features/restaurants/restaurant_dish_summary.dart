@@ -3,16 +3,16 @@ import '../../core/models.dart';
 class RestaurantDishSummary {
   RestaurantDishSummary(this.name);
   final String name;
-  RestaurantDish? saved;
   final history = <({Visit visit, VisitDish dish})>[];
   final paths = <String>[];
-  double get price =>
-      history.isNotEmpty ? history.first.dish.price : saved!.price;
+  double get price => package == null ? history.first.dish.price : 0;
+  VisitPackage? get package =>
+      history.first.visit.packageFor(history.first.dish);
   String get note {
     for (final entry in history) {
       if (entry.dish.note.isNotEmpty) return entry.dish.note;
     }
-    return saved?.note ?? '';
+    return '';
   }
 
   int get visits => history.map((entry) => entry.visit.id).toSet().length;
@@ -31,14 +31,6 @@ List<RestaurantDishSummary> restaurantDishSummaries(Restaurant restaurant) {
       summary.history.add((visit: visit, dish: dish));
       summary.paths.addAll(dish.imagePaths);
     }
-  }
-  for (final dish in restaurant.foods) {
-    final summary = dishes.putIfAbsent(
-      dish.name,
-      () => RestaurantDishSummary(dish.name),
-    );
-    summary.saved = dish;
-    summary.paths.addAll(dish.imagePaths);
   }
   for (final summary in dishes.values) {
     final unique = summary.paths.toSet().toList();

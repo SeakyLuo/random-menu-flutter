@@ -16,9 +16,6 @@ Iterable<List<String>> _imageLists(MenuData data) sync* {
     yield recipe.imagePaths;
   }
   for (final restaurant in data.restaurants) {
-    for (final dish in restaurant.foods) {
-      yield dish.imagePaths;
-    }
     for (final visit in restaurant.records) {
       yield visit.imagePaths;
       for (final item in visit.items) {

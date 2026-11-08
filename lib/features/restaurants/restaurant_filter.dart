@@ -14,6 +14,8 @@ class RestaurantQuery {
     this.county = '',
     this.start,
     this.end,
+    this.minPrice,
+    this.maxPrice,
     Set<String>? companions,
     this.alone = false,
     this.favorite = false,
@@ -26,6 +28,8 @@ class RestaurantQuery {
   String county;
   DateTime? start;
   DateTime? end;
+  double? minPrice;
+  double? maxPrice;
   Set<String> companions;
   bool alone;
   bool favorite;
@@ -38,7 +42,9 @@ class RestaurantQuery {
       companions.isNotEmpty ||
       alone ||
       companionsOnly;
-  bool get active => hasRegion || hasRecords || favorite || category.isNotEmpty;
+  bool get hasPrice => minPrice != null || maxPrice != null;
+  bool get active =>
+      hasRegion || hasRecords || hasPrice || favorite || category.isNotEmpty;
   RestaurantQuery copy() => RestaurantQuery(
     category: category,
     companionsOnly: companionsOnly,
@@ -47,6 +53,8 @@ class RestaurantQuery {
     county: county,
     start: start,
     end: end,
+    minPrice: minPrice,
+    maxPrice: maxPrice,
     companions: {...companions},
     alone: alone,
     favorite: favorite,
@@ -62,9 +70,18 @@ class RestaurantQuery {
       (!alone || v.companions.isEmpty) &&
       (!companionsOnly ||
           (v.companions.isNotEmpty && companions.every(v.companions.contains)));
+  bool matchesPrice(Restaurant r) {
+    if (!hasPrice) return true;
+    final price = r.averageCost;
+    return price > 0 &&
+        (minPrice == null || price >= minPrice!) &&
+        (maxPrice == null || price <= maxPrice!);
+  }
+
   bool matches(Restaurant r) =>
       (!favorite || r.favorite) &&
       (category.isEmpty || r.category == category) &&
+      matchesPrice(r) &&
       (!hasRegion || r.addressEntries.any(matchesAddress)) &&
       (!hasRecords || r.records.any((v) => matchesVisit(r, v)));
   String get sortLabel => switch (sort) {

@@ -5,8 +5,10 @@ import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/widgets.dart';
 import 'restaurant_entries.dart';
-import 'restaurant_images.dart';
-import 'visit_coupon_fields.dart';
+import '../media/media_actions.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'restaurant_dish_card.dart';
+import 'restaurant_dish_page.dart';
 
 Future<bool> removeRestaurantVisit(
   BuildContext context,
@@ -16,7 +18,7 @@ Future<bool> removeRestaurantVisit(
   final store = MenuScope.of(context);
   if (!await confirmAction(
     context,
-    title: '删除用餐记录？',
+    title: '删除消费记录？',
     message: '删除 ${dayLabel(visit.date)} 的记录及本次菜品明细和照片引用。餐厅菜单仍会保留，记录无法恢复。',
   )) {
     return false;
@@ -31,7 +33,7 @@ Future<bool> removeRestaurantVisit(
           .records
           .removeWhere((v) => v.id == visit.id),
     ),
-    success: '用餐记录已删除',
+    success: '消费记录已删除',
   );
 }
 
@@ -51,15 +53,13 @@ class VisitDetailPage extends StatelessWidget {
     final visit = r.records.where((v) => v.id == visitId).firstOrNull;
     if (visit == null) {
       return Scaffold(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        appBar: AppBar(title: const Text('用餐记录')),
+        appBar: AppBar(title: const Text('消费记录')),
         body: const SizedBox.shrink(),
       );
     }
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: const Text('用餐记录'),
+        title: const Text('消费记录'),
         actions: [
           IconButton(
             tooltip: '编辑记录',
@@ -92,103 +92,207 @@ class VisitDetailPage extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 960),
           child: ListView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
             children: [
-              Text(
-                r.name,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '${dayLabel(visit.date)} ${TimeOfDay.fromDateTime(visit.date).format(context)}',
-              ),
-              if (visit.address.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              Material(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(20),
+                clipBehavior: Clip.antiAlias,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const MenuIcon(Icons.place_outlined, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(child: SelectableText(visit.address)),
+                      Text(
+                        r.name,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          MenuIcon(
+                            Icons.schedule,
+                            size: 18,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${dayLabel(visit.date)} ${TimeOfDay.fromDateTime(visit.date).format(context)}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1.5,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            '¥${money(visit.totalCost)}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.5,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (visit.address.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              MenuIcon(
+                                Icons.place_outlined,
+                                size: 18,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: SelectableText(
+                                  visit.address,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    height: 1.5,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (visit.companions.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              MenuIcon(
+                                Icons.people_outline,
+                                size: 18,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  visit.companions.join('、'),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    height: 1.5,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (visit.note.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            '“${visit.note}”',
+                            style: const TextStyle(fontSize: 14, height: 1.6),
+                          ),
+                        ),
                     ],
                   ),
                 ),
-              const SizedBox(height: 20),
-              Text(
-                '共 ¥${money(visit.totalCost)}',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
+              ),
+              if (visit.imagePaths.isNotEmpty) ...[
+                _VisitSectionTitle(
+                  '用餐环境',
+                  count: '${visit.imagePaths.length} 张',
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${visit.companions.length + 1} 人 · 人均 ¥${money(visit.totalCost / (visit.companions.length + 1))}',
-              ),
-              const SizedBox(height: 8),
-              Text(
-                visit.companions.isEmpty
-                    ? '独自用餐'
-                    : '饭搭子：${visit.companions.join('、')}',
-              ),
-              if (visit.coupons.isNotEmpty) ...[
-                const SectionTitle('用券'),
-                for (final coupon in visit.coupons)
+                SizedBox(
+                  height: 150,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: visit.imagePaths.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 10),
+                    itemBuilder: (context, index) => SizedBox(
+                      width: 140,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: GestureDetector(
+                          onTap: () => showPhotoViewer(
+                            context,
+                            visit.imagePaths,
+                            index,
+                            title: '用餐环境',
+                          ),
+                          child: LocalPhoto(path: visit.imagePaths[index]),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              if (visit.packages.isNotEmpty) ...[
+                const SectionTitle('本次套餐'),
+                for (final package in visit.packages)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
-                      '${visitCouponLabel(coupon)}${visit.autoCost && !coupon.appliesTo(visit.bill.subtotal) ? ' · 未达门槛，未抵扣' : ''}',
+                      '${package.name} · 套餐总价 ¥${money(package.totalPrice)}',
                     ),
                   ),
               ],
-              if (visit.note.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 20),
-                  child: Text(visit.note, style: const TextStyle(height: 1.6)),
-                ),
-              SectionTitle('本次菜品 · ${visit.items.length}'),
-              if (visit.items.isEmpty)
-                Text(
-                  '这次没有记录菜品。',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              if (visit.items.isNotEmpty) ...[
+                _VisitSectionTitle('本次菜品', count: '${visit.items.length} 道'),
+                LayoutBuilder(
+                  builder: (context, constraints) => MasonryGridView.count(
+                    shrinkWrap: true,
+                    primary: false,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    crossAxisCount: constraints.maxWidth >= 600 ? 2 : 1,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 24,
+                    itemCount: visit.items.length,
+                    itemBuilder: (context, index) {
+                      final dish = visit.items[index];
+                      return RestaurantDishCard(
+                        name: dish.name,
+                        paths: dish.imagePaths,
+                        price: dish.price,
+                        note: dish.note,
+                        quantity: dish.quantity,
+                        package: visit.packageFor(dish),
+                        onTap: () => Navigator.push<void>(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => RestaurantDishPage(
+                              restaurantId: restaurantId,
+                              name: dish.name,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
-              for (final item in visit.items)
-                Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.name,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '¥${money(item.price)} × ${item.quantity} 份 = ¥${money(item.cost)}',
-                        ),
-                        if (item.note.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 10),
-                            child: Text(item.note),
-                          ),
-                        if (item.imagePaths.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 14),
-                            child: RestaurantImages(paths: item.imagePaths),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              if (visit.imagePaths.isNotEmpty) ...[
-                SectionTitle('环境照片 · ${visit.imagePaths.length}'),
-                RestaurantImages(paths: visit.imagePaths),
+              ] else if (visit.dishes.isNotEmpty) ...[
+                _VisitSectionTitle('本次菜品', count: '${visit.dishes.length} 道'),
+                Text(visit.dishes.join('、')),
               ],
               const SizedBox(height: 40),
             ],
@@ -197,4 +301,23 @@ class VisitDetailPage extends StatelessWidget {
       ),
     );
   }
+}
+
+class _VisitSectionTitle extends StatelessWidget {
+  const _VisitSectionTitle(this.title, {required this.count});
+
+  final String title;
+  final String count;
+
+  @override
+  Widget build(BuildContext context) => SectionTitle(
+    title,
+    trailing: Text(
+      count,
+      style: TextStyle(
+        fontSize: 13,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    ),
+  );
 }

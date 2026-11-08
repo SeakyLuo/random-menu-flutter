@@ -2,34 +2,26 @@ part of 'menu_database.dart';
 
 typedef _Images = List<String> Function(String, String, String, [int]);
 
-Map<String, List<RestaurantDish>> _dishGroups(
-  List<Map<String, Object?>> rows,
-  _Images images,
-) {
-  final result = <String, List<RestaurantDish>>{};
-  for (final row in rows) {
-    final restaurant = row['restaurant_id'] as String, id = row['id'] as String;
-    (result[restaurant] ??= []).add(
-      RestaurantDish(
-        id: id,
-        name: row['name'] as String,
-        price: (row['price'] as num).toDouble(),
-        quantity: row['quantity'] as int,
-        note: row['note'] as String,
-        imagePaths: images('dish', restaurant, id),
-      ),
-    );
-  }
-  return result;
-}
-
 Map<String, List<Visit>> _visitGroups(
   List<Map<String, Object?>> visits,
   List<Map<String, Object?>> items,
   List<Map<String, Object?>> people,
   List<Map<String, Object?>> couponRows,
+  List<Map<String, Object?>> packageRows,
   _Images images,
 ) {
+  final packages = <(String, String), List<VisitPackage>>{};
+  for (final row in packageRows) {
+    (packages[(row['restaurant_id'] as String, row['visit_id'] as String)] ??=
+            [])
+        .add(
+          VisitPackage(
+            id: row['id'] as String,
+            name: row['name'] as String,
+            totalPrice: (row['total_price'] as num).toDouble(),
+          ),
+        );
+  }
   final coupons = <(String, String), List<VisitCoupon>>{};
   for (final row in couponRows) {
     (coupons[(row['restaurant_id'] as String, row['visit_id'] as String)] ??=
@@ -38,6 +30,7 @@ Map<String, List<Visit>> _visitGroups(
           VisitCoupon(
             threshold: (row['threshold'] as num?)?.toDouble(),
             discount: (row['discount'] as num).toDouble(),
+            quantity: row['quantity'] as int,
           ),
         );
   }
@@ -54,6 +47,7 @@ Map<String, List<Visit>> _visitGroups(
     (grouped[(restaurant, visit)] ??= []).add(
       VisitDish(
         dishId: row['dish_id'] as String,
+        packageId: row['package_id'] as String?,
         name: row['name'] as String,
         price: (row['price'] as num).toDouble(),
         quantity: row['quantity'] as int,
@@ -74,6 +68,7 @@ Map<String, List<Visit>> _visitGroups(
         address: row['address'] as String,
         autoCost: row['auto_cost'] == 1,
         coupons: coupons[(restaurant, id)] ?? [],
+        packages: packages[(restaurant, id)] ?? [],
         note: row['note'] as String,
         dishes: List<String>.from(jsonDecode(row['dishes'] as String) as List),
         companions: companions[(restaurant, id)] ?? [],
@@ -82,95 +77,109 @@ Map<String, List<Visit>> _visitGroups(
       ),
     );
   }
+  for (final visits in result.values) {
+    for (final visit in visits) {
+      visit.validatePackages();
+    }
+  }
   return result;
 }
 
-List<_TableRows> _restaurantRows(List<Restaurant> restaurants) => [
-  _TableRows(
-    'restaurant_visit_coupons',
-    ['restaurant_id', 'visit_id', 'position'],
-    [
-      for (final restaurant in restaurants)
-        for (final visit in restaurant.records)
-          for (final (position, coupon) in visit.coupons.indexed)
-            {
-              'restaurant_id': restaurant.id,
-              'visit_id': visit.id,
-              'position': position,
-              'threshold': coupon.threshold,
-              'discount': coupon.discount,
-            },
-    ],
-  ),
-  _TableRows(
-    'restaurant_dishes',
-    ['restaurant_id', 'id'],
-    [
-      for (final r in restaurants)
-        for (final (i, d) in r.foods.indexed)
-          {
-            'restaurant_id': r.id,
-            'id': d.id,
-            'position': i,
-            'name': d.name,
-            'price': d.price,
-            'quantity': d.quantity,
-            'note': d.note,
-          },
-    ],
-  ),
-  _TableRows(
-    'restaurant_visits',
-    ['restaurant_id', 'id'],
-    [
-      for (final r in restaurants)
-        for (final (i, v) in r.records.indexed)
-          {
-            'restaurant_id': r.id,
-            'id': v.id,
-            'position': i,
-            'date': v.date.toIso8601String(),
-            'total_cost': v.totalCost,
-            'address_id': v.addressId,
-            'address': v.address,
-            'auto_cost': v.autoCost ? 1 : 0,
-            'note': v.note,
-            'dishes': jsonEncode(v.dishes),
-          },
-    ],
-  ),
-  _TableRows(
-    'restaurant_visit_items',
-    ['restaurant_id', 'visit_id', 'position'],
-    [
-      for (final r in restaurants)
-        for (final v in r.records)
-          for (final (i, d) in v.items.indexed)
+List<_TableRows> _restaurantRows(List<Restaurant> restaurants) {
+  for (final restaurant in restaurants) {
+    for (final visit in restaurant.records) {
+      visit.validatePackages();
+    }
+  }
+  return [
+    _TableRows(
+      'restaurant_visit_packages',
+      ['restaurant_id', 'visit_id', 'id'],
+      [
+        for (final restaurant in restaurants)
+          for (final visit in restaurant.records)
+            for (final (position, package) in visit.packages.indexed)
+              {
+                'restaurant_id': restaurant.id,
+                'visit_id': visit.id,
+                'id': package.id,
+                'position': position,
+                'name': package.name,
+                'total_price': package.totalPrice,
+              },
+      ],
+    ),
+    _TableRows(
+      'restaurant_visit_coupons',
+      ['restaurant_id', 'visit_id', 'position'],
+      [
+        for (final restaurant in restaurants)
+          for (final visit in restaurant.records)
+            for (final (position, coupon) in visit.coupons.indexed)
+              {
+                'restaurant_id': restaurant.id,
+                'visit_id': visit.id,
+                'position': position,
+                'threshold': coupon.threshold,
+                'discount': coupon.discount,
+                'quantity': coupon.quantity,
+              },
+      ],
+    ),
+    _TableRows(
+      'restaurant_visits',
+      ['restaurant_id', 'id'],
+      [
+        for (final r in restaurants)
+          for (final (i, v) in r.records.indexed)
             {
               'restaurant_id': r.id,
-              'visit_id': v.id,
+              'id': v.id,
               'position': i,
-              'dish_id': d.dishId,
-              'name': d.name,
-              'price': d.price,
-              'quantity': d.quantity,
-              'note': d.note,
+              'date': v.date.toIso8601String(),
+              'total_cost': v.totalCost,
+              'address_id': v.addressId,
+              'address': v.address,
+              'auto_cost': v.autoCost ? 1 : 0,
+              'note': v.note,
+              'dishes': jsonEncode(v.dishes),
             },
-    ],
-  ),
-  _TableRows(
-    'visit_companions',
-    ['restaurant_id', 'visit_id', 'position'],
-    [
-      for (final r in restaurants)
-        for (final v in r.records)
-          for (final (i, name) in v.companions.indexed)
-            {
-              'restaurant_id': r.id,
-              'visit_id': v.id,
-              'position': i,
-              'name': name,
-            },
-    ],
-  ),
-];
+      ],
+    ),
+    _TableRows(
+      'restaurant_visit_items',
+      ['restaurant_id', 'visit_id', 'position'],
+      [
+        for (final r in restaurants)
+          for (final v in r.records)
+            for (final (i, d) in v.items.indexed)
+              {
+                'restaurant_id': r.id,
+                'visit_id': v.id,
+                'position': i,
+                'dish_id': d.dishId,
+                'package_id': d.packageId,
+                'name': d.name,
+                'price': d.price,
+                'quantity': d.quantity,
+                'note': d.note,
+              },
+      ],
+    ),
+    _TableRows(
+      'visit_companions',
+      ['restaurant_id', 'visit_id', 'position'],
+      [
+        for (final r in restaurants)
+          for (final v in r.records)
+            for (final (i, name) in v.companions.indexed)
+              {
+                'restaurant_id': r.id,
+                'visit_id': v.id,
+                'position': i,
+                'name': name,
+              },
+      ],
+    ),
+  ];
+}

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../ui/menu_icon.dart';
+import '../../ui/library_photo_card.dart';
 import '../../ui/search_match.dart';
 import '../media/photo_widget.dart';
 import 'restaurant_search_fields.dart';
+import 'restaurant_food_summary.dart';
+import '../../ui/widgets.dart';
 
 class SearchDishCard extends StatelessWidget {
   const SearchDishCard({
@@ -25,68 +28,50 @@ class SearchDishCard extends StatelessWidget {
       label: '查看${dish.name}详情',
       child: Material(
         type: MaterialType.transparency,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: onOpen,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              AspectRatio(
-                aspectRatio: 1,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      if (hasPhoto)
-                        RetainedLocalPhoto(path: dish.paths.first)
-                      else
-                        ColoredBox(
-                          color: scheme.surfaceContainer,
-                          child: Center(
-                            child: MenuIcon(
-                              Icons.ramen_dining_outlined,
-                              size: 36,
-                              color: scheme.onSurfaceVariant,
-                            ),
+              LibraryPhotoCard(
+                hasPhoto: hasPhoto,
+                label: '查看${dish.name}详情',
+                onTap: onOpen,
+                cover: hasPhoto
+                    ? RetainedLocalPhoto(path: dish.paths.first)
+                    : DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              scheme.primaryContainer.withValues(alpha: .4),
+                              scheme.surface,
+                            ],
                           ),
                         ),
-                      if (hasPhoto)
-                        const DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Colors.transparent,
-                                Color(0xc4000000),
-                              ],
-                              stops: [0, .45, 1],
-                            ),
-                          ),
-                        ),
-                      Positioned(
-                        left: 12,
-                        right: 12,
-                        bottom: 12,
-                        child: Text.rich(
-                          highlightSearchText(
-                            dish.name,
-                            query,
-                            hasPhoto ? const Color(0xffffe4a3) : scheme.primary,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 16,
-                            height: 1.4,
-                            fontWeight: FontWeight.w600,
-                            color: hasPhoto ? Colors.white : scheme.onSurface,
+                        child: Center(
+                          child: MenuIcon(
+                            Icons.ramen_dining_outlined,
+                            size: 54,
+                            color: scheme.primary.withValues(alpha: .5),
                           ),
                         ),
                       ),
-                    ],
+                caption: Text.rich(
+                  highlightSearchText(
+                    dish.name,
+                    query,
+                    hasPhoto ? const Color(0xff83d8ac) : scheme.primary,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                    color: hasPhoto ? Colors.white : scheme.onSurface,
                   ),
                 ),
               ),
@@ -127,6 +112,15 @@ class SearchDishCard extends StatelessWidget {
                 SearchMatchCaption(
                   text: '“${searchMatchExcerpt(note, query)}”',
                   query: query,
+                  onTap: onOpen,
+                )
+              else if (dish.note.isEmpty &&
+                  (dish.package != null || dish.price > 0))
+                SearchMatchCaption(
+                  text: dish.package != null
+                      ? visitPackageLabel(dish.package!)
+                      : '¥${money(dish.price)}',
+                  query: '',
                   onTap: onOpen,
                 ),
             ],

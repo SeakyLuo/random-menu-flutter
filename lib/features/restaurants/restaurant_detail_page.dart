@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/menu_store.dart';
+import '../../core/current_city.dart';
 import '../../core/models.dart';
 import '../../ui/menu_icon.dart';
 import '../../ui/theme.dart';
@@ -13,7 +14,6 @@ import 'restaurant_gallery_data.dart';
 import '../photo_import/photo_import_page.dart';
 import 'restaurant_dish_browser.dart';
 import 'restaurant_dish_summary.dart';
-import 'restaurant_dishes_page.dart';
 import 'restaurant_editor.dart';
 import 'restaurant_entries.dart';
 import 'restaurant_visit_card.dart';
@@ -32,9 +32,29 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
   final _scroll = ScrollController();
   final _headerKey = GlobalKey();
   final _tabOffsets = [0.0, 0.0];
+  String? _currentCity = CurrentCity.cached;
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _updateCurrentCity);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateCurrentCity());
+  }
+
+  Future<void> _updateCurrentCity() async {
+    if (!mounted) return;
+    await performAction(context, () async {
+      final city = await CurrentCity.resolve();
+      if (mounted && city != _currentCity) {
+        setState(() => _currentCity = city);
+      }
+    });
+  }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -117,13 +137,6 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
             builder: (_) => PhotoImportPage(restaurantId: restaurant.id),
           ),
         );
-      case 'dishes':
-        Navigator.push(
-          context,
-          MaterialPageRoute<void>(
-            builder: (_) => RestaurantDishesPage(restaurantId: restaurant.id),
-          ),
-        );
       case 'link':
         performAction(
           context,
@@ -156,6 +169,12 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
     final dishes = restaurantDishSummaries(restaurant);
     final records = [...restaurant.records]
       ..sort((a, b) => b.date.compareTo(a.date));
+    final verticalFoods =
+        records.length == 1 ||
+        records.fold<int>(0, (count, visit) => count + visit.items.length) <= 7;
+    final addressCount = restaurant.addressEntries.isEmpty
+        ? restaurant.addresses.length
+        : restaurant.addressEntries.length;
     final gallery = restaurantGallery(restaurant);
     final dishPaths = gallery
         .where((photo) => !photo.isEnvironment)
@@ -238,17 +257,12 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
                             const MenuPopupItem(
                               value: 'visit',
                               icon: Icons.add,
-                              child: Text('新增用餐记录'),
+                              child: Text('新增消费记录'),
                             ),
                             const MenuPopupItem(
                               value: 'import',
                               icon: Icons.add_photo_alternate_outlined,
-                              child: Text('从照片新增用餐记录'),
-                            ),
-                            const MenuPopupItem(
-                              value: 'dishes',
-                              icon: Icons.edit_note,
-                              child: Text('管理菜品资料'),
+                              child: Text('从照片新增消费记录'),
                             ),
                             if (restaurant.link.isNotEmpty)
                               const MenuPopupItem(
@@ -281,8 +295,11 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
                         dishPaths: dishPaths,
                         environmentPaths: environmentPaths,
                       ),
-                      RestaurantDetailInfo(restaurant: restaurant),
-                      const SizedBox(height: 12),
+                      RestaurantDetailInfo(
+                        restaurant: restaurant,
+                        currentCity: _currentCity,
+                      ),
+                      const SizedBox(height: 4),
                     ],
                   ),
                 ),
@@ -290,11 +307,15 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
                   pinned: true,
                   delegate: _RestaurantTabs(
                     height: math.max(
-                      48,
-                      MediaQuery.textScalerOf(context).scale(14) * 1.4 + 20,
+                      44,
+                      MediaQuery.textScalerOf(context).scale(14) * 1.4 + 16,
                     ),
                     color: background,
                     child: TabBar(
+                      overlayColor: const WidgetStatePropertyAll(
+                        Colors.transparent,
+                      ),
+                      splashFactory: NoSplash.splashFactory,
                       onTap: (index) => _switchTab(index),
                       isScrollable: true,
                       tabAlignment: TabAlignment.start,
@@ -313,7 +334,7 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
                         borderRadius: BorderRadius.circular(3),
                       ),
                       tabs: [
-                        Tab(text: '用餐记录 ${records.length}'),
+                        Tab(text: '消费记录 ${records.length}'),
                         Tab(text: '吃过的菜 ${dishes.length}'),
                       ],
                     ),
@@ -324,19 +345,22 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
                     const SliverToBoxAdapter(
                       child: EmptyState(
                         icon: Icons.edit_note,
-                        title: '还没有用餐记录',
-                        message: '可从右上角更多添加用餐记录。',
+                        title: '还没有消费记录',
+                        message: '可从右上角更多添加消费记录。',
                       ),
                     )
                   else
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                       sliver: SliverList.separated(
                         itemCount: records.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 12),
                         itemBuilder: (_, index) => RestaurantVisitCard(
                           restaurant: restaurant,
                           visit: records[index],
+                          verticalFoods: verticalFoods,
+                          showAddress: addressCount != 1,
+                          currentCity: _currentCity,
                         ),
                       ),
                     )

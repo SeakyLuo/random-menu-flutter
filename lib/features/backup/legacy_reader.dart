@@ -116,7 +116,7 @@ class LegacyFiles {
     return ordered.map((name) {
       final path = _photoPaths[name];
       if (path == null) {
-        throw const FormatException('备份缺少菜谱或用餐记录引用的照片，无法完整恢复。');
+        throw const FormatException('备份缺少菜谱或消费记录引用的照片，无法完整恢复。');
       }
       return path;
     }).toList();

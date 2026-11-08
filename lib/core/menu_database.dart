@@ -12,6 +12,8 @@ part 'menu_database_restaurant_rows.dart';
 part 'menu_database_read.dart';
 part 'menu_database_write.dart';
 part 'menu_database_coupon_upgrade.dart';
+part 'menu_database_package_upgrade.dart';
+part 'menu_database_coupon_quantity_upgrade.dart';
 
 class MenuDatabase {
   MenuDatabase._(this._database);
@@ -20,13 +22,21 @@ class MenuDatabase {
   static Future<MenuDatabase> open(Directory directory) async {
     final database = await openDatabase(
       '${directory.path}/menu.db',
-      version: 2,
+      version: 5,
       onCreate: (db, _) async {
         for (final statement in _schema) {
           await db.execute(statement);
         }
       },
-      onUpgrade: (db, oldVersion, newVersion) => _upgradeVisitCoupons(db),
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await _upgradeVisitCoupons(db);
+        if (oldVersion < 3) await _upgradeVisitPackages(db);
+        if (oldVersion < 4) {
+          await db.execute('DROP TABLE restaurant_dishes');
+          await db.delete('images', where: 'kind = ?', whereArgs: ['dish']);
+        }
+        if (oldVersion < 5) await _upgradeCouponQuantities(db, oldVersion);
+      },
     );
     final result = MenuDatabase._(database);
     await database.transaction((txn) async {

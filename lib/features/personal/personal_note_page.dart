@@ -106,7 +106,9 @@ class _PersonalNotePageState extends State<PersonalNotePage> {
                     style: const TextStyle(height: 1.9),
                     decoration: InputDecoration(
                       hintText: '采购清单、做菜灵感，或今天的用餐心情…',
-                      fillColor: Theme.of(context).colorScheme.surface,
+                      fillColor: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).inputDecorationTheme.fillColor
+                          : Theme.of(context).colorScheme.surface,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,

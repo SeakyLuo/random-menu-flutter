@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../ui/search_scope.dart';
+import '../../ui/menu_segmented.dart';
 import '../media/media_actions.dart';
 import '../media/photo_widget.dart';
 import 'restaurant_photo_deck.dart';
@@ -35,31 +35,42 @@ class _RestaurantDetailGalleryState extends State<RestaurantDetailGallery> {
     super.didUpdateWidget(oldWidget);
     if (widget.environmentPaths.isEmpty) {
       _group = _PhotoGroup.dishes;
-    } else if (oldWidget.environmentPaths.isEmpty && widget.dishPaths.isEmpty) {
+    } else if (widget.dishPaths.isEmpty) {
       _group = _PhotoGroup.environment;
     }
   }
 
+  void _select(List<String> paths, int index) {
+    final group = index < widget.dishPaths.length
+        ? _PhotoGroup.dishes
+        : _PhotoGroup.environment;
+    setState(() {
+      _group = group;
+      _selectedPaths[group] = paths[index];
+    });
+  }
+
   void _open(List<String> paths, int index) {
-    final group = _group;
     showPhotoViewer(
       context,
       paths,
       index,
-      title: group == _PhotoGroup.environment ? '用餐环境' : widget.name,
+      title: widget.name,
       onReturnIndex: (next) {
-        if (mounted) setState(() => _selectedPaths[group] = paths[next]);
+        if (mounted) _select(paths, next);
       },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final paths = _group == _PhotoGroup.dishes
-        ? widget.dishPaths
-        : widget.environmentPaths;
+    final paths = [...widget.dishPaths, ...widget.environmentPaths];
     final selectedIndex = paths.indexOf(_selectedPaths[_group] ?? '');
-    final index = selectedIndex < 0 ? 0 : selectedIndex;
+    final index = selectedIndex >= 0
+        ? selectedIndex
+        : _group == _PhotoGroup.environment
+        ? widget.dishPaths.length
+        : 0;
     final colors = Theme.of(context).colorScheme;
     if (widget.dishPaths.isEmpty && widget.environmentPaths.isEmpty) {
       return const SizedBox.shrink();
@@ -74,8 +85,7 @@ class _RestaurantDetailGalleryState extends State<RestaurantDetailGallery> {
               key: ValueKey((_group, Object.hashAll(paths))),
               itemCount: paths.length,
               index: index,
-              onChanged: (next) =>
-                  setState(() => _selectedPaths[_group] = paths[next]),
+              onChanged: (next) => _select(paths, next),
               onTap: () => _open(paths, index),
               itemBuilder: (context, photoIndex) => DecoratedBox(
                 decoration: BoxDecoration(
@@ -111,22 +121,15 @@ class _RestaurantDetailGalleryState extends State<RestaurantDetailGallery> {
                   ),
                 ),
               ),
-            )
-          else if (widget.environmentPaths.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Text(
-                '还没有菜品照片',
-                style: TextStyle(color: colors.onSurfaceVariant),
-              ),
             ),
-          if (widget.environmentPaths.isNotEmpty)
+          if (widget.dishPaths.isNotEmpty && widget.environmentPaths.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 16, bottom: 4),
+              padding: EdgeInsets.zero,
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 240),
-                  child: SearchScope<_PhotoGroup>(
+                  constraints: const BoxConstraints(maxWidth: 140),
+                  child: MenuSegmented<_PhotoGroup>(
+                    compact: true,
                     labels: const {
                       _PhotoGroup.dishes: '菜品',
                       _PhotoGroup.environment: '环境',

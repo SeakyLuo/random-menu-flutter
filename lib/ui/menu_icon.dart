@@ -52,6 +52,7 @@ enum _Glyph {
   heart,
   heartFilled,
   plus,
+  minus,
   photo,
   brokenPhoto,
   back,
@@ -80,6 +81,7 @@ enum _Glyph {
   camera,
   crop,
   drag,
+  dragDots,
   eye,
   eyeOff,
   copy,
@@ -126,6 +128,7 @@ _Glyph _glyphFor(IconData icon) => switch (icon) {
   Icons.favorite_border || Icons.favorite_outline => _Glyph.heart,
   Icons.favorite => _Glyph.heartFilled,
   Icons.add || Icons.add_rounded => _Glyph.plus,
+  Icons.remove => _Glyph.minus,
   Icons.add_photo_alternate_outlined ||
   Icons.photo_outlined ||
   Icons.photo_library_outlined ||
@@ -192,7 +195,8 @@ _Glyph _glyphFor(IconData icon) => switch (icon) {
   Icons.photo_camera_outlined ||
   Icons.camera_alt => _Glyph.camera,
   Icons.crop || Icons.crop_free || Icons.crop_square => _Glyph.crop,
-  Icons.drag_handle || Icons.drag_indicator || Icons.reorder => _Glyph.drag,
+  Icons.drag_handle || Icons.reorder => _Glyph.drag,
+  Icons.drag_indicator => _Glyph.dragDots,
   Icons.visibility_outlined || Icons.visibility => _Glyph.eye,
   Icons.visibility_off_outlined || Icons.visibility_off => _Glyph.eyeOff,
   Icons.copy || Icons.content_copy => _Glyph.copy,
@@ -400,6 +404,8 @@ class _MenuIconPainter extends CustomPainter {
         );
       case _Glyph.plus:
         line(12, 4, 12, 20);
+        line(4, 12, 20, 12);
+      case _Glyph.minus:
         line(4, 12, 20, 12);
       case _Glyph.photo:
       case _Glyph.brokenPhoto:
@@ -655,6 +661,13 @@ class _MenuIconPainter extends CustomPainter {
             ..lineTo(18, 6)
             ..lineTo(18, 22),
         );
+      case _Glyph.dragDots:
+        final dot = Paint()..color = color;
+        for (final x in [9.0, 15.0]) {
+          for (final y in [6.0, 12.0, 18.0]) {
+            canvas.drawCircle(Offset(x, y), 1.35, dot);
+          }
+        }
       case _Glyph.drag:
         line(5, 9, 19, 9);
         line(5, 15, 19, 15);

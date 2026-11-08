@@ -71,10 +71,7 @@ RestaurantSearchMatches searchRestaurantContents(
       );
     }
     for (final dish in restaurantDishSummaries(restaurant)) {
-      final notes = [
-        if (dish.saved case final saved?) saved.note,
-        ...dish.history.map((entry) => entry.dish.note),
-      ];
+      final notes = [...dish.history.map((entry) => entry.dish.note)];
       final note = notes.where(matches).firstOrNull;
       if (matches(dish.name) || note != null) {
         result.dishes.add(RestaurantDishHit(restaurant, dish, note));
@@ -88,7 +85,6 @@ RestaurantSearchMatches searchRestaurantContents(
   _rank(
     result.dishes,
     (hit) => restaurantDishSearchScore(hit.dish.name, [
-      if (hit.dish.saved case final saved?) saved.note,
       ...hit.dish.history.map((entry) => entry.dish.note),
     ], query),
   );

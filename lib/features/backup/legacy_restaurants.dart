@@ -41,11 +41,6 @@ class _LegacyRestaurant {
         .list('records')
         .map((raw) => _visit(raw, addresses))
         .toList();
-    for (final rawDish in restaurant.list('foods', omitted: true)) {
-      _dish(rawDish);
-    }
-    final home = dishes.values.where((dish) => dish.orderInHome >= 0).toList()
-      ..sort((a, b) => a.orderInHome.compareTo(b.orderInHome));
     var category = '';
     if (restaurant.has('foodType')) {
       final type = LegacyObject(restaurant.values['foodType'], {'id', 'name'});
@@ -62,18 +57,6 @@ class _LegacyRestaurant {
       link: restaurant.text('link'),
       favorite: restaurant.flag('favorite'),
       records: records,
-      foods: home
-          .map(
-            (dish) => RestaurantDish(
-              id: dish.id,
-              name: dish.name,
-              price: dish.price,
-              quantity: dish.quantity,
-              note: dish.note,
-              imagePaths: dish.images,
-            ),
-          )
-          .toList(),
     );
   }
 

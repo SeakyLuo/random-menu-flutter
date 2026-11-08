@@ -1,3 +1,4 @@
+import 'restaurant_price.dart';
 import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../core/menu_store.dart';
@@ -110,6 +111,17 @@ class _RestaurantCardState extends State<RestaurantCard> {
   @override
   Widget build(BuildContext context) {
     final r = widget.restaurant;
+    var review = r.note.trim();
+    if (widget.showReview && review.isEmpty) {
+      Visit? latestReview;
+      for (final visit in r.records) {
+        if (visit.note.trim().isNotEmpty &&
+            (latestReview == null || visit.date.isAfter(latestReview.date))) {
+          latestReview = visit;
+        }
+      }
+      review = latestReview?.note.trim() ?? '';
+    }
     final scheme = Theme.of(context).colorScheme;
     final count = r.addressEntries.isEmpty
         ? r.addresses.length
@@ -175,26 +187,7 @@ class _RestaurantCardState extends State<RestaurantCard> {
                     ),
                     const SizedBox(width: 12),
                     if (r.averageCost > 0)
-                      Text.rich(
-                        TextSpan(
-                          text: '¥${money(r.averageCost)}',
-                          children: [
-                            TextSpan(
-                              text: ' /人',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w400,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: scheme.onSurface,
-                        ),
-                      )
+                      RestaurantPrice(r.averageCost)
                     else
                       Text(
                         '未记录人均',
@@ -208,8 +201,13 @@ class _RestaurantCardState extends State<RestaurantCard> {
               ),
             ),
           ),
-          if (widget.showReview && r.note.isNotEmpty)
-            SearchMatchCaption(text: '“${r.note}”', query: '', onTap: _open),
+          if (widget.showReview && review.isNotEmpty)
+            SearchMatchCaption(
+              text: '“$review”',
+              query: '',
+              onTap: _open,
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 2),
+            ),
         ],
       ),
     );

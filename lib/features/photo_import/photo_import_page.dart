@@ -260,7 +260,7 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(existing == null ? '从照片创建餐厅' : '从照片添加用餐记录'),
+          title: Text(existing == null ? '从照片创建餐厅' : '从照片添加消费记录'),
           leading: IconButton(
             tooltip: '返回',
             onPressed: busy ? null : leave,
@@ -300,7 +300,7 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
                 ),
               const SizedBox(height: 18),
               const Text(
-                '先核对每张照片的实际拍摄时间和分店，再预览用餐记录。缺少拍摄信息的照片可手动补充，照片默认作为环境记录。',
+                '先核对每张照片的实际拍摄时间和分店，再预览消费记录。缺少拍摄信息的照片可手动补充，照片默认作为环境记录。',
                 style: TextStyle(height: 1.6),
               ),
               SectionTitle(
@@ -466,7 +466,7 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
                     ),
                   ),
                 const SizedBox(height: 24),
-                FilledButton(onPressed: preview, child: const Text('预览用餐记录')),
+                FilledButton(onPressed: preview, child: const Text('预览消费记录')),
               ],
               if (busy)
                 const Padding(

@@ -201,8 +201,6 @@ List<_TableRows> _tables(
         for (final r in recipes)
           ..._imageRows('recipe', '', r.id, r.imagePaths),
         for (final r in restaurants) ...[
-          for (final dish in r.foods)
-            ..._imageRows('dish', r.id, dish.id, dish.imagePaths),
           for (final visit in r.records) ...[
             ..._imageRows('visit', r.id, visit.id, visit.imagePaths),
             for (final (i, item) in visit.items.indexed)
@@ -233,7 +231,7 @@ List<Map<String, Object?>> _imageRows(
 ];
 
 Map<String, dynamic> _settings(MenuData data) => {
-  'version': 3,
+  'version': 6,
   'note': data.note,
   'themeMode': data.themeMode,
   'autoTag': data.autoTag,
