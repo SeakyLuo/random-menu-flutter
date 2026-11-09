@@ -8,12 +8,14 @@ import '../../ui/menu_numeric_fields.dart';
 import '../../ui/menu_popup.dart';
 import 'restaurant_images.dart';
 import 'restaurant_food_summary.dart';
+import 'restaurant_dish_cover_menu.dart';
 
 Future<VisitDish?> editVisitDish(
   BuildContext context,
   VisitDish item, {
   bool requirePrice = false,
   List<VisitPackage> packages = const [],
+  String? restaurantId,
 }) => Navigator.push<VisitDish>(
   context,
   MaterialPageRoute(
@@ -21,6 +23,7 @@ Future<VisitDish?> editVisitDish(
       item: item,
       requirePrice: requirePrice,
       packages: packages,
+      restaurantId: restaurantId,
     ),
   ),
 );
@@ -30,10 +33,12 @@ class _VisitDishEditor extends StatefulWidget {
     required this.item,
     this.requirePrice = false,
     required this.packages,
+    required this.restaurantId,
   });
   final bool requirePrice;
   final List<VisitPackage> packages;
   final VisitDish item;
+  final String? restaurantId;
   @override
   State<_VisitDishEditor> createState() => _VisitDishEditorState();
 }
@@ -47,9 +52,11 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
   late final note = TextEditingController(text: widget.item.note);
   late List<String> images = [...widget.item.imagePaths];
   late String? packageId = widget.item.packageId;
+  late bool isDish = widget.item.isDish;
   bool leaving = false;
   bool picking = false;
   bool get dirty =>
+      isDish != widget.item.isDish ||
       name.text != widget.item.name ||
       price.text != (widget.requirePrice ? '' : money(widget.item.price)) ||
       quantity.text != '${widget.item.quantity}' ||
@@ -94,10 +101,6 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
         ? double.tryParse(price.text.trim())
         : widget.item.price;
     final count = int.tryParse(quantity.text.trim());
-    if (name.text.trim().isEmpty) {
-      showToast(context, '请填写菜品名称');
-      return;
-    }
     if (cost == null || !cost.isFinite || cost < 0) {
       showToast(context, '请输入有效的单价');
       return;
@@ -111,6 +114,7 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
       context,
       VisitDish(
         dishId: widget.item.dishId,
+        isDish: isDish,
         packageId: packageId,
         name: name.text.trim(),
         price: cost,
@@ -134,6 +138,13 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
           title: const Text('本次点单'),
+          actions: [
+            RestaurantDishCoverMenu(
+              restaurantId: widget.restaurantId,
+              dishId: widget.item.dishId,
+              enabled: !picking,
+            ),
+          ],
           leading: IconButton(
             tooltip: '返回',
             onPressed: picking ? null : leave,
@@ -170,12 +181,43 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                 children: [
-                  const MenuFieldLabel('菜品名称', isRequired: true),
+                  MenuFieldLabel(
+                    '名称',
+                    minHeight: 44,
+                    bottomSpacing: 4,
+                    trailing: MergeSemantics(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => setState(() => isDish = !isDish),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 44),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Checkbox(
+                                value: isDish,
+                                onChanged: (value) =>
+                                    setState(() => isDish = value!),
+                                activeColor: Theme.of(
+                                  context,
+                                ).colorScheme.primary,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              const Text('菜品', style: TextStyle(fontSize: 13)),
+                              const SizedBox(width: 4),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   TextField(
                     controller: name,
                     style: const TextStyle(fontSize: 15),
                     textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(hintText: '填写菜品名称'),
+                    decoration: const InputDecoration(hintText: '可不填，之后再补充'),
                   ),
                   const SizedBox(height: 24),
                   RestaurantImages(

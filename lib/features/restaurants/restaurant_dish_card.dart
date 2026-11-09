@@ -73,7 +73,7 @@ class RestaurantDishCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    name,
+                    name.isEmpty ? '未命名菜品' : name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

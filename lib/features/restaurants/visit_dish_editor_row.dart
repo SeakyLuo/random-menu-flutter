@@ -3,7 +3,6 @@ import '../../core/models.dart';
 import '../../ui/menu_icon.dart';
 import '../../ui/widgets.dart';
 import '../media/media_actions.dart';
-import 'restaurant_food_summary.dart';
 
 class VisitDishEditorRow extends StatelessWidget {
   const VisitDishEditorRow({
@@ -12,7 +11,6 @@ class VisitDishEditorRow extends StatelessWidget {
     required this.package,
     required this.index,
     required this.onEdit,
-    required this.confirmRemove,
     required this.onRemove,
   });
 
@@ -20,7 +18,6 @@ class VisitDishEditorRow extends StatelessWidget {
   final VisitPackage? package;
   final int index;
   final VoidCallback onEdit;
-  final Future<bool> Function() confirmRemove;
   final VoidCallback onRemove;
 
   @override
@@ -36,7 +33,6 @@ class VisitDishEditorRow extends StatelessWidget {
       child: Dismissible(
         key: ObjectKey(dish),
         direction: DismissDirection.endToStart,
-        confirmDismiss: (_) => confirmRemove(),
         onDismissed: (_) => onRemove(),
         background: Container(
           alignment: AlignmentDirectional.centerEnd,
@@ -98,7 +94,7 @@ class VisitDishEditorRow extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                dish.name.isEmpty ? '填写菜名' : dish.name,
+                                dish.name.isEmpty ? '未命名菜品' : dish.name,
                                 style: const TextStyle(
                                   fontSize: 16,
                                   height: 1.4,
@@ -106,10 +102,12 @@ class VisitDishEditorRow extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (package == null) ...[
+                            if (package == null || dish.quantity > 1) ...[
                               const SizedBox(width: 8),
                               Text(
-                                '¥${money(dish.price)}',
+                                package == null
+                                    ? '${dish.quantity > 1 ? '${dish.quantity}×' : ''}¥${money(dish.price)}'
+                                    : '×${dish.quantity}',
                                 style: const TextStyle(
                                   fontSize: 15,
                                   height: 1.4,
@@ -118,18 +116,6 @@ class VisitDishEditorRow extends StatelessWidget {
                             ],
                           ],
                         ),
-                        if (package != null || dish.quantity > 1)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 3),
-                            child: Text(
-                              [
-                                if (package != null)
-                                  visitPackageLabel(package!),
-                                if (dish.quantity > 1) '${dish.quantity} 份',
-                              ].join(' · '),
-                              style: secondary.copyWith(fontSize: 12),
-                            ),
-                          ),
                         if (dish.note.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 4),

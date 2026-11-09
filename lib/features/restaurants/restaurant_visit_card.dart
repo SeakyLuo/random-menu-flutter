@@ -132,6 +132,7 @@ class RestaurantVisitCard extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 10),
                   child: VisitFoodList(
                     restaurantId: restaurant.id,
+                    visitId: visit.id,
                     items: visit.items,
                     packages: visit.packages,
                     vertical: verticalFoods,

@@ -154,15 +154,29 @@ class EmptyState extends StatelessWidget {
 
 OverlayEntry? _toast;
 Timer? _toastTimer;
-void showToast(BuildContext context, String message) {
+VoidCallback showToast(
+  BuildContext context,
+  String message, {
+  String actionLabel = '撤销',
+  VoidCallback? onAction,
+}) {
   _toastTimer?.cancel();
   _toast?.remove();
-  final entry = OverlayEntry(
+  late final OverlayEntry entry;
+  void dismiss() {
+    if (_toast != entry) return;
+    _toastTimer?.cancel();
+    entry.remove();
+    _toast = null;
+  }
+
+  entry = OverlayEntry(
     builder: (context) => Positioned(
       left: 24,
       right: 24,
       bottom: MediaQuery.viewInsetsOf(context).bottom + 110,
       child: IgnorePointer(
+        ignoring: onAction == null,
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
@@ -171,11 +185,26 @@ void showToast(BuildContext context, String message) {
               child: GlassSurface(
                 radius: 18,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
+                  padding: EdgeInsets.symmetric(
                     horizontal: 20,
-                    vertical: 14,
+                    vertical: onAction == null ? 14 : 4,
                   ),
-                  child: Text(message, textAlign: TextAlign.center),
+                  child: onAction == null
+                      ? Text(message, textAlign: TextAlign.center)
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(child: Text(message)),
+                            const SizedBox(width: 12),
+                            TextButton(
+                              onPressed: () {
+                                dismiss();
+                                onAction();
+                              },
+                              child: Text(actionLabel),
+                            ),
+                          ],
+                        ),
                 ),
               ),
             ),
@@ -186,10 +215,8 @@ void showToast(BuildContext context, String message) {
   );
   _toast = entry;
   Overlay.of(context, rootOverlay: true).insert(entry);
-  _toastTimer = Timer(const Duration(seconds: 3), () {
-    entry.remove();
-    _toast = null;
-  });
+  _toastTimer = Timer(Duration(seconds: onAction == null ? 3 : 5), dismiss);
+  return dismiss;
 }
 
 Future<bool> performAction(

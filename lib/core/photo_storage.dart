@@ -26,11 +26,16 @@ class PhotoStorage {
 
   static File sourceFile(String path) => File('$path.source.json');
 
-  Future<List<String>> pick({bool camera = false, bool single = false}) async {
+  Future<List<String>> pick({
+    bool camera = false,
+    bool single = false,
+    bool readLocation = false,
+  }) async {
     final files = <String>[];
     if ((Platform.isAndroid || Platform.isIOS) && !camera) {
       final selected = await _channel.invokeListMethod<dynamic>('pick', {
         'single': single,
+        'readLocation': readLocation,
       });
       for (final item in selected!) {
         final photo = Map<String, dynamic>.from(item as Map);

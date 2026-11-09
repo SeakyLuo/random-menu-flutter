@@ -194,34 +194,26 @@ class _RecipeSearchPageState extends State<RecipeSearchPage> {
     final results = _resultsFor(data, _scope);
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        leading: IconButton(
-          tooltip: '返回菜谱',
-          onPressed: () => Navigator.pop(context),
-          icon: const MenuIcon(Icons.arrow_back),
-        ),
-        titleSpacing: 8,
-        title: term.isEmpty
-            ? const Text(
-                '搜索菜谱',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              )
-            : ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
-                child: MenuSegmented(
-                  labels: _labels,
-                  selected: _scope,
-                  onChanged: _changeScope,
-                ),
-              ),
-        actions: const [SizedBox(width: 48)],
-      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: LibraryLayout.maxWidth),
             child: Column(
               children: [
+                if (term.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 600),
+                        child: MenuSegmented(
+                          labels: _labels,
+                          selected: _scope,
+                          onChanged: _changeScope,
+                        ),
+                      ),
+                    ),
+                  ),
                 if (results.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -293,6 +285,7 @@ class _RecipeSearchPageState extends State<RecipeSearchPage> {
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 600),
                             child: SearchFieldBar(
+                              onClose: () => Navigator.pop(context),
                               hintText: '搜索菜名、备注',
                               controller: _search,
                               focusNode: _focus,

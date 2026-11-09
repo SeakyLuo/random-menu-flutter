@@ -93,12 +93,14 @@ class VisitDish {
     required this.dishId,
     required this.name,
     this.packageId,
+    this.isDish = true,
     this.price = 0,
     this.quantity = 1,
     this.note = '',
     this.imagePaths = const [],
   });
   String dishId;
+  bool isDish;
   String? packageId;
   String name;
   double price;
@@ -108,6 +110,7 @@ class VisitDish {
   double get cost => price * quantity;
   factory VisitDish.fromJson(Map<String, dynamic> j) => VisitDish(
     dishId: j['dishId'] as String,
+    isDish: j['isDish'] as bool,
     packageId: j['packageId'] as String?,
     name: j['name'] as String,
     price: (j['price'] as num).toDouble(),
@@ -117,6 +120,7 @@ class VisitDish {
   );
   Map<String, dynamic> toJson() => {
     'dishId': dishId,
+    'isDish': isDish,
     'packageId': packageId,
     'name': name,
     'price': price,
@@ -221,6 +225,7 @@ class Restaurant {
     this.note = '',
     this.link = '',
     this.favorite = false,
+    this.coverDishId,
     this.records = const [],
   });
   String id;
@@ -231,6 +236,7 @@ class Restaurant {
   String note;
   String link;
   bool favorite;
+  String? coverDishId;
   List<Visit> records;
   double get averageCost {
     final paid = records.where((v) => v.totalCost > 0);
@@ -245,6 +251,7 @@ class Restaurant {
     note: j['note'] as String,
     link: j['link'] as String,
     favorite: j['favorite'] as bool,
+    coverDishId: j['coverDishId'] as String?,
     addresses: List<String>.from(j['addresses'] as List),
     addressEntries: (j['addressEntries'] as List)
         .map((e) => RestaurantAddress.fromJson(e as Map<String, dynamic>))
@@ -262,6 +269,7 @@ class Restaurant {
     'note': note,
     'link': link,
     'favorite': favorite,
+    'coverDishId': coverDishId,
     'records': records.map((e) => e.toJson()).toList(),
   };
 }
@@ -334,7 +342,9 @@ class MenuData {
     if (j['version'] == 3) j = upgradeMenuV3(j);
     if (j['version'] == 4) j = upgradeMenuV4(j);
     if (j['version'] == 5) j = upgradeMenuV5(j);
-    if (j['version'] != 6) {
+    if (j['version'] == 6) j = upgradeMenuV6(j);
+    if (j['version'] == 7) j = upgradeMenuV7(j);
+    if (j['version'] != 8) {
       throw const FormatException('Unsupported menu format');
     }
     return MenuData(
@@ -374,7 +384,7 @@ class MenuData {
     );
   }
   Map<String, dynamic> toJson() => {
-    'version': 6,
+    'version': 8,
     'recipes': recipes.map((e) => e.toJson()).toList(),
     'restaurants': restaurants.map((e) => e.toJson()).toList(),
     'toCook': toCook,

@@ -66,15 +66,18 @@ class MenuMcpServer extends ChangeNotifier {
         ),
       );
     });
+    return server;
+  }
+
+  Future<void> startConfiguredConnection() async {
     if (config.enabled) {
       // Startup is a UI boundary: keep configuration editable on bind failure.
       try {
-        await server.configure(config);
+        await configure(config);
       } on Object catch (error) {
-        server.startupError = error.toString();
+        startupError = error.toString();
       }
     }
-    return server;
   }
 
   Future<void> _persist(MenuMcpConfig value) async {

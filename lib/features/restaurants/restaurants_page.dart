@@ -74,7 +74,7 @@ class RestaurantsPageState extends State<RestaurantsPage> {
     final store = MenuScope.of(context);
     setState(() => _creating = true);
     await performAction(context, () async {
-      final paths = await store.photos.pick();
+      final paths = await store.photos.pick(readLocation: true);
       if (paths.isEmpty) return;
       try {
         final draft = await buildRestaurantFromPhotos(paths);

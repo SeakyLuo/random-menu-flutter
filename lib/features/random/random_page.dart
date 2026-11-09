@@ -427,44 +427,23 @@ class _RandomPageState extends State<RandomPage> {
                   ),
                 ),
               ),
-              if (menu.isEmpty)
-                TextButton(
-                  onPressed: _busy ? null : _openMenu,
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(0, 32),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    foregroundColor: Theme.of(
-                      context,
-                    ).colorScheme.onSurfaceVariant,
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('添加菜品', style: TextStyle(fontSize: 12)),
-                      SizedBox(width: 2),
-                      MenuIcon(Icons.chevron_right, size: 14),
-                    ],
-                  ),
-                )
-              else
-                TextButton(
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.only(left: 16),
-                    minimumSize: const Size(44, 32),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    foregroundColor: Theme.of(
-                      context,
-                    ).colorScheme.onSurfaceVariant,
-                    disabledForegroundColor: Theme.of(
-                      context,
-                    ).colorScheme.onSurfaceVariant,
-                  ),
-                  onPressed: _busy || MenuScope.of(context).data.recipes.isEmpty
-                      ? null
-                      : _reset,
-                  child: const Text('重置', style: TextStyle(fontSize: 12)),
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.only(left: 16),
+                  minimumSize: const Size(44, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant,
+                  disabledForegroundColor: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant,
                 ),
+                onPressed: _busy || MenuScope.of(context).data.recipes.isEmpty
+                    ? null
+                    : _reset,
+                child: const Text('重置', style: TextStyle(fontSize: 12)),
+              ),
             ],
           ),
           const SizedBox(height: 7),

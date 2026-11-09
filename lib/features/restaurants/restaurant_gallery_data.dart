@@ -25,6 +25,7 @@ List<RestaurantPhoto> restaurantGallery(Restaurant restaurant) {
   for (final visit in restaurant.records) {
     for (var i = 0; i < visit.items.length; i++) {
       final dish = visit.items[i];
+      if (!dish.isDish) continue;
       foods.add((visit: visit, dish: dish, index: i));
       orders.update(dish.name, (v) => v + 1, ifAbsent: () => 1);
     }
@@ -53,6 +54,10 @@ List<RestaurantPhoto> restaurantGallery(Restaurant restaurant) {
     final date = b.visit.date.compareTo(a.visit.date);
     return date != 0 ? date : a.index.compareTo(b.index);
   });
+  final cover = foods.indexWhere(
+    (item) => item.dish.dishId == restaurant.coverDishId,
+  );
+  if (cover > 0) foods.insert(0, foods.removeAt(cover));
   final visits = [...restaurant.records]
     ..sort((a, b) => b.date.compareTo(a.date));
   final result = <RestaurantPhoto>[

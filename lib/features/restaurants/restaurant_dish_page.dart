@@ -5,16 +5,20 @@ import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/menu_icon.dart';
 import '../../ui/widgets.dart';
+import '../../ui/menu_popup.dart';
 import '../media/media_actions.dart';
 import 'restaurant_dish_summary.dart';
 import 'visit_detail_page.dart';
 import 'restaurant_food_summary.dart';
+import 'restaurant_cover_action.dart';
 
 class RestaurantDishPage extends StatefulWidget {
   const RestaurantDishPage({
     super.key,
     required this.restaurantId,
     required this.name,
+    this.sourceVisitId,
+    this.sourceItemIndex,
   }) : previewDish = null,
        previewPackage = null;
   RestaurantDishPage.preview({
@@ -23,10 +27,14 @@ class RestaurantDishPage extends StatefulWidget {
     required VisitPackage package,
   }) : restaurantId = '',
        name = dish.name,
+       sourceVisitId = null,
+       sourceItemIndex = null,
        previewDish = dish,
        previewPackage = package;
   final String restaurantId;
   final String name;
+  final String? sourceVisitId;
+  final int? sourceItemIndex;
   final VisitDish? previewDish;
   final VisitPackage? previewPackage;
   @override
@@ -36,9 +44,9 @@ class RestaurantDishPage extends StatefulWidget {
 class _RestaurantDishPageState extends State<RestaurantDishPage> {
   final _photos = PageController();
   int _photo = 0;
+  bool _savingCover = false;
   RestaurantDishSummary? _dish;
   List<String> _paths = [];
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -50,9 +58,14 @@ class _RestaurantDishPageState extends State<RestaurantDishPage> {
       final restaurant = MenuScope.of(
         context,
       ).data.restaurants.firstWhere((r) => r.id == widget.restaurantId);
-      _dish = restaurantDishSummaries(
-        restaurant,
-      ).where((dish) => dish.name == widget.name).firstOrNull;
+      _dish = restaurantDishSummaries(restaurant, includeNonDishes: true)
+          .where(
+            (dish) => widget.name.isEmpty
+                ? dish.history.first.visit.id == widget.sourceVisitId &&
+                      dish.history.first.index == widget.sourceItemIndex
+                : dish.name == widget.name,
+          )
+          .firstOrNull;
     }
     final paths = _dish?.paths ?? const <String>[];
     if (!listEquals(_paths, paths)) {
@@ -98,11 +111,45 @@ class _RestaurantDishPageState extends State<RestaurantDishPage> {
     final price = preview == null ? dish.price : 0.0;
     final note = preview == null ? dish.note : preview.note;
     final scheme = Theme.of(context).colorScheme;
+    final coverDishId = preview == null
+        ? MenuScope.of(context).data.restaurants
+              .firstWhere((restaurant) => restaurant.id == widget.restaurantId)
+              .coverDishId
+        : null;
+    final isCover = dish.history.any(
+      (entry) => entry.dish.dishId == coverDishId,
+    );
+    final coverSource = dish.history
+        .where((entry) => entry.dish.isDish && entry.dish.imagePaths.isNotEmpty)
+        .firstOrNull;
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         titleSpacing: 0,
-        title: Text(dish.name),
+        title: Text(dish.name.isEmpty ? '菜品详情' : dish.name),
+        actions: [
+          if (preview == null && (coverSource != null || isCover))
+            MenuPopupButton<String>(
+              tooltip: '菜品操作',
+              enabled: !_savingCover,
+              onSelected: (_) async {
+                setState(() => _savingCover = true);
+                await setRestaurantCover(
+                  context,
+                  widget.restaurantId,
+                  isCover ? null : coverSource!.dish.dishId,
+                );
+                if (mounted) setState(() => _savingCover = false);
+              },
+              itemBuilder: (_) => [
+                MenuPopupItem(
+                  value: 'cover',
+                  icon: isCover ? Icons.restart_alt : Icons.image_outlined,
+                  child: Text(isCover ? '恢复默认封面' : '设为餐厅封面'),
+                ),
+              ],
+            ),
+        ],
         leading: IconButton(
           tooltip: '返回',
           onPressed: () => Navigator.pop(context),

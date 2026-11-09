@@ -14,7 +14,8 @@ import 'restaurant_images.dart';
 import 'visit_dish_editor.dart';
 import 'visit_coupon_fields.dart';
 import 'visit_package_fields.dart';
-import 'visit_dish_editor_row.dart';
+import 'visit_food_groups.dart';
+import '../../ui/menu_popup.dart';
 import 'restaurant_record_draft.dart';
 import '../photo_import/import_models.dart';
 
@@ -73,6 +74,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
   bool picking = false;
   bool get busy => saving || picking;
   bool leaving = false;
+  VoidCallback? dismissDishUndo;
   bool get dirty =>
       jsonEncode(packages.map((p) => p.toJson()).toList()) !=
           jsonEncode(
@@ -128,6 +130,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
   void changed() => setState(() {});
   @override
   void dispose() {
+    dismissDishUndo?.call();
     total.dispose();
     companions.dispose();
     note.dispose();
@@ -146,6 +149,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
       return;
     }
     if (!mounted) return;
+    dismissDishUndo?.call();
     setState(() => leaving = true);
     Navigator.pop(context);
   }
@@ -285,11 +289,12 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
     });
   }
 
-  Future<void> addItem() async {
+  Future<void> addItem({String? packageId}) async {
     final item = await editVisitDish(
       context,
-      VisitDish(dishId: newId(), name: ''),
+      VisitDish(dishId: newId(), name: '', packageId: packageId),
       packages: packages,
+      restaurantId: widget.draftOnly ? null : widget.restaurant.id,
     );
     if (item != null && mounted) {
       setState(() {
@@ -301,7 +306,12 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
 
   Future<void> editItem(int index) async {
     final original = items[index];
-    final item = await editVisitDish(context, original, packages: packages);
+    final item = await editVisitDish(
+      context,
+      original,
+      packages: packages,
+      restaurantId: widget.draftOnly ? null : widget.restaurant.id,
+    );
     if (item != null && mounted) {
       setState(() {
         items[items.indexOf(original)] = item;
@@ -310,7 +320,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
     }
   }
 
-  Future<void> addPhotoItems() async {
+  Future<void> addPhotoItems({String? packageId}) async {
     setState(() => picking = true);
     await performAction(context, () async {
       final paths = await MenuScope.of(context).photos.pick();
@@ -329,8 +339,12 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
         }
         items.addAll(
           photos.map(
-            (photo) =>
-                VisitDish(dishId: '', name: '', imagePaths: [photo.path]),
+            (photo) => VisitDish(
+              dishId: newId(),
+              name: '',
+              packageId: packageId,
+              imagePaths: [photo.path],
+            ),
           ),
         );
         recalculate();
@@ -339,9 +353,30 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
     if (mounted) setState(() => picking = false);
   }
 
-  void moveItem(int from, int to) => setState(() {
-    final item = items.removeAt(from);
-    items.insert(to, item);
+  Future<void> editPackage([VisitPackage? package]) async {
+    final result = await showVisitPackageEditor(context, package: package);
+    if (!mounted || result == null) return;
+    setState(() {
+      if (package == null) {
+        packages.add(result);
+      } else {
+        packages[packages.indexWhere((p) => p.id == package.id)] = result;
+      }
+      recalculate();
+    });
+  }
+
+  void moveGroupItem(String? packageId, int from, int to) => setState(() {
+    final positions = [
+      for (var i = 0; i < items.length; i++)
+        if (items[i].packageId == packageId) i,
+    ];
+    final ordered = [for (final position in positions) items[position]];
+    final dish = ordered.removeAt(from);
+    ordered.insert(to, dish);
+    for (var i = 0; i < positions.length; i++) {
+      items[positions[i]] = ordered[i];
+    }
   });
   Future<void> removePackage(VisitPackage package) async {
     final count = items.where((i) => i.packageId == package.id).length;
@@ -354,15 +389,16 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
     final after = VisitBill(visitSubtotal(unbound, remaining), coupons);
     if (!await confirmAction(
       context,
-      title: '移除“${package.name}”？',
+      title: '解除“${package.name}”？',
       message:
           '${count > 0 ? '保留 $count 道菜并改为单点，恢复各自单价。' : '套餐总价将不再计入消费。'}'
           '${autoCost ? '自动实付将从 ¥${money(bill.total)} 改为 ¥${money(after.total)}。' : '手填实付金额保持不变。'}',
-      confirmLabel: '移除套餐',
+      confirmLabel: '解除套餐',
     )) {
       return;
     }
     if (!mounted) return;
+    dismissDishUndo?.call();
     setState(() {
       packages = remaining;
       items = unbound;
@@ -370,10 +406,21 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
     });
   }
 
-  void removeItem(VisitDish dish) => setState(() {
-    items.remove(dish);
-    recalculate();
-  });
+  void removeItem(VisitDish dish) {
+    final index = items.indexOf(dish);
+    setState(() {
+      items.removeAt(index);
+      recalculate();
+    });
+    dismissDishUndo = showToast(
+      context,
+      dish.name.isEmpty ? '已移除菜品' : '已移除“${dish.name}”',
+      onAction: () => setState(() {
+        items.insert(index.clamp(0, items.length), dish);
+        recalculate();
+      }),
+    );
+  }
 
   Future<void> save() async {
     if (address.isEmpty) {
@@ -392,6 +439,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
       return;
     }
     if (widget.draftOnly) {
+      dismissDishUndo?.call();
       final result = Visit(
         id: widget.visit?.id ?? newId(),
         date: date,
@@ -412,6 +460,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
       return;
     }
     final store = MenuScope.of(context);
+    dismissDishUndo?.call();
     setState(() => saving = true);
     final success = await performAction(context, () async {
       Future<String> keep(String path) async =>
@@ -423,6 +472,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
         items.map(
           (i) async => VisitDish(
             dishId: i.dishId,
+            isDish: i.isDish,
             packageId: i.packageId,
             name: i.name,
             price: i.price,

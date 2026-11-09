@@ -3,20 +3,22 @@ import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../ui/menu_icon.dart';
 import '../../ui/widgets.dart';
-import '../media/media_actions.dart';
-import 'restaurant_dish_page.dart';
+import '../media/photo_widget.dart';
+import 'visit_dish_sheet.dart';
 import 'restaurant_food_summary.dart';
 
 class VisitFoodList extends StatelessWidget {
   const VisitFoodList({
     super.key,
     required this.restaurantId,
+    required this.visitId,
     required this.items,
     required this.packages,
     required this.vertical,
   });
 
   final String restaurantId;
+  final String visitId;
   final List<VisitDish> items;
   final List<VisitPackage> packages;
   VisitPackage? packageFor(VisitDish dish) => dish.packageId == null
@@ -43,15 +45,7 @@ class VisitFoodList extends StatelessWidget {
                 ),
               ),
             )
-          : GestureDetector(
-              onTap: () => showPhotoViewer(
-                context,
-                dish.imagePaths,
-                0,
-                title: dish.name,
-              ),
-              child: LocalPhoto(path: dish.imagePaths.first),
-            ),
+          : LocalPhoto(path: dish.imagePaths.first),
     ),
   );
 
@@ -72,7 +66,7 @@ class VisitFoodList extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  dish.name,
+                  dish.name.isEmpty ? '未命名菜品' : dish.name,
                   style: const TextStyle(
                     fontSize: 16,
                     height: 1.4,
@@ -104,7 +98,7 @@ class VisitFoodList extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          dish.name,
+          dish.name.isEmpty ? '未命名菜品' : dish.name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
@@ -126,12 +120,11 @@ class VisitFoodList extends StatelessWidget {
 
   Widget _tile(BuildContext context, VisitDish dish, double width) => InkWell(
     borderRadius: BorderRadius.circular(9),
-    onTap: () => Navigator.push<void>(
+    onTap: () => showVisitDishDetail(
       context,
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            RestaurantDishPage(restaurantId: restaurantId, name: dish.name),
-      ),
+      restaurantId: restaurantId,
+      visitId: visitId,
+      itemIndex: items.indexOf(dish),
     ),
     child: vertical
         ? Row(

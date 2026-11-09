@@ -17,6 +17,7 @@ import 'restaurant_dish_summary.dart';
 import 'restaurant_editor.dart';
 import 'restaurant_entries.dart';
 import 'restaurant_visit_card.dart';
+import 'restaurant_cover_action.dart';
 
 class RestaurantDetailPage extends StatefulWidget {
   const RestaurantDetailPage({super.key, required this.restaurantId});
@@ -145,6 +146,8 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
         );
       case 'delete':
         _delete(restaurant);
+      case 'defaultCover':
+        setRestaurantCover(context, restaurant.id, null);
     }
   }
 
@@ -270,6 +273,12 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
                                 icon: Icons.link,
                                 child: Text('复制餐厅链接'),
                               ),
+                            if (restaurant.coverDishId != null)
+                              const MenuPopupItem(
+                                value: 'defaultCover',
+                                icon: Icons.restart_alt,
+                                child: Text('恢复默认封面'),
+                              ),
                             MenuPopupItem(
                               value: 'delete',
                               icon: Icons.delete_outline,
@@ -291,6 +300,7 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       RestaurantDetailGallery(
+                        key: ValueKey(restaurant.coverDishId),
                         name: restaurant.name,
                         dishPaths: dishPaths,
                         environmentPaths: environmentPaths,

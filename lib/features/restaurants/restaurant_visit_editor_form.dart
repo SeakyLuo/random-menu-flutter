@@ -221,48 +221,45 @@ extension _RestaurantVisitEditorForm on _RestaurantVisitEditorState {
                               },
                             ),
                             const SizedBox(height: 16),
-                            VisitPackageFields(
-                              packages: packages,
-                              items: items,
-                              onChanged: (value) => updateForm(() {
-                                packages = value;
-                                recalculate();
-                              }),
-                              onRemove: removePackage,
-                            ),
-                            const SizedBox(height: 16),
                             MenuFieldLabel(
                               '本次菜品 · ${items.length}',
                               minHeight: 44,
                               bottomSpacing: 4,
-                              trailing: Tooltip(
-                                message: widget.draftOnly
-                                    ? '添加菜品，长按从照片快速添加'
-                                    : '添加菜品',
-                                triggerMode: widget.draftOnly
-                                    ? TooltipTriggerMode.manual
-                                    : TooltipTriggerMode.longPress,
-                                child: GestureDetector(
-                                  onLongPress: widget.draftOnly
-                                      ? addPhotoItems
-                                      : null,
-                                  child: IconButton(
-                                    onPressed: addItem,
-                                    tooltip: '添加菜品',
-                                    constraints: const BoxConstraints.tightFor(
-                                      width: 44,
-                                      height: 44,
+                              trailing: MenuPopupButton<String>(
+                                tooltip: '添加本次菜品',
+                                buttonBuilder: (open) => Tooltip(
+                                  message: '添加菜品，长按从照片快速添加',
+                                  triggerMode: TooltipTriggerMode.manual,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(22),
+                                    onTap: open,
+                                    onLongPress: () => addPhotoItems(),
+                                    child: const SizedBox.square(
+                                      dimension: 44,
+                                      child: Center(
+                                        child: MenuIcon(Icons.add, size: 20),
+                                      ),
                                     ),
-                                    style: IconButton.styleFrom(
-                                      tapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                    icon: const MenuIcon(Icons.add, size: 20),
                                   ),
                                 ),
+                                onSelected: (action) => action == 'single'
+                                    ? addItem()
+                                    : editPackage(),
+                                itemBuilder: (_) => const [
+                                  MenuPopupItem(
+                                    value: 'single',
+                                    icon: Icons.add,
+                                    child: Text('添加单点'),
+                                  ),
+                                  MenuPopupItem(
+                                    value: 'package',
+                                    icon: Icons.receipt_long_outlined,
+                                    child: Text('添加套餐'),
+                                  ),
+                                ],
                               ),
                             ),
-                            if (items.isEmpty)
+                            if (items.isEmpty && packages.isEmpty)
                               Text(
                                 '还没有添加菜品',
                                 style: TextStyle(
@@ -274,31 +271,17 @@ extension _RestaurantVisitEditorForm on _RestaurantVisitEditorState {
                               ),
                           ],
                         ),
-                        SliverReorderableList(
-                          itemCount: items.length,
-                          onReorderItem: moveItem,
-                          proxyDecorator: (child, index, animation) => child,
-                          itemBuilder: (context, index) {
-                            final dish = items[index];
-                            return VisitDishEditorRow(
-                              key: ObjectKey(dish),
-                              dish: dish,
-                              package: dish.packageId == null
-                                  ? null
-                                  : packages.firstWhere(
-                                      (p) => p.id == dish.packageId,
-                                    ),
-                              index: index,
-                              onEdit: () => editItem(index),
-                              confirmRemove: () => confirmAction(
-                                context,
-                                title: '移除本次菜品？',
-                                message: '从本次点单中移除“${dish.name}”，餐厅菜单会保留。',
-                                confirmLabel: '移除',
-                              ),
-                              onRemove: () => removeItem(dish),
-                            );
-                          },
+                        VisitFoodGroups(
+                          items: items,
+                          packages: packages,
+                          onEdit: (dish) => editItem(items.indexOf(dish)),
+                          onRemove: removeItem,
+                          onReorder: moveGroupItem,
+                          onEditPackage: editPackage,
+                          onRemovePackage: removePackage,
+                          onAdd: (packageId) => addItem(packageId: packageId),
+                          onQuickAdd: (packageId) =>
+                              addPhotoItems(packageId: packageId),
                         ),
                       ],
                     ),

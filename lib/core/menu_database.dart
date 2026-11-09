@@ -5,6 +5,7 @@ import 'models.dart';
 import 'menu_sql_statement.dart';
 import 'menu_write_scope.dart';
 import 'visit_coupon_migration.dart';
+import 'dish_identity_upgrade.dart';
 
 part 'menu_database_sql.dart';
 part 'menu_database_schema.dart';
@@ -14,6 +15,7 @@ part 'menu_database_write.dart';
 part 'menu_database_coupon_upgrade.dart';
 part 'menu_database_package_upgrade.dart';
 part 'menu_database_coupon_quantity_upgrade.dart';
+part 'menu_database_dish_identity_upgrade.dart';
 
 class MenuDatabase {
   MenuDatabase._(this._database);
@@ -22,13 +24,18 @@ class MenuDatabase {
   static Future<MenuDatabase> open(Directory directory) async {
     final database = await openDatabase(
       '${directory.path}/menu.db',
-      version: 5,
+      version: 8,
       onCreate: (db, _) async {
         for (final statement in _schema) {
           await db.execute(statement);
         }
       },
       onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 7) {
+          await db.execute(
+            'ALTER TABLE restaurants ADD COLUMN cover_dish_id TEXT',
+          );
+        }
         if (oldVersion < 2) await _upgradeVisitCoupons(db);
         if (oldVersion < 3) await _upgradeVisitPackages(db);
         if (oldVersion < 4) {
@@ -36,6 +43,26 @@ class MenuDatabase {
           await db.delete('images', where: 'kind = ?', whereArgs: ['dish']);
         }
         if (oldVersion < 5) await _upgradeCouponQuantities(db, oldVersion);
+        if (oldVersion < 6) {
+          // Offline data maintenance can classify items before the next app upgrade.
+          final itemColumns = await db.rawQuery(
+            'PRAGMA table_info(restaurant_visit_items)',
+          );
+          if (!itemColumns.any((column) => column['name'] == 'is_dish')) {
+            await db.execute(
+              'ALTER TABLE restaurant_visit_items ADD COLUMN is_dish '
+              'INTEGER NOT NULL DEFAULT 1 CHECK (is_dish IN (0,1))',
+            );
+          }
+          final row = (await db.query('menu_settings')).single;
+          final payload =
+              jsonDecode(row['payload'] as String) as Map<String, dynamic>;
+          payload['version'] = 7;
+          await db.update('menu_settings', {
+            'payload': jsonEncode(payload),
+          }, where: 'id = 1');
+        }
+        if (oldVersion < 8) await _upgradeDishIdentities(db);
       },
     );
     final result = MenuDatabase._(database);
@@ -53,6 +80,20 @@ class MenuDatabase {
     });
     return result;
   }
+
+  Future<MenuData> readForStartup() => _database.transaction((txn) async {
+    final data = await _read(txn);
+    if (data.selectedMenu.isEmpty &&
+        data.recipes.any((recipe) => recipe.hiddenRounds > 0)) {
+      await txn.update('recipes', {
+        'hidden_rounds': 0,
+      }, where: 'hidden_rounds > 0');
+      for (final recipe in data.recipes) {
+        recipe.hiddenRounds = 0;
+      }
+    }
+    return data;
+  });
 
   Future<MenuData> read({
     MenuWriteScope scope = MenuWriteScope.all,

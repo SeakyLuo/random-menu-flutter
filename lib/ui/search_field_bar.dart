@@ -9,9 +9,11 @@ class SearchFieldBar extends StatelessWidget {
     required this.focusNode,
     required this.onSubmitted,
     required this.hintText,
+    required this.onClose,
   });
 
   final String hintText;
+  final VoidCallback onClose;
   final TextEditingController controller;
   final FocusNode focusNode;
   final ValueChanged<String> onSubmitted;
@@ -23,7 +25,7 @@ class SearchFieldBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    return GlassSurface(
+    final field = GlassSurface(
       radius: 24,
       shadowOpacity: .4,
       borderColor: dark ? const Color(0x24ffffff) : const Color(0xe6ffffff),
@@ -83,6 +85,28 @@ class SearchFieldBar extends StatelessWidget {
           ),
         ),
       ),
+    );
+    return Row(
+      children: [
+        Expanded(child: field),
+        const SizedBox(width: 8),
+        GlassSurface(
+          radius: 24,
+          shadowOpacity: .4,
+          borderColor: dark ? const Color(0x24ffffff) : const Color(0xe6ffffff),
+          gradientColors: dark
+              ? const [Color(0xf51c2b24), Color(0xeb1a2822)]
+              : const [Color(0xf5ffffff), Color(0xebf7faf8)],
+          child: SizedBox.square(
+            dimension: 48,
+            child: IconButton(
+              tooltip: '关闭搜索',
+              onPressed: onClose,
+              icon: MenuIcon(Icons.close, size: 22, color: scheme.onSurface),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

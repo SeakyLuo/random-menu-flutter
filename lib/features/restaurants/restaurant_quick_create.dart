@@ -53,7 +53,7 @@ Future<RestaurantQuickDraft> buildRestaurantFromPhotos(
       return sameDay ||
           record.date.difference(date).abs() <= const Duration(hours: 3);
     }).firstOrNull;
-    final dish = VisitDish(dishId: '', name: '', imagePaths: [photo.path]);
+    final dish = VisitDish(dishId: newId(), name: '', imagePaths: [photo.path]);
     if (record == null) {
       draft.records.add(
         Visit(

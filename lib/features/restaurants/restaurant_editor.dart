@@ -14,7 +14,7 @@ import 'restaurant_record_draft.dart';
 import 'restaurant_record_section.dart';
 import 'restaurant_visit_editor.dart';
 import 'visit_dish_editor.dart';
-import '../photo_import/import_models.dart';
+import 'restaurant_quick_create.dart';
 
 Future<bool> editRestaurant(
   BuildContext context, {
@@ -166,33 +166,35 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
   Future<void> addRecordPhotos() async {
     setState(() => picking = true);
     await performAction(context, () async {
-      final paths = await MenuScope.of(context).photos.pick();
+      final paths = await MenuScope.of(context).photos.pick(readLocation: true);
       if (paths.isEmpty) return;
-      final photos = <ImportPhoto>[];
-      for (var offset = 0; offset < paths.length; offset += 8) {
-        photos.addAll(
-          await Future.wait(paths.skip(offset).take(8).map(readImportPhoto)),
-        );
-      }
+      final draft = await buildRestaurantFromPhotos(paths);
       if (!mounted) return;
-      final dates =
-          photos.map((photo) => photo.date).whereType<DateTime>().toList()
-            ..sort();
-      final visit = Visit(
-        id: newId(),
-        date: dates.isEmpty ? DateTime.now() : dates.first,
-        autoCost: true,
-        addressId: addresses.length == 1 ? addresses.single.id : '',
-        address: addresses.length == 1 ? addresses.single.fullAddress : '',
-        items: photos
-            .map(
-              (photo) =>
-                  VisitDish(dishId: '', name: '', imagePaths: [photo.path]),
-            )
-            .toList(),
-      );
-      setState(() => recordDraft.records.add(visit));
-      if (dates.isEmpty) showToast(context, '照片没有拍摄时间，请核对消费日期');
+      setState(() {
+        for (final address in draft.addresses) {
+          final existing = addresses
+              .where((entry) => entry.fullAddress == address.fullAddress)
+              .firstOrNull;
+          final target = existing ?? address;
+          if (existing == null) addresses.add(address);
+          for (final record in draft.records) {
+            if (record.addressId == address.id) {
+              record.addressId = target.id;
+              record.address = target.fullAddress;
+            }
+          }
+        }
+        for (final record in draft.records) {
+          if (record.addressId.isEmpty && addresses.length == 1) {
+            record.addressId = addresses.single.id;
+            record.address = addresses.single.fullAddress;
+          }
+        }
+        recordDraft.records.addAll(draft.records);
+      });
+      if (draft.missingDates) {
+        showToast(context, '部分照片没有拍摄时间，请核对消费日期');
+      }
     });
     if (mounted) setState(() => picking = false);
   }
@@ -234,6 +236,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
       context,
       visit.items[index],
       packages: visit.packages,
+      restaurantId: widget.restaurant?.id,
     );
     if (dish == null || !mounted) return;
     setState(() {
@@ -277,17 +280,6 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
       if (visit.address.isEmpty) {
         showToast(context, '请补充 ${dayLabel(visit.date)} 的消费分店');
         await editRecord(visit);
-        return;
-      }
-      final missing = visit.items.indexWhere(
-        (item) => item.name.trim().isEmpty,
-      );
-      if (missing >= 0) {
-        showToast(
-          context,
-          '请补充 ${dayLabel(visit.date)} 第 ${missing + 1} 道菜的名称',
-        );
-        await editRecordDish(visit, missing);
         return;
       }
     }

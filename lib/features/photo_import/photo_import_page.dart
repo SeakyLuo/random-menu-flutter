@@ -83,7 +83,7 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
   Future<void> pick() async {
     setState(() => busy = true);
     await performAction(context, () async {
-      final files = await MenuScope.of(context).photos.pick();
+      final files = await MenuScope.of(context).photos.pick(readLocation: true);
       final added = <ImportPhoto>[];
       for (var offset = 0; offset < files.length; offset += 8) {
         added.addAll(

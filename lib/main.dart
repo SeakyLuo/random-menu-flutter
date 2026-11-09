@@ -14,8 +14,9 @@ import 'ui/widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  final systemUi = SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   final store = await MenuStore.open();
+  await systemUi;
   await MenuMcpServer.open(store);
   runApp(RandomMenuApp(store: store));
 }
@@ -82,8 +83,12 @@ class _MenuHomeState extends State<MenuHome> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final error = MenuMcpServer.instance.startupError;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await WidgetsBinding.instance.waitUntilFirstFrameRasterized;
+      if (!mounted) return;
+      final server = MenuMcpServer.instance;
+      await server.startConfiguredConnection();
+      final error = server.startupError;
       if (error != null && mounted) showToast(context, error);
     });
   }

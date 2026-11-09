@@ -52,6 +52,8 @@ class RestaurantDishSliver extends StatelessWidget {
                     builder: (_) => RestaurantDishPage(
                       restaurantId: restaurant.id,
                       name: dish.name,
+                      sourceVisitId: dish.history.first.visit.id,
+                      sourceItemIndex: dish.history.first.index,
                     ),
                   ),
                 ),

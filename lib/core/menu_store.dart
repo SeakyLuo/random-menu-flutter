@@ -21,10 +21,14 @@ class MenuStore extends ChangeNotifier {
     final root = await getApplicationSupportDirectory();
     final directory = Directory('${root.path}/random_menu');
     await directory.create(recursive: true);
-    final database = await MenuDatabase.open(directory);
-    final data = await database.read();
-    final photos = await PhotoStorage.open(directory);
-    return MenuStore._(directory, database, data, photos);
+    final (snapshot, photos) = await (
+      () async {
+        final database = await MenuDatabase.open(directory);
+        return (database, await database.readForStartup());
+      }(),
+      PhotoStorage.open(directory),
+    ).wait;
+    return MenuStore._(directory, snapshot.$1, snapshot.$2, photos);
   }
 
   Future<void> reload({MenuWriteScope scope = MenuWriteScope.all}) {

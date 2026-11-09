@@ -8,7 +8,7 @@ import 'restaurant_entries.dart';
 import '../media/media_actions.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'restaurant_dish_card.dart';
-import 'restaurant_dish_page.dart';
+import 'visit_dish_sheet.dart';
 
 Future<bool> removeRestaurantVisit(
   BuildContext context,
@@ -277,14 +277,11 @@ class VisitDetailPage extends StatelessWidget {
                         note: dish.note,
                         quantity: dish.quantity,
                         package: visit.packageFor(dish),
-                        onTap: () => Navigator.push<void>(
+                        onTap: () => showVisitDishDetail(
                           context,
-                          MaterialPageRoute<void>(
-                            builder: (_) => RestaurantDishPage(
-                              restaurantId: restaurantId,
-                              name: dish.name,
-                            ),
-                          ),
+                          restaurantId: restaurantId,
+                          visitId: visit.id,
+                          itemIndex: index,
                         ),
                       );
                     },

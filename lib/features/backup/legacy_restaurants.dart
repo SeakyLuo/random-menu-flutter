@@ -108,7 +108,7 @@ class _LegacyRestaurant {
     final items = visit.list('foods', omitted: true).map((raw) {
       final dish = _dish(raw, visitId: id);
       return VisitDish(
-        dishId: dish.orderInHome >= 0 ? dish.id : '',
+        dishId: newId(),
         name: dish.name,
         price: dish.price,
         quantity: dish.quantity,

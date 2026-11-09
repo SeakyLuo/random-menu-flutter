@@ -77,7 +77,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
     final result = await editVisitDish(
       context,
       VisitDish(
-        dishId: '',
+        dishId: newId(),
         name: name,
         price: same.first.price,
         quantity: 1,
@@ -117,8 +117,9 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
         group.items.insertAll(index, [
           for (final path in item.imagePaths)
             VisitDish(
-              dishId: '',
+              dishId: newId(),
               name: item.name,
+              isDish: item.isDish,
               price: item.price,
               quantity: 1,
               note: item.note,
@@ -287,6 +288,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
               VisitDish(
                 dishId: newId(),
                 name: item.name,
+                isDish: item.isDish,
                 price: item.price,
                 quantity: item.quantity,
                 note: item.note,
@@ -434,7 +436,11 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
                       for (var i = 0; i < group.items.length; i++)
                         ListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: Text(group.items[i].name),
+                          title: Text(
+                            group.items[i].name.isEmpty
+                                ? '未命名菜品'
+                                : group.items[i].name,
+                          ),
                           subtitle: Text(
                             '¥${money(group.items[i].price)} × ${group.items[i].quantity} 份 = ¥${money(group.items[i].cost)} · ${group.items[i].imagePaths.length} 张照片',
                           ),
@@ -458,13 +464,15 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
                                 value: 'edit',
                                 child: Text('核对单价与数量'),
                               ),
-                              if (group.items
-                                      .where(
-                                        (item) =>
-                                            item.name == group.items[i].name,
-                                      )
-                                      .length >
-                                  1)
+                              if (group.items[i].name.isNotEmpty &&
+                                  group.items
+                                          .where(
+                                            (item) =>
+                                                item.name ==
+                                                group.items[i].name,
+                                          )
+                                          .length >
+                                      1)
                                 const MenuPopupItem(
                                   icon: Icons.call_merge,
                                   value: 'merge',

@@ -61,7 +61,7 @@ class SearchDishCard extends StatelessWidget {
                       ),
                 caption: Text.rich(
                   highlightSearchText(
-                    dish.name,
+                    dish.name.isEmpty ? '未命名菜品' : dish.name,
                     query,
                     hasPhoto ? const Color(0xff83d8ac) : scheme.primary,
                   ),

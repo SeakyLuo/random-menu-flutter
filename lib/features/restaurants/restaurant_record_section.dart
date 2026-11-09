@@ -58,7 +58,7 @@ class RestaurantRecordSection extends StatelessWidget {
         final measured =
             84 +
             5 +
-            textHeight(dish.name.isEmpty ? '填写菜名' : dish.name, nameStyle) +
+            textHeight(dish.name.isEmpty ? '未命名菜品' : dish.name, nameStyle) +
             (summary.isEmpty ? 0 : 2 + textHeight(summary, summaryStyle));
         if (measured > height) height = measured;
       }
@@ -255,7 +255,7 @@ class RestaurantRecordSection extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 5),
                                       Text(
-                                        dish.name.isEmpty ? '填写菜名' : dish.name,
+                                        dish.name.isEmpty ? '未命名菜品' : dish.name,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: nameStyle,

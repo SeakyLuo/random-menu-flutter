@@ -5,10 +5,21 @@ Future<MenuData> _read(
   MenuWriteScope scope = MenuWriteScope.all,
   MenuData? current,
 }) async {
-  final entries = await Future.wait([
-    for (final table in MenuSqlStatement.tables) _readTable(txn, table, scope),
-  ]);
-  final rows = Map<String, List<Map<String, Object?>>>.fromEntries(entries);
+  final batch = txn.batch();
+  final tables = <String>[];
+  final rows = <String, List<Map<String, Object?>>>{};
+  for (final table in MenuSqlStatement.tables) {
+    if (_queueReadTable(batch, table, scope)) {
+      tables.add(table);
+    } else {
+      rows[table] = [];
+    }
+  }
+  // Keep the snapshot transaction while crossing the platform channel once.
+  final results = await batch.commit();
+  for (var i = 0; i < tables.length; i++) {
+    rows[tables[i]] = List<Map<String, Object?>>.from(results[i] as List);
+  }
   final settings =
       jsonDecode(rows['menu_settings']!.single['payload'] as String)
           as Map<String, dynamic>;
@@ -97,6 +108,7 @@ Future<MenuData> _read(
         addressEntries: branches[row['id']] ?? [],
         records: visits[row['id']] ?? [],
         favorite: favorites.contains(('restaurant', row['id'])),
+        coverDishId: row['cover_dish_id'] as String?,
       ),
   ];
   final values = <(String, String), List<String>>{};
@@ -191,11 +203,7 @@ List<T> _mergeRecords<T>(
   ];
 }
 
-Future<MapEntry<String, List<Map<String, Object?>>>> _readTable(
-  Transaction txn,
-  String table,
-  MenuWriteScope scope,
-) async {
+bool _queueReadTable(Batch batch, String table, MenuWriteScope scope) {
   final order = switch (table) {
     'recipes' ||
     'restaurants' ||
@@ -217,16 +225,9 @@ Future<MapEntry<String, List<Map<String, Object?>>>> _readTable(
     _ => null,
   };
   final filter = _rowFilter(table, scope);
-  if (filter.$1 == '0') return MapEntry(table, []);
-  return MapEntry(
-    table,
-    await txn.query(
-      table,
-      where: filter.$1,
-      whereArgs: filter.$2,
-      orderBy: order,
-    ),
-  );
+  if (filter.$1 == '0') return false;
+  batch.query(table, where: filter.$1, whereArgs: filter.$2, orderBy: order);
+  return true;
 }
 
 (String?, List<Object?>) _rowFilter(String table, MenuWriteScope scope) {

@@ -130,7 +130,12 @@ class _RestaurantSearchPageState extends State<RestaurantSearchPage> {
       _openResult(RestaurantDetailPage(restaurantId: restaurant.id));
 
   Future<void> _openDish(RestaurantDishHit hit) => _openResult(
-    RestaurantDishPage(restaurantId: hit.restaurant.id, name: hit.dish.name),
+    RestaurantDishPage(
+      restaurantId: hit.restaurant.id,
+      name: hit.dish.name,
+      sourceVisitId: hit.dish.history.first.visit.id,
+      sourceItemIndex: hit.dish.history.first.index,
+    ),
   );
 
   Future<void> _openContext(RestaurantSearchHit hit) => _openResult(
@@ -214,34 +219,26 @@ class _RestaurantSearchPageState extends State<RestaurantSearchPage> {
     final matches = searchRestaurantContents(data.restaurants, _query);
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        leading: IconButton(
-          tooltip: '返回餐厅',
-          onPressed: () => Navigator.pop(context),
-          icon: const MenuIcon(Icons.arrow_back),
-        ),
-        titleSpacing: 8,
-        title: term.isEmpty
-            ? const Text(
-                '搜索餐厅',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              )
-            : ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
-                child: MenuSegmented(
-                  labels: _labels,
-                  selected: _scope,
-                  onChanged: _changeScope,
-                ),
-              ),
-        actions: const [SizedBox(width: 48)],
-      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: LibraryLayout.maxWidth),
             child: Column(
               children: [
+                if (term.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 600),
+                        child: MenuSegmented(
+                          labels: _labels,
+                          selected: _scope,
+                          onChanged: _changeScope,
+                        ),
+                      ),
+                    ),
+                  ),
                 Expanded(
                   child: Stack(
                     children: [
@@ -300,6 +297,7 @@ class _RestaurantSearchPageState extends State<RestaurantSearchPage> {
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 600),
                             child: SearchFieldBar(
+                              onClose: () => Navigator.pop(context),
                               hintText: '搜索餐厅、菜品、评价',
                               controller: _search,
                               focusNode: _focus,

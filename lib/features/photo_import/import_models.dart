@@ -125,7 +125,8 @@ class ImportVisit {
   List<String> environments;
   bool separateDishesConfirmed = false;
   bool get duplicateDishes =>
-      items.map((i) => i.name).toSet().length != items.length;
+      items.where((i) => i.name.isNotEmpty).map((i) => i.name).toSet().length !=
+      items.where((i) => i.name.isNotEmpty).length;
   double get total => items.fold(0.0, (sum, item) => sum + item.cost);
 }
 
@@ -163,7 +164,7 @@ List<ImportVisit> groupImportPhotos(
     } else {
       target.items.add(
         VisitDish(
-          dishId: '',
+          dishId: newId(),
           name: photo.name,
           price: photo.price,
           quantity: photo.quantity,
@@ -188,7 +189,7 @@ ImportVisit importVisitFromPhotos(
       for (final photo in photos)
         if (photo.kind == ImportPhotoKind.dish)
           VisitDish(
-            dishId: '',
+            dishId: newId(),
             name: photo.name,
             price: photo.price,
             quantity: photo.quantity,

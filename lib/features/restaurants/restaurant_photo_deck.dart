@@ -11,6 +11,7 @@ class RestaurantPhotoDeck extends StatefulWidget {
     required this.itemBuilder,
     required this.onChanged,
     required this.onTap,
+    this.preloadIndex,
   });
 
   final int itemCount;
@@ -18,6 +19,7 @@ class RestaurantPhotoDeck extends StatefulWidget {
   final IndexedWidgetBuilder itemBuilder;
   final ValueChanged<int> onChanged;
   final VoidCallback onTap;
+  final int? preloadIndex;
 
   @override
   State<RestaurantPhotoDeck> createState() => _RestaurantPhotoDeckState();
@@ -157,6 +159,16 @@ class _RestaurantPhotoDeckState extends State<RestaurantPhotoDeck>
             child: Stack(
               clipBehavior: Clip.none,
               children: [
+                // Use the visible card's exact constraints and retain its image
+                // stream so the first group switch can reuse the decoded photo.
+                if (widget.preloadIndex case final preloadIndex?)
+                  Offstage(
+                    child: SizedBox(
+                      width: width,
+                      height: height,
+                      child: widget.itemBuilder(context, preloadIndex),
+                    ),
+                  ),
                 // This covered card keeps the next backing photo continuous
                 // when the outgoing card is tucked below the rest of the deck.
                 if (hasThird && (currentOnTop || !forward))

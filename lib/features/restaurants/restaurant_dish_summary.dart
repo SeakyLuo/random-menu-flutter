@@ -3,7 +3,7 @@ import '../../core/models.dart';
 class RestaurantDishSummary {
   RestaurantDishSummary(this.name);
   final String name;
-  final history = <({Visit visit, VisitDish dish})>[];
+  final history = <({Visit visit, VisitDish dish, int index})>[];
   final paths = <String>[];
   double get price => package == null ? history.first.dish.price : 0;
   VisitPackage? get package =>
@@ -18,17 +18,21 @@ class RestaurantDishSummary {
   int get visits => history.map((entry) => entry.visit.id).toSet().length;
 }
 
-List<RestaurantDishSummary> restaurantDishSummaries(Restaurant restaurant) {
-  final dishes = <String, RestaurantDishSummary>{};
+List<RestaurantDishSummary> restaurantDishSummaries(
+  Restaurant restaurant, {
+  bool includeNonDishes = false,
+}) {
+  final dishes = <Object, RestaurantDishSummary>{};
   final visits = [...restaurant.records]
     ..sort((a, b) => b.date.compareTo(a.date));
   for (final visit in visits) {
-    for (final dish in visit.items) {
+    for (final (index, dish) in visit.items.indexed) {
+      if (!includeNonDishes && !dish.isDish) continue;
       final summary = dishes.putIfAbsent(
-        dish.name,
+        dish.name.isEmpty ? (visit.id, index) : dish.name,
         () => RestaurantDishSummary(dish.name),
       );
-      summary.history.add((visit: visit, dish: dish));
+      summary.history.add((visit: visit, dish: dish, index: index));
       summary.paths.addAll(dish.imagePaths);
     }
   }

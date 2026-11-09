@@ -208,10 +208,6 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
         : double.tryParse(price.text.trim());
     final count = int.tryParse(quantity.text.trim());
     if (photo.kind == ImportPhotoKind.dish) {
-      if (name.text.trim().isEmpty) {
-        showToast(context, '请填写这张菜品照片的菜名');
-        return;
-      }
       if (amount == null || !amount.isFinite || amount < 0) {
         showToast(context, '请输入有效的菜品单价');
         return;
@@ -349,7 +345,7 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
                 const SizedBox(height: 20),
                 TextField(
                   controller: name,
-                  decoration: const InputDecoration(labelText: '菜品名称'),
+                  decoration: const InputDecoration(labelText: '菜品名称（可选）'),
                 ),
                 const SizedBox(height: 20),
                 TextField(

@@ -34,10 +34,14 @@ class RestaurantCard extends StatefulWidget {
 }
 
 class _RestaurantCardState extends State<RestaurantCard> {
-  late List<RestaurantPhoto> _photos = restaurantGallery(widget.restaurant);
+  late List<RestaurantPhoto> _photos = restaurantGallery(
+    widget.restaurant,
+  ).where((photo) => !photo.isEnvironment).toList();
   bool _initialized = false;
   bool _savingFavorite = false;
   String? _selected;
+  String get _photoStorageKey =>
+      'restaurant-photo:${widget.restaurant.id}:${widget.restaurant.coverDishId ?? 'default'}';
   int get _index =>
       _selected == null ? 0 : _photos.indexWhere((p) => p.key == _selected);
   @override
@@ -45,10 +49,9 @@ class _RestaurantCardState extends State<RestaurantCard> {
     super.didChangeDependencies();
     if (!_initialized) {
       _selected =
-          PageStorage.of(context).readState(
+          PageStorage.of(
                 context,
-                identifier: 'restaurant-photo:${widget.restaurant.id}',
-              )
+              ).readState(context, identifier: _photoStorageKey)
               as String?;
       if (_selected != null && !_photos.any((p) => p.key == _selected)) {
         _selected = null;
@@ -59,18 +62,24 @@ class _RestaurantCardState extends State<RestaurantCard> {
 
   void _select(int index) {
     setState(() => _selected = _photos[index].key);
-    PageStorage.of(context).writeState(
+    PageStorage.of(
       context,
-      _selected,
-      identifier: 'restaurant-photo:${widget.restaurant.id}',
-    );
+    ).writeState(context, _selected, identifier: _photoStorageKey);
   }
 
   @override
   void didUpdateWidget(covariant RestaurantCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.restaurant != widget.restaurant) {
-      _photos = restaurantGallery(widget.restaurant);
+      _photos = restaurantGallery(
+        widget.restaurant,
+      ).where((photo) => !photo.isEnvironment).toList();
+      if (oldWidget.restaurant.coverDishId != widget.restaurant.coverDishId) {
+        _selected = null;
+        PageStorage.of(
+          context,
+        ).writeState(context, null, identifier: _photoStorageKey);
+      }
       if (_selected != null && !_photos.any((p) => p.key == _selected)) {
         _selected = null;
       }

@@ -47,6 +47,7 @@ Map<String, List<Visit>> _visitGroups(
     (grouped[(restaurant, visit)] ??= []).add(
       VisitDish(
         dishId: row['dish_id'] as String,
+        isDish: row['is_dish'] == 1,
         packageId: row['package_id'] as String?,
         name: row['name'] as String,
         price: (row['price'] as num).toDouble(),
@@ -158,6 +159,7 @@ List<_TableRows> _restaurantRows(List<Restaurant> restaurants) {
                 'visit_id': v.id,
                 'position': i,
                 'dish_id': d.dishId,
+                'is_dish': d.isDish ? 1 : 0,
                 'package_id': d.packageId,
                 'name': d.name,
                 'price': d.price,

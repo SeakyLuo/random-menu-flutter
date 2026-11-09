@@ -6,7 +6,8 @@ const _schema = [
   '''CREATE TABLE recipes (id TEXT PRIMARY KEY, position INTEGER NOT NULL,
  name TEXT NOT NULL, note TEXT NOT NULL, hidden_rounds INTEGER NOT NULL, created_at TEXT NOT NULL)''',
   '''CREATE TABLE restaurants (id TEXT PRIMARY KEY, position INTEGER NOT NULL,
- name TEXT NOT NULL, category_id TEXT, note TEXT NOT NULL, link TEXT NOT NULL, addresses TEXT NOT NULL)''',
+ name TEXT NOT NULL, category_id TEXT, note TEXT NOT NULL, link TEXT NOT NULL, addresses TEXT NOT NULL,
+ cover_dish_id TEXT)''',
   '''CREATE TABLE restaurant_addresses (
           restaurant_id TEXT NOT NULL, id TEXT NOT NULL,
           position INTEGER NOT NULL, province TEXT NOT NULL,
@@ -54,6 +55,7 @@ const _schema = [
   '''CREATE TABLE restaurant_visit_items (restaurant_id TEXT NOT NULL,
  visit_id TEXT NOT NULL, position INTEGER NOT NULL, dish_id TEXT NOT NULL, name TEXT NOT NULL,
  price REAL NOT NULL, quantity INTEGER NOT NULL, note TEXT NOT NULL, package_id TEXT,
+ is_dish INTEGER NOT NULL DEFAULT 1 CHECK (is_dish IN (0,1)),
  PRIMARY KEY (restaurant_id,visit_id,position))''',
   '''CREATE TABLE restaurant_categories (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,
  position INTEGER NOT NULL, listed INTEGER NOT NULL CHECK (listed IN (0,1)))''',

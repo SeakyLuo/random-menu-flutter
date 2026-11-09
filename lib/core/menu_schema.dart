@@ -1,5 +1,39 @@
 import 'models.dart';
 import 'visit_coupon_migration.dart';
+import 'dish_identity_upgrade.dart';
+
+Map<String, dynamic> upgradeMenuV7(Map<String, dynamic> source) {
+  final items = <Map>[];
+  for (final restaurant in source['restaurants'] as List) {
+    for (final visit in restaurant['records'] as List) {
+      items.addAll((visit['items'] as List).cast<Map>());
+    }
+  }
+  final ids = items.map((item) => item['dishId'] as String).toList();
+  final upgraded = upgradedDishIds(ids);
+  final changed = <String>{};
+  for (var i = 0; i < items.length; i++) {
+    if (ids[i] != upgraded[i]) changed.add(ids[i]);
+    items[i]['dishId'] = upgraded[i];
+  }
+  for (final restaurant in source['restaurants'] as List) {
+    if (changed.contains(restaurant['coverDishId'])) {
+      restaurant['coverDishId'] = null;
+    }
+  }
+  return {...source, 'version': 8};
+}
+
+Map<String, dynamic> upgradeMenuV6(Map<String, dynamic> source) {
+  for (final restaurant in source['restaurants'] as List) {
+    for (final visit in restaurant['records'] as List) {
+      for (final item in visit['items'] as List) {
+        item['isDish'] = true;
+      }
+    }
+  }
+  return {...source, 'version': 7};
+}
 
 Map<String, dynamic> upgradeMenuV5(Map<String, dynamic> source) {
   for (final restaurant in source['restaurants'] as List) {

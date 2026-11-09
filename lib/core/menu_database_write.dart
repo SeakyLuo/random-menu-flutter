@@ -10,6 +10,19 @@ List<_TableRows> _tables(
   final restaurants = data.restaurants
       .where((r) => scope.allRestaurants || scope.restaurants.contains(r.id))
       .toList();
+  for (final restaurant in restaurants) {
+    if (restaurant.coverDishId != null &&
+        !restaurant.records.any(
+          (visit) => visit.items.any(
+            (dish) =>
+                dish.dishId == restaurant.coverDishId &&
+                dish.isDish &&
+                dish.imagePaths.isNotEmpty,
+          ),
+        )) {
+      restaurant.coverDishId = null;
+    }
+  }
   void assignPositions(Map<String, int> positions, Iterable<String> ids) {
     var next = positions.values.fold(-1, (a, b) => a > b ? a : b) + 1;
     for (final id in ids) {
@@ -63,6 +76,7 @@ List<_TableRows> _tables(
             'note': r.note,
             'link': r.link,
             'addresses': jsonEncode(r.addresses),
+            'cover_dish_id': r.coverDishId,
           },
       ],
     ),
@@ -231,7 +245,7 @@ List<Map<String, Object?>> _imageRows(
 ];
 
 Map<String, dynamic> _settings(MenuData data) => {
-  'version': 6,
+  'version': 8,
   'note': data.note,
   'themeMode': data.themeMode,
   'autoTag': data.autoTag,

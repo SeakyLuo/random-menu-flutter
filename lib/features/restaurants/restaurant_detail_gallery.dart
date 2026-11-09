@@ -85,6 +85,11 @@ class _RestaurantDetailGalleryState extends State<RestaurantDetailGallery> {
               key: ValueKey((_group, Object.hashAll(paths))),
               itemCount: paths.length,
               index: index,
+              preloadIndex:
+                  widget.dishPaths.isNotEmpty &&
+                      widget.environmentPaths.isNotEmpty
+                  ? widget.dishPaths.length
+                  : null,
               onChanged: (next) => _select(paths, next),
               onTap: () => _open(paths, index),
               itemBuilder: (context, photoIndex) => DecoratedBox(
@@ -103,7 +108,11 @@ class _RestaurantDetailGalleryState extends State<RestaurantDetailGallery> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      RetainedLocalPhoto(path: paths[photoIndex]),
+                      // Keep backing cards covered while this photo decodes.
+                      ColoredBox(
+                        color: colors.surface,
+                        child: RetainedLocalPhoto(path: paths[photoIndex]),
+                      ),
                       Positioned.fill(
                         child: IgnorePointer(
                           child: DecoratedBox(
