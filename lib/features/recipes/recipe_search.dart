@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:lpinyin/lpinyin.dart';
 import '../../core/models.dart';
 
 enum RecipeSearchField { all, name, tags, note }
@@ -69,7 +70,14 @@ void mergeRecipe(Recipe target, Recipe incoming) {
 List<String> orderedRecipeTags(MenuData data) {
   final tags = [...data.recipeTags];
   if (data.recipeTagSort == 'name') {
-    tags.sort();
+    final letters = {
+      for (final tag in tags)
+        tag: PinyinHelper.getPinyinE(tag, separator: '').toLowerCase(),
+    };
+    tags.sort((a, b) {
+      final order = letters[a]!.compareTo(letters[b]!);
+      return order != 0 ? order : a.compareTo(b);
+    });
   } else {
     final counts = {for (final tag in tags) tag: 0};
     final positions = {for (var i = 0; i < tags.length; i++) tags[i]: i};

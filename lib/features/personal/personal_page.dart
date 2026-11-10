@@ -6,6 +6,8 @@ import '../../ui/widgets.dart';
 import '../../ui/library_widgets.dart';
 import '../backup/backup_page.dart';
 import '../mcp/menu_mcp_page.dart';
+import '../recipes/recipe_tags_page.dart';
+import '../restaurants/restaurant_categories_page.dart';
 import 'appearance_page.dart';
 import 'personal_collections.dart';
 import 'personal_note_page.dart';
@@ -93,6 +95,31 @@ class _PersonalPageState extends State<PersonalPage> {
               onTap: () => _open(context, const PersonalNotePage()),
             ),
           ]),
+          _group(context, '分类管理', [
+            _entry(
+              context,
+              Icons.label_outline,
+              '菜谱标签',
+              value: '${data.recipeTags.length} 个',
+              onTap: () => _open(context, const RecipeTagsPage()),
+            ),
+            _entry(
+              context,
+              Icons.restaurant_outlined,
+              '餐厅菜系',
+              value: '${restaurantCategoryNames(data).length} 个',
+              onTap: () => _open(context, const RestaurantCategoriesPage()),
+            ),
+            _entry(
+              context,
+              Icons.auto_awesome_outlined,
+              '自动标签',
+              value: data.autoTag
+                  ? '${data.tagRules.length + data.patternTagRules.length} 条规则'
+                  : '已关闭',
+              onTap: () => _open(context, const TagRulesPage()),
+            ),
+          ]),
           _group(context, '偏好设置', [
             _entry(
               context,
@@ -111,15 +138,6 @@ class _PersonalPageState extends State<PersonalPage> {
                 _ => '跟随系统',
               },
               onTap: () => _open(context, const AppearancePage()),
-            ),
-            _entry(
-              context,
-              Icons.auto_awesome_outlined,
-              '自动标签',
-              value: data.autoTag
-                  ? '${data.tagRules.length + data.patternTagRules.length} 条规则'
-                  : '已关闭',
-              onTap: () => _open(context, const TagRulesPage()),
             ),
           ]),
           _group(context, '数据管理', [

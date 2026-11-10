@@ -2,12 +2,61 @@ import '../../ui/menu_popup.dart';
 import '../../ui/menu_dialog.dart';
 import '../../ui/menu_icon.dart';
 import 'package:flutter/material.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import '../../ui/library_widgets.dart';
 import '../../core/menu_store.dart';
 import '../../ui/widgets.dart';
 import 'recipe_search.dart';
 
-class RecipeTagsPage extends StatelessWidget {
+class RecipeTagsPage extends StatefulWidget {
   const RecipeTagsPage({super.key});
+
+  @override
+  State<RecipeTagsPage> createState() => _RecipeTagsPageState();
+}
+
+class _RecipeTagsPageState extends State<RecipeTagsPage> {
+  bool _saving = false;
+  final _scroll = ItemScrollController();
+  List<String> _displayedTags = [];
+
+  Future<void> _scrollTo(int index, {double alignment = 0}) async {
+    if (_displayedTags.isEmpty) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _scroll.jumpTo(index: index, alignment: alignment);
+    } else {
+      await _scroll.scrollTo(
+        index: index,
+        alignment: alignment,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void _reveal(String tag) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _scrollTo(_displayedTags.indexOf(tag), alignment: .25);
+    });
+  }
+
+  Future<void> _sort(String sort) async {
+    setState(() => _saving = true);
+    final saved = await performAction(
+      context,
+      () => MenuScope.of(
+        context,
+      ).update(MenuWriteScope.settings, (data) => data.recipeTagSort = sort),
+    );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (saved) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (mounted) await _scrollTo(0);
+      });
+    }
+  }
 
   Future<void> _rename(BuildContext context, {String? oldName}) async {
     final store = MenuScope.of(context);
@@ -17,7 +66,8 @@ class RecipeTagsPage extends StatelessWidget {
           _TagNameDialog(initialName: oldName, existing: store.data.recipeTags),
     );
     if (result == null || result == oldName || !context.mounted) return;
-    await performAction(
+    setState(() => _saving = true);
+    final saved = await performAction(
       context,
       () => store.update(MenuWriteScope.recipesAll, (data) {
         if (oldName == null) {
@@ -54,6 +104,9 @@ class RecipeTagsPage extends StatelessWidget {
       }),
       success: oldName == null ? '标签已添加' : '标签已重命名',
     );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (saved) _reveal(result);
   }
 
   Future<void> _delete(BuildContext context, String tag) async {
@@ -66,6 +119,7 @@ class RecipeTagsPage extends StatelessWidget {
       return;
     }
     if (!context.mounted) return;
+    setState(() => _saving = true);
     await performAction(
       context,
       () => store.update(MenuWriteScope.recipesAll, (data) {
@@ -82,97 +136,138 @@ class RecipeTagsPage extends StatelessWidget {
       }),
       success: '标签已删除',
     );
+    if (mounted) setState(() => _saving = false);
   }
 
   @override
   Widget build(BuildContext context) {
     final store = MenuScope.of(context);
     final tags = orderedRecipeTags(store.data);
+    _displayedTags = tags;
+    final counts = {for (final tag in tags) tag: 0};
+    for (final recipe in store.data.recipes) {
+      for (final tag in recipe.tags) {
+        counts[tag] = counts[tag]! + 1;
+      }
+    }
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: MenuScrollTitle(child: const Text('标签管理')),
+        title: MenuScrollTitle(
+          onTap: () => _scrollTo(0),
+          child: const Text('标签管理'),
+        ),
         actions: [
-          TextButton(
-            onPressed: () => _rename(context),
-            child: const Text('新增'),
-          ),
           MenuPopupButton<String>(
-            icon: const MenuIcon(Icons.more_horiz),
+            icon: const MenuIcon(Icons.sort_by_alpha),
             tooltip: '标签排序',
-
-            onSelected: (sort) => performAction(
-              context,
-              () => store.update(
-                MenuWriteScope.settings,
-                (data) => data.recipeTagSort = sort,
-              ),
-            ),
+            enabled: !_saving,
+            onSelected: _sort,
             itemBuilder: (_) => [
+              MenuPopupItem(
+                icon: Icons.sort_by_alpha,
+                value: 'name',
+                selected: store.data.recipeTagSort == 'name',
+                child: const Text('按字母排序'),
+              ),
               MenuPopupItem(
                 icon: Icons.bar_chart,
                 value: 'default',
                 selected: store.data.recipeTagSort == 'default',
                 child: const Text('按使用数量排序'),
               ),
-              MenuPopupItem(
-                icon: Icons.sort_by_alpha,
-                value: 'name',
-                selected: store.data.recipeTagSort == 'name',
-                child: const Text('按名称排序'),
-              ),
             ],
           ),
         ],
       ),
-      body: tags.isEmpty
-          ? EmptyState(
-              icon: Icons.label_outline,
-              title: '还没有标签',
-              message: '添加常用标签，整理自己的菜谱。',
-              actionLabel: '添加标签',
-              onAction: () => _rename(context),
-            )
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 720),
-                child: ListView.separated(
-                  primary: true,
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
-                  itemCount: tags.length,
-                  separatorBuilder: (_, _) => const Divider(),
-                  itemBuilder: (_, index) {
-                    final tag = tags[index];
-                    final count = store.data.recipes
-                        .where((r) => r.tags.contains(tag))
-                        .length;
-                    return ListTile(
-                      title: Text(tag),
-                      subtitle: Text('$count 道菜谱'),
-                      trailing: MenuPopupButton<String>(
-                        icon: const MenuIcon(Icons.more_horiz),
-                        tooltip: '管理“$tag”',
-                        onSelected: (action) => action == 'rename'
-                            ? _rename(context, oldName: tag)
-                            : _delete(context, tag),
-                        itemBuilder: (_) => const [
-                          MenuPopupItem(
-                            icon: Icons.edit_outlined,
-                            value: 'rename',
-                            child: Text('重命名'),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              tags.isEmpty
+                  ? const Center(child: Text('还没有标签，点击右下角 ＋ 添加'))
+                  : ScrollablePositionedList.separated(
+                      itemScrollController: _scroll,
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
+                      itemCount: tags.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 6),
+                      itemBuilder: (_, index) {
+                        final tag = tags[index];
+                        return Material(
+                          key: ValueKey(tag),
+                          color: colors.surface,
+                          borderRadius: BorderRadius.circular(2),
+                          clipBehavior: Clip.antiAlias,
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.only(
+                              left: 16,
+                              right: 4,
+                            ),
+                            onTap: _saving
+                                ? null
+                                : () => _rename(context, oldName: tag),
+                            title: Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: tag,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      height: 1.5,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: '  ${counts[tag]} 道',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w400,
+                                      color: colors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            trailing: MenuPopupButton<String>(
+                              icon: MenuIcon(
+                                Icons.more_horiz,
+                                size: 18,
+                                color: colors.onSurfaceVariant,
+                              ),
+                              tooltip: '管理“$tag”',
+                              enabled: !_saving,
+                              onSelected: (action) => action == 'rename'
+                                  ? _rename(context, oldName: tag)
+                                  : _delete(context, tag),
+                              itemBuilder: (_) => const [
+                                MenuPopupItem(
+                                  icon: Icons.edit_outlined,
+                                  value: 'rename',
+                                  child: Text('重命名'),
+                                ),
+                                MenuPopupItem(
+                                  icon: Icons.delete_outline,
+                                  destructive: true,
+                                  value: 'delete',
+                                  child: Text('删除标签'),
+                                ),
+                              ],
+                            ),
                           ),
-                          MenuPopupItem(
-                            icon: Icons.delete_outline,
-                            destructive: true,
-                            value: 'delete',
-                            child: Text('删除标签'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                        );
+                      },
+                    ),
+              LibraryFab(
+                label: '新增标签',
+                bottom: 20,
+                onPressed: _saving ? null : () => _rename(context),
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -212,14 +307,14 @@ class _TagNameDialogState extends State<_TagNameDialog> {
 
   @override
   Widget build(BuildContext context) => MenuDialog(
-    title: widget.initialName == null ? '添加标签' : '重命名标签',
+    title: widget.initialName == null ? '新增标签' : '重命名标签',
     content: TextField(
       controller: _controller,
       autofocus: true,
       maxLength: 30,
       textInputAction: TextInputAction.done,
       onSubmitted: (_) => _submit(),
-      decoration: const InputDecoration(labelText: '标签名称'),
+      decoration: const InputDecoration(hintText: '例如：家常菜'),
     ),
     actions: Row(
       children: [

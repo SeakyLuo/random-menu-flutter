@@ -1,4 +1,3 @@
-import '../../core/tag_path.dart';
 import '../../ui/menu_popup.dart';
 import '../../ui/menu_icon.dart';
 import 'dart:convert';
@@ -113,7 +112,9 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
 
   late final draftId = widget.restaurant?.id ?? newId();
   late bool favorite = widget.restaurant?.favorite ?? false;
-  late List<String> _storedCategories = [...?widget.restaurant?.categories];
+  late final List<String> _storedCategories = [
+    ...?widget.restaurant?.categories,
+  ];
   bool saving = false;
   bool picking = false;
   bool get busy => saving || picking;
@@ -166,35 +167,6 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
     addresses.add(address);
     _newAddressId = address.id;
   });
-
-  Future<void> manageCategories() async {
-    FocusScope.of(context).unfocus();
-    await Navigator.push<void>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => RestaurantCategoriesPage(
-          onRenamed: (oldName, newName) {
-            if (!mounted) return;
-            _storedCategories = [
-              for (final tag in _storedCategories)
-                renamedTagPath(tag, oldName, newName),
-            ];
-            categories = [
-              for (final tag in categories)
-                renamedTagPath(tag, oldName, newName),
-            ];
-            changed();
-          },
-          onDeleted: (name) {
-            if (!mounted) return;
-            _storedCategories.removeWhere((tag) => tagPathContains(name, tag));
-            categories.removeWhere((tag) => tagPathContains(name, tag));
-            changed();
-          },
-        ),
-      ),
-    );
-  }
 
   Future<void> removeAddress(int index) async {
     final address = addresses[index];
@@ -560,10 +532,6 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                     ),
                     busy: busy,
                     onChanged: (value) => setState(() => categories = value),
-                    trailing: TextButton(
-                      onPressed: busy ? null : manageCategories,
-                      child: const Text('管理'),
-                    ),
                   ),
                   const SizedBox(height: 16),
                   MenuFieldLabel(

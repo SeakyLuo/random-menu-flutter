@@ -1,5 +1,7 @@
 import '../../core/tag_path.dart';
 import 'package:flutter/material.dart';
+import 'package:lpinyin/lpinyin.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/menu_dialog.dart';
@@ -17,13 +19,7 @@ List<String> restaurantCategoryNames(MenuData data) => {
 }.toList()..sort();
 
 class RestaurantCategoriesPage extends StatefulWidget {
-  const RestaurantCategoriesPage({
-    super.key,
-    required this.onRenamed,
-    required this.onDeleted,
-  });
-  final void Function(String oldName, String newName) onRenamed;
-  final ValueChanged<String> onDeleted;
+  const RestaurantCategoriesPage({super.key});
   @override
   State<RestaurantCategoriesPage> createState() =>
       _RestaurantCategoriesPageState();
@@ -31,6 +27,30 @@ class RestaurantCategoriesPage extends StatefulWidget {
 
 class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
   bool _saving = false;
+  bool _alphabetical = true;
+  final _scroll = ItemScrollController();
+  List<String> _displayedNames = [];
+
+  Future<void> _scrollTo(int index, {double alignment = 0}) async {
+    if (_displayedNames.isEmpty) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _scroll.jumpTo(index: index, alignment: alignment);
+    } else {
+      await _scroll.scrollTo(
+        index: index,
+        alignment: alignment,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void _reveal(String name) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _scrollTo(_displayedNames.indexOf(name), alignment: .25);
+    });
+  }
 
   Future<void> _rename({String? oldName}) async {
     final store = MenuScope.of(context);
@@ -72,9 +92,9 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
       }),
       success: oldName == null ? '菜系已添加' : '菜系已重命名',
     );
-    if (saved && oldName != null) widget.onRenamed(oldName, result);
     if (!mounted) return;
     setState(() => _saving = false);
+    if (saved) _reveal(result);
   }
 
   Future<void> _delete(String name) async {
@@ -93,7 +113,7 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
     }
     if (!mounted) return;
     setState(() => _saving = true);
-    final saved = await performAction(
+    await performAction(
       context,
       () => store.update(MenuWriteScope.restaurantsAll, (data) {
         data.restaurantCategories.removeWhere(
@@ -107,7 +127,6 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
       }),
       success: '菜系已删除',
     );
-    if (saved) widget.onDeleted(name);
     if (!mounted) return;
     setState(() => _saving = false);
   }
@@ -125,9 +144,63 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
         counts[tag] = counts[tag]! + 1;
       }
     }
+    final parts = {for (final name in names) name: name.split('/')};
+    final letters = {
+      for (final part in parts.values.expand((parts) => parts).toSet())
+        part: PinyinHelper.getPinyinE(part, separator: '').toLowerCase(),
+    };
+    names.sort((a, b) {
+      final left = parts[a]!;
+      final right = parts[b]!;
+      for (var i = 0; i < left.length && i < right.length; i++) {
+        if (left[i] == right[i]) continue;
+        if (!_alphabetical) {
+          final leftCount = counts[left.take(i + 1).join('/')]!;
+          final rightCount = counts[right.take(i + 1).join('/')]!;
+          final order = rightCount.compareTo(leftCount);
+          if (order != 0) return order;
+        }
+        final order = letters[left[i]]!.compareTo(letters[right[i]]!);
+        return order != 0 ? order : left[i].compareTo(right[i]);
+      }
+      return left.length.compareTo(right.length);
+    });
+    _displayedNames = names;
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: MenuScrollTitle(child: const Text('菜系管理'))),
+      appBar: AppBar(
+        title: MenuScrollTitle(
+          onTap: () => _scrollTo(0),
+          child: const Text('菜系管理'),
+        ),
+        actions: [
+          MenuPopupButton<bool>(
+            icon: const MenuIcon(Icons.sort_by_alpha),
+            tooltip: '菜系排序',
+            enabled: !_saving,
+            onSelected: (value) {
+              setState(() => _alphabetical = value);
+              WidgetsBinding.instance.addPostFrameCallback((_) async {
+                if (mounted) await _scrollTo(0);
+              });
+            },
+            itemBuilder: (_) => [
+              MenuPopupItem(
+                value: true,
+                icon: Icons.sort_by_alpha,
+                selected: _alphabetical,
+                child: const Text('按字母排序'),
+              ),
+              MenuPopupItem(
+                value: false,
+                icon: Icons.bar_chart,
+                selected: !_alphabetical,
+                child: const Text('按使用数量排序'),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
@@ -136,14 +209,15 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
             children: [
               names.isEmpty
                   ? const Center(child: Text('还没有菜系，点击右下角 ＋ 添加'))
-                  : ListView.separated(
-                      primary: true,
+                  : ScrollablePositionedList.separated(
+                      itemScrollController: _scroll,
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
                       itemCount: names.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 6),
                       itemBuilder: (context, index) {
                         final name = names[index];
                         return Material(
+                          key: ValueKey(name),
                           color: colors.surface,
                           borderRadius: BorderRadius.circular(2),
                           clipBehavior: Clip.antiAlias,

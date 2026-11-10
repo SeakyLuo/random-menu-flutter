@@ -379,7 +379,7 @@ class _RestaurantCardState extends State<RestaurantCard> {
           Positioned(
             left: 16,
             right: _photos.isEmpty ? 65 : 16,
-            bottom: 17,
+            bottom: 13,
             child: IgnorePointer(
               child: Text.rich(
                 widget.titleBuilder?.call(_photos.isNotEmpty) ??
