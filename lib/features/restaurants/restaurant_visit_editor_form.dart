@@ -51,7 +51,9 @@ extension _RestaurantVisitEditorForm on _RestaurantVisitEditorState {
       child: Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
-          title: Text(widget.visit == null ? '添加消费记录' : '编辑消费记录'),
+          title: MenuScrollTitle(
+            child: Text(widget.visit == null ? '添加消费记录' : '编辑消费记录'),
+          ),
           leading: IconButton(
             tooltip: '返回',
             onPressed: busy ? null : leave,
@@ -65,13 +67,25 @@ extension _RestaurantVisitEditorForm on _RestaurantVisitEditorState {
             Expanded(
               child: FilledButton(
                 onPressed: busy ? null : save,
-                child: Text(
-                  saving
-                      ? '保存中…'
-                      : widget.draftOnly
-                      ? '完成'
-                      : '保存记录',
-                  style: const TextStyle(fontSize: 15),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (saving) ...[
+                      const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      saving
+                          ? '保存中…'
+                          : widget.draftOnly
+                          ? '完成'
+                          : '保存记录',
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -83,6 +97,7 @@ extension _RestaurantVisitEditorForm on _RestaurantVisitEditorState {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
               child: CustomScrollView(
+                primary: true,
                 slivers: [
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -179,21 +194,36 @@ extension _RestaurantVisitEditorForm on _RestaurantVisitEditorState {
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
                                   ),
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 hintText: '填写实际支付金额',
-                                prefixText: '¥ ',
+                                prefixIconConstraints: const BoxConstraints(
+                                  minWidth: 0,
+                                  minHeight: 0,
+                                ),
+                                prefixIcon: MenuCurrencyPrefix(
+                                  currency: currency,
+                                  onChanged: (value) =>
+                                      updateForm(() => currency = value),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 16),
-                            VisitCouponFields(
-                              coupons: coupons,
-                              subtotal: subtotal,
-                              autoCost: autoCost,
-                              onChanged: (value) => updateForm(() {
-                                coupons = value;
-                                recalculate();
-                              }),
-                            ),
+                          ],
+                        ),
+                        VisitCouponSliver(
+                          currency: currency,
+                          onCurrencyChanged: (value) =>
+                              updateForm(() => currency = value),
+                          coupons: coupons,
+                          subtotal: subtotal,
+                          autoCost: autoCost,
+                          onChanged: (value) => updateForm(() {
+                            coupons = value;
+                            recalculate();
+                          }),
+                        ),
+                        SliverList.list(
+                          children: [
                             const SizedBox(height: 16),
                             const MenuFieldLabel(
                               '评价',
@@ -205,7 +235,7 @@ extension _RestaurantVisitEditorForm on _RestaurantVisitEditorState {
                               style: const TextStyle(fontSize: 15, height: 1.6),
                               minLines: 3,
                               maxLines: 6,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 hintText: '记下这次用餐的小细节',
                               ),
                             ),
@@ -272,6 +302,7 @@ extension _RestaurantVisitEditorForm on _RestaurantVisitEditorState {
                           ],
                         ),
                         VisitFoodGroups(
+                          currency: currency,
                           items: items,
                           packages: packages,
                           onEdit: (dish) => editItem(items.indexOf(dish)),

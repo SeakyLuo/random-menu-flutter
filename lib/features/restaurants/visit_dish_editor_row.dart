@@ -8,6 +8,7 @@ class VisitDishEditorRow extends StatelessWidget {
   const VisitDishEditorRow({
     super.key,
     required this.dish,
+    this.currency = MenuCurrency.cny,
     required this.package,
     required this.index,
     required this.onEdit,
@@ -15,6 +16,7 @@ class VisitDishEditorRow extends StatelessWidget {
   });
 
   final VisitDish dish;
+  final MenuCurrency currency;
   final VisitPackage? package;
   final int index;
   final VoidCallback onEdit;
@@ -106,7 +108,7 @@ class VisitDishEditorRow extends StatelessWidget {
                               const SizedBox(width: 8),
                               Text(
                                 package == null
-                                    ? '${dish.quantity > 1 ? '${dish.quantity}×' : ''}¥${money(dish.price)}'
+                                    ? '${dish.quantity > 1 ? '${dish.quantity}×' : ''}${currency.symbol}${money(dish.price)}'
                                     : '×${dish.quantity}',
                                 style: const TextStyle(
                                   fontSize: 15,

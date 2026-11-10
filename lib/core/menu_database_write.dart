@@ -3,7 +3,12 @@ part of 'menu_database.dart';
 List<_TableRows> _tables(
   MenuData data, {
   MenuWriteScope scope = MenuWriteScope.all,
+  int? visitPosition,
+  bool validateVisitCover = false,
 }) {
+  if (scope.visitId != null) {
+    return _visitTables(data, scope, visitPosition, validateVisitCover);
+  }
   final recipes = data.recipes
       .where((r) => scope.allRecipes || scope.recipes.contains(r.id))
       .toList();
@@ -35,8 +40,7 @@ List<_TableRows> _tables(
   final tags = {...data.recipeTags, for (final r in data.recipes) ...r.tags};
   final categories = {
     ...data.restaurantCategories,
-    for (final r in data.restaurants)
-      if (r.category.isNotEmpty) r.category,
+    for (final r in data.restaurants) ...r.categories,
   };
   for (final tag in tags) {
     data.recipeTagIds.putIfAbsent(tag, newId);
@@ -70,9 +74,6 @@ List<_TableRows> _tables(
             'id': r.id,
             'position': data.restaurantPositions[r.id],
             'name': r.name,
-            'category_id': r.category.isEmpty
-                ? null
-                : data.restaurantCategoryIds[r.category],
             'note': r.note,
             'link': r.link,
             'addresses': jsonEncode(r.addresses),
@@ -131,6 +132,19 @@ List<_TableRows> _tables(
             'position': i,
             'listed': data.restaurantCategories.contains(name) ? 1 : 0,
           },
+      ],
+    ),
+    _TableRows(
+      'restaurant_category_links',
+      ['restaurant_id', 'position'],
+      [
+        for (final r in restaurants)
+          for (final (i, category) in r.categories.toSet().indexed)
+            {
+              'restaurant_id': r.id,
+              'position': i,
+              'category_id': data.restaurantCategoryIds[category],
+            },
       ],
     ),
     _TableRows(
@@ -245,7 +259,7 @@ List<Map<String, Object?>> _imageRows(
 ];
 
 Map<String, dynamic> _settings(MenuData data) => {
-  'version': 8,
+  'version': 11,
   'note': data.note,
   'themeMode': data.themeMode,
   'autoTag': data.autoTag,

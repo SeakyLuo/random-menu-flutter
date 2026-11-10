@@ -42,6 +42,7 @@ Future<void> showVisitDishDetail(
           )
           .length,
       package: visit.packageFor(visit.items[itemIndex]),
+      currency: visit.currency,
     ),
   );
 }
@@ -54,6 +55,7 @@ class _VisitDishSheet extends StatefulWidget {
     required this.item,
     required this.matchingItems,
     required this.package,
+    required this.currency,
   });
   final String restaurantId;
   final String visitId;
@@ -61,24 +63,27 @@ class _VisitDishSheet extends StatefulWidget {
   final VisitDish item;
   final int matchingItems;
   final VisitPackage? package;
+  final MenuCurrency currency;
 
   @override
   State<_VisitDishSheet> createState() => _VisitDishSheetState();
 }
 
 class _VisitDishSheetState extends State<_VisitDishSheet> {
+  late MenuCurrency _currency = widget.currency;
   late VisitDish _item = widget.item;
   late VisitPackage? _package = widget.package;
   late int _itemIndex = widget.itemIndex;
   late int _matchingItems = widget.matchingItems;
-  VisitDish? _pending;
   bool _editing = false;
   final _photos = PageController();
+  final _scroll = ScrollController();
   int _photo = 0;
 
   @override
   void dispose() {
     _photos.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -99,82 +104,92 @@ class _VisitDishSheetState extends State<_VisitDishSheet> {
     final store = MenuScope.of(context);
     setState(() => _editing = true);
     var saved = false;
-    final success = await performAction(context, () async {
+    await performAction(context, () async {
       final visit = store.data.restaurants
           .firstWhere((r) => r.id == widget.restaurantId)
           .records
           .firstWhere((v) => v.id == widget.visitId);
       final index = _locate(visit);
-      if (index < 0 && _pending == null) {
+      if (index < 0) {
         throw StateError('这条明细已被修改，请重新打开后编辑');
       }
-      final edited = await editVisitDish(
+      await editVisitDish(
         context,
-        _pending ?? VisitDish.fromJson(_item.toJson()),
+        VisitDish.fromJson(_item.toJson()),
         packages: visit.packages,
+        currency: visit.currency,
         restaurantId: widget.restaurantId,
+        onSave: (edited, currency) => performAction(context, () async {
+          edited.imagePaths = await Future.wait(
+            edited.imagePaths.map(
+              (path) => path.startsWith('${store.directory.path}/images/')
+                  ? Future.value(path)
+                  : store.keepImage(path),
+            ),
+          );
+          var savedIndex = index;
+          var matchingItems = _matchingItems;
+          await store.update(
+            MenuWriteScope.visit(widget.restaurantId, widget.visitId),
+            (draft) {
+              final current = draft.restaurants
+                  .firstWhere((r) => r.id == widget.restaurantId)
+                  .records
+                  .firstWhere((v) => v.id == widget.visitId);
+              savedIndex = _locate(current);
+              requireUnchangedRecord(
+                _item.toJson(),
+                savedIndex < 0 ? null : current.items[savedIndex].toJson(),
+              );
+              for (final packageId in {
+                _item.packageId,
+                edited.packageId,
+              }.nonNulls) {
+                final before = visit.packages.firstWhere(
+                  (p) => p.id == packageId,
+                );
+                final latest = current.packages
+                    .where((p) => p.id == packageId)
+                    .firstOrNull;
+                requireUnchangedRecord(before.toJson(), latest?.toJson());
+              }
+              requireUnchangedRecord(
+                {'currency': visit.currency.code},
+                {'currency': current.currency.code},
+              );
+              current.currency = currency;
+              current.items[savedIndex] = edited;
+              matchingItems = current.items
+                  .where(
+                    (item) =>
+                        jsonEncode(item.toJson()) ==
+                        jsonEncode(edited.toJson()),
+                  )
+                  .length;
+              if (current.autoCost) current.totalCost = current.bill.total;
+            },
+          );
+          saved = true;
+          if (!mounted) return;
+          setState(() {
+            _item = edited;
+            _currency = currency;
+            _itemIndex = savedIndex;
+            _matchingItems = matchingItems;
+            _package = edited.packageId == null
+                ? null
+                : visit.packages.firstWhere((p) => p.id == edited.packageId);
+            _photo = 0;
+          });
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _photos.hasClients) _photos.jumpToPage(0);
+          });
+        }),
       );
-      if (edited == null || !mounted) return;
-      _pending = edited;
-      edited.imagePaths = await Future.wait(
-        edited.imagePaths.map(
-          (path) => path.startsWith('${store.directory.path}/images/')
-              ? Future.value(path)
-              : store.keepImage(path),
-        ),
-      );
-      var savedIndex = index;
-      var matchingItems = _matchingItems;
-      await store.update(MenuWriteScope.restaurant(widget.restaurantId), (
-        draft,
-      ) {
-        final current = draft.restaurants
-            .firstWhere((r) => r.id == widget.restaurantId)
-            .records
-            .firstWhere((v) => v.id == widget.visitId);
-        savedIndex = _locate(current);
-        requireUnchangedRecord(
-          _item.toJson(),
-          savedIndex < 0 ? null : current.items[savedIndex].toJson(),
-        );
-        for (final packageId in {_item.packageId, edited.packageId}.nonNulls) {
-          final before = visit.packages.firstWhere((p) => p.id == packageId);
-          final latest = current.packages
-              .where((p) => p.id == packageId)
-              .firstOrNull;
-          requireUnchangedRecord(before.toJson(), latest?.toJson());
-        }
-        current.items[savedIndex] = edited;
-        matchingItems = current.items
-            .where(
-              (item) =>
-                  jsonEncode(item.toJson()) == jsonEncode(edited.toJson()),
-            )
-            .length;
-        if (current.autoCost) current.totalCost = current.bill.total;
-      });
-      saved = true;
-      if (!mounted) return;
-      setState(() {
-        _item = edited;
-        _itemIndex = savedIndex;
-        _matchingItems = matchingItems;
-        _package = edited.packageId == null
-            ? null
-            : visit.packages.firstWhere((p) => p.id == edited.packageId);
-        _pending = null;
-        _photo = 0;
-      });
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _photos.hasClients) _photos.jumpToPage(0);
-      });
     });
     if (!mounted) return;
     setState(() => _editing = false);
     if (saved) showToast(context, '明细已保存');
-    if (!success && _pending != null) {
-      showToast(context, '未保存，草稿已保留。点击编辑可继续修改或复制内容');
-    }
   }
 
   @override
@@ -193,17 +208,20 @@ class _VisitDishSheetState extends State<_VisitDishSheet> {
               padding: const EdgeInsets.only(bottom: 4),
               child: Row(
                 children: [
-                  const Expanded(
-                    child: Text(
-                      '菜品详情',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
+                  Expanded(
+                    child: MenuScrollTitle(
+                      controller: _scroll,
+                      child: const Text(
+                        '菜品详情',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
                   IconButton(
-                    tooltip: _pending == null ? '编辑明细' : '继续编辑',
+                    tooltip: '编辑明细',
                     onPressed: _editing ? null : _edit,
                     icon: const MenuIcon(Icons.edit_outlined, size: 23),
                   ),
@@ -217,6 +235,7 @@ class _VisitDishSheetState extends State<_VisitDishSheet> {
             ),
             Flexible(
               child: ListView(
+                controller: _scroll,
                 shrinkWrap: true,
                 padding: const EdgeInsets.only(bottom: 20),
                 children: [
@@ -297,8 +316,8 @@ class _VisitDishSheetState extends State<_VisitDishSheet> {
                   const SizedBox(height: 8),
                   Text(
                     _package == null
-                        ? '¥${money(_item.price)} · ${_item.quantity} 份'
-                        : '${visitPackageLabel(_package!)} · ${_item.quantity} 份',
+                        ? '${_currency.symbol}${money(_item.price)} · ${_item.quantity} 份'
+                        : '${visitPackageLabel(_package!, currency: _currency)} · ${_item.quantity} 份',
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.5,

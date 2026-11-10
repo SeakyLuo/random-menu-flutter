@@ -64,7 +64,9 @@ class _AddressEditorState extends State<_AddressEditor> {
     child: Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: Text(widget.address == null ? '添加地址' : '编辑地址'),
+        title: MenuScrollTitle(
+          child: Text(widget.address == null ? '添加地址' : '编辑地址'),
+        ),
         leading: IconButton(
           tooltip: '返回',
           onPressed: leave,
@@ -73,6 +75,7 @@ class _AddressEditorState extends State<_AddressEditor> {
         actions: [TextButton(onPressed: save, child: const Text('完成'))],
       ),
       body: ListView(
+        primary: true,
         padding: const EdgeInsets.all(24),
         children: [
           RestaurantAddressFields(

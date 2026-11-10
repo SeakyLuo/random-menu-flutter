@@ -11,6 +11,7 @@ class VisitFoodList extends StatelessWidget {
   const VisitFoodList({
     super.key,
     required this.restaurantId,
+    this.currency = MenuCurrency.cny,
     required this.visitId,
     required this.items,
     required this.packages,
@@ -18,6 +19,7 @@ class VisitFoodList extends StatelessWidget {
   });
 
   final String restaurantId;
+  final MenuCurrency currency;
   final String visitId;
   final List<VisitDish> items;
   final List<VisitPackage> packages;
@@ -27,7 +29,7 @@ class VisitFoodList extends StatelessWidget {
   final bool vertical;
 
   String _price(VisitDish dish) =>
-      '¥${money(dish.price)}${dish.quantity > 1 ? ' × ${dish.quantity}' : ''}';
+      '${currency.symbol}${money(dish.price)}${dish.quantity > 1 ? ' × ${dish.quantity}' : ''}';
 
   Widget _image(BuildContext context, VisitDish dish, double width) => SizedBox(
     width: width,
@@ -51,7 +53,11 @@ class VisitFoodList extends StatelessWidget {
 
   Widget _fields(BuildContext context, VisitDish dish) {
     final package = packageFor(dish);
-    final summary = restaurantFoodSummary(dish, package: package);
+    final summary = restaurantFoodSummary(
+      dish,
+      currency: currency,
+      package: package,
+    );
     final secondaryStyle = TextStyle(
       fontSize: vertical ? 14 : 12,
       height: 1.5,
@@ -89,7 +95,10 @@ class VisitFoodList extends StatelessWidget {
             Text('“${dish.note}”', style: secondaryStyle),
           ] else if (package != null) ...[
             const SizedBox(height: 4),
-            Text(visitPackageLabel(package), style: secondaryStyle),
+            Text(
+              visitPackageLabel(package, currency: currency),
+              style: secondaryStyle,
+            ),
           ],
         ],
       );
@@ -187,9 +196,17 @@ class VisitFoodList extends StatelessWidget {
         height,
         90 +
             textHeight(dish.name, 13, 1.4, FontWeight.w500) +
-            (restaurantFoodSummary(dish, package: packageFor(dish)).isNotEmpty
+            (restaurantFoodSummary(
+                  dish,
+                  currency: currency,
+                  package: packageFor(dish),
+                ).isNotEmpty
                 ? textHeight(
-                    restaurantFoodSummary(dish, package: packageFor(dish)),
+                    restaurantFoodSummary(
+                      dish,
+                      currency: currency,
+                      package: packageFor(dish),
+                    ),
                     12,
                     1.5,
                     FontWeight.w400,

@@ -9,6 +9,10 @@ class MenuSuggestionInput extends StatefulWidget {
     required this.choices,
     required this.hintText,
     this.onSelected,
+    this.autofocus = false,
+    this.decoration,
+    this.style,
+    this.maxLines,
     this.showSuggestionsWhenEmpty = false,
     this.emptyMessage,
     this.optionsViewOpenDirection = OptionsViewOpenDirection.down,
@@ -19,6 +23,10 @@ class MenuSuggestionInput extends StatefulWidget {
   final List<String> choices;
   final String hintText;
   final ValueChanged<String>? onSelected;
+  final bool autofocus;
+  final InputDecoration? decoration;
+  final TextStyle? style;
+  final int? maxLines;
   final bool showSuggestionsWhenEmpty;
   final String? emptyMessage;
   final OptionsViewOpenDirection optionsViewOpenDirection;
@@ -255,10 +263,11 @@ class _MenuSuggestionInputState extends State<MenuSuggestionInput>
       key: _fieldKey,
       controller: widget.controller,
       focusNode: _focus,
+      autofocus: widget.autofocus,
       onTapOutside: (_) => _focus.unfocus(),
-      style: const TextStyle(fontSize: 15),
+      style: widget.style ?? const TextStyle(fontSize: 15),
       minLines: 1,
-      maxLines: widget.commaSeparated ? 3 : 1,
+      maxLines: widget.maxLines ?? (widget.commaSeparated ? 3 : 1),
       textInputAction: widget.onSelected == null
           ? TextInputAction.next
           : TextInputAction.done,
@@ -266,17 +275,19 @@ class _MenuSuggestionInputState extends State<MenuSuggestionInput>
         if (!widget.commaSeparated) submit();
         if (widget.onSelected == null) _focus.nextFocus();
       },
-      decoration: InputDecoration(
-        hintText: widget.hintText,
-        helperText: noMatches ? widget.emptyMessage : null,
-        suffixIcon: value.text.isEmpty
-            ? null
-            : IconButton(
-                tooltip: '清空输入',
-                onPressed: widget.controller.clear,
-                icon: const MenuIcon(Icons.close, size: 18),
-              ),
-      ),
+      decoration:
+          widget.decoration ??
+          InputDecoration(
+            hintText: widget.hintText,
+            helperText: noMatches ? widget.emptyMessage : null,
+            suffixIcon: value.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: '清空输入',
+                    onPressed: widget.controller.clear,
+                    icon: const MenuIcon(Icons.close, size: 18),
+                  ),
+          ),
     );
   }
 

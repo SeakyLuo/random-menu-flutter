@@ -2,6 +2,36 @@ import 'models.dart';
 import 'visit_coupon_migration.dart';
 import 'dish_identity_upgrade.dart';
 
+Map<String, dynamic> upgradeMenuV10(Map<String, dynamic> source) {
+  for (final restaurant in source['restaurants'] as List) {
+    final category = restaurant.remove('category') as String;
+    restaurant['categories'] = category.isEmpty ? <String>[] : [category];
+  }
+  return {...source, 'version': 11};
+}
+
+Map<String, dynamic> upgradeMenuV9(Map<String, dynamic> source) {
+  for (final restaurant in source['restaurants'] as List) {
+    for (final visit in restaurant['records'] as List) {
+      visit['currency'] = 'CNY';
+    }
+  }
+  return {...source, 'version': 10};
+}
+
+Map<String, dynamic> upgradeMenuV8(Map<String, dynamic> source) {
+  for (final restaurant in source['restaurants'] as List) {
+    for (final visit in restaurant['records'] as List) {
+      for (final coupon in visit['coupons'] as List) {
+        coupon['type'] = 'amount';
+        coupon['rate'] = null;
+        coupon['maxDiscount'] = null;
+      }
+    }
+  }
+  return {...source, 'version': 9};
+}
+
 Map<String, dynamic> upgradeMenuV7(Map<String, dynamic> source) {
   final items = <Map>[];
   for (final restaurant in source['restaurants'] as List) {

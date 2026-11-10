@@ -152,6 +152,7 @@ class MenuSqlStatement {
     'restaurant_visit_coupons',
     'restaurant_visit_packages',
     'restaurant_categories',
+    'restaurant_category_links',
     'visit_companions',
     'search_history',
     'images',

@@ -50,7 +50,7 @@ class _LegacyRestaurant {
     return Restaurant(
       id: 'android-restaurant-$restaurantId',
       name: restaurant.text('name', required: true),
-      category: category,
+      categories: category.isEmpty ? [] : [category],
       addresses: addresses.map((address) => address.fullAddress).toList(),
       addressEntries: addresses,
       note: restaurant.text('comment'),

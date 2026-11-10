@@ -13,10 +13,12 @@ class SearchDishCard extends StatelessWidget {
     required this.hit,
     required this.query,
     required this.onOpen,
+    required this.onOpenRestaurant,
   });
   final RestaurantDishHit hit;
   final String query;
   final VoidCallback onOpen;
+  final VoidCallback onOpenRestaurant;
 
   @override
   Widget build(BuildContext context) {
@@ -75,37 +77,46 @@ class SearchDishCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(3, 7, 3, 2),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: MenuIcon(
-                        Icons.storefront,
-                        size: 14,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text.rich(
-                        highlightSearchText(
-                          hit.restaurant.name,
-                          query,
-                          scheme.primary,
+              Semantics(
+                container: true,
+                button: true,
+                label: '查看${hit.restaurant.name}餐厅详情',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onOpenRestaurant,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(3, 7, 3, 2),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: MenuIcon(
+                            Icons.storefront,
+                            size: 14,
+                            color: scheme.onSurfaceVariant,
+                          ),
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.4,
-                          color: scheme.onSurfaceVariant,
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text.rich(
+                            highlightSearchText(
+                              hit.restaurant.name,
+                              query,
+                              scheme.primary,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.4,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
               if (hit.note case final note?)
@@ -118,8 +129,11 @@ class SearchDishCard extends StatelessWidget {
                   (dish.package != null || dish.price > 0))
                 SearchMatchCaption(
                   text: dish.package != null
-                      ? visitPackageLabel(dish.package!)
-                      : '¥${money(dish.price)}',
+                      ? visitPackageLabel(
+                          dish.package!,
+                          currency: dish.currency,
+                        )
+                      : '${dish.currency.symbol}${money(dish.price)}',
                   query: '',
                   onTap: onOpen,
                 ),

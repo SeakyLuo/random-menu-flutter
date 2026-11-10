@@ -26,5 +26,5 @@ Future<bool> setRestaurantCover(
     }
     restaurant.coverDishId = dishId;
   }),
-  success: dishId == null ? '已恢复默认封面' : '已设为餐厅封面',
+  success: dishId == null ? '已取消设为封面' : '已设为餐厅封面',
 );

@@ -26,6 +26,7 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
   int initialAddressCount = 0;
   final initialAddressIds = <String>{};
   bool initialized = false;
+  MenuCurrency currency = MenuCurrency.cny;
   bool busy = false;
   bool leaving = false;
   bool get dirty =>
@@ -175,6 +176,7 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
       MaterialPageRoute(
         builder: (_) => ImportPhotoEditor(
           photo: photos[index],
+          currency: currency,
           addresses: addresses,
           lockedAddressIds: initialAddressIds,
         ),
@@ -183,6 +185,7 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
     if (result != null && mounted) {
       setState(() {
         photos[index] = result.photo;
+        currency = result.currency;
         addresses = result.addresses;
       });
     }
@@ -228,6 +231,9 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
       return;
     }
     final groups = groupImportPhotos(photos, addresses);
+    for (final group in groups) {
+      group.currency = currency;
+    }
     final imported = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -260,7 +266,9 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(existing == null ? '从照片创建餐厅' : '从照片添加消费记录'),
+          title: MenuScrollTitle(
+            child: Text(existing == null ? '从照片创建餐厅' : '从照片添加消费记录'),
+          ),
           leading: IconButton(
             tooltip: '返回',
             onPressed: busy ? null : leave,
@@ -278,6 +286,7 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
         body: AbsorbPointer(
           absorbing: busy,
           child: ListView(
+            primary: true,
             padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
             children: [
               if (existing == null) ...[

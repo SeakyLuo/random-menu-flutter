@@ -15,11 +15,15 @@ class _AppearancePageState extends State<AppearancePage> {
   Widget build(BuildContext context) {
     final store = MenuScope.of(context);
     return Scaffold(
-      appBar: AppBar(titleSpacing: 0, title: const Text('外观')),
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: MenuScrollTitle(child: const Text('外观')),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
           child: ListView(
+            primary: true,
             padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
             children: [
               for (final item in [

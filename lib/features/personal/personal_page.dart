@@ -3,6 +3,7 @@ import '../../core/menu_store.dart';
 import '../../ui/menu_icon.dart';
 import '../../ui/menu_settings_section.dart';
 import '../../ui/widgets.dart';
+import '../../ui/library_widgets.dart';
 import '../backup/backup_page.dart';
 import '../mcp/menu_mcp_page.dart';
 import 'appearance_page.dart';
@@ -10,9 +11,21 @@ import 'personal_collections.dart';
 import 'personal_note_page.dart';
 import 'tag_rules_page.dart';
 
-class PersonalPage extends StatelessWidget {
+class PersonalPage extends StatefulWidget {
   const PersonalPage({super.key, required this.onNavigate});
   final ValueChanged<int> onNavigate;
+  @override
+  State<PersonalPage> createState() => _PersonalPageState();
+}
+
+class _PersonalPageState extends State<PersonalPage> {
+  final _scroll = ScrollController();
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
   void _open(BuildContext context, Widget page) =>
       Navigator.push(context, MaterialPageRoute<void>(builder: (_) => page));
   @override
@@ -20,7 +33,9 @@ class PersonalPage extends StatelessWidget {
     final data = MenuScope.of(context).data;
     return MenuPage(
       title: '我的',
+      onTitleTap: () => scrollMenuToTop(context, _scroll),
       child: ListView(
+        controller: _scroll,
         padding: EdgeInsets.fromLTRB(
           16,
           8,
@@ -36,8 +51,8 @@ class PersonalPage extends StatelessWidget {
               onTap: () => _open(
                 context,
                 FavoritesPage(
-                  onBrowseRecipes: () => onNavigate(1),
-                  onBrowseRestaurants: () => onNavigate(2),
+                  onBrowseRecipes: () => widget.onNavigate(1),
+                  onBrowseRestaurants: () => widget.onNavigate(2),
                 ),
               ),
             ),

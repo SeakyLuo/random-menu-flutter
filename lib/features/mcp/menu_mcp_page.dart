@@ -164,7 +164,7 @@ class _MenuMcpPageState extends State<MenuMcpPage> {
     child: Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
-        title: const Text('MCP 连接'),
+        title: MenuScrollTitle(child: const Text('MCP 连接')),
         leading: IconButton(
           onPressed: _saving ? null : _leave,
           tooltip: '返回',
@@ -194,6 +194,7 @@ class _MenuMcpPageState extends State<MenuMcpPage> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
           child: ListView(
+            primary: true,
             padding: EdgeInsets.fromLTRB(
               16,
               8,

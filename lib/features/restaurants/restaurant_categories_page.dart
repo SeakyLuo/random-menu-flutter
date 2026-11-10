@@ -109,7 +109,7 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
     }
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('菜系管理')),
+      appBar: AppBar(title: MenuScrollTitle(child: const Text('菜系管理'))),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
@@ -119,6 +119,7 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
               names.isEmpty
                   ? const Center(child: Text('还没有菜系，点击右下角 ＋ 添加'))
                   : ListView.separated(
+                      primary: true,
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
                       itemCount: names.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 6),

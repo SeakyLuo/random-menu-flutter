@@ -98,7 +98,7 @@ class _TagSelectionPageState extends State<TagSelectionPage> {
       appBar: AppBar(
         titleSpacing: 0,
         backgroundColor: scheme.surface,
-        title: const Text('选择标签'),
+        title: MenuScrollTitle(controller: _scroll, child: const Text('选择标签')),
         actions: [
           PageActionButton(icon: Icons.add, label: '新建标签', onPressed: _create),
           const SizedBox(width: 12),

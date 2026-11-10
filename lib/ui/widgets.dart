@@ -1,4 +1,6 @@
 import 'menu_icon.dart';
+import 'menu_scroll_title.dart';
+export 'menu_scroll_title.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'glass_surface.dart';
@@ -8,11 +10,13 @@ class MenuAppBar extends StatelessWidget {
   const MenuAppBar({
     super.key,
     required this.title,
+    this.onTitleTap,
     this.actions = const [],
     this.compact = true,
     this.actionsSpacing = 8,
   });
   final String title;
+  final VoidCallback? onTitleTap;
   final List<Widget> actions;
   final bool compact;
   final double actionsSpacing;
@@ -27,15 +31,18 @@ class MenuAppBar extends StatelessWidget {
           spacing: actionsSpacing,
           children: [
             Expanded(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontSize: 20,
-                  height: 1.2,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0,
+              child: MenuScrollTitle(
+                onTap: onTitleTap,
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontSize: 20,
+                    height: 1.2,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0,
+                  ),
                 ),
               ),
             ),
@@ -51,6 +58,7 @@ class MenuPage extends StatelessWidget {
   const MenuPage({
     super.key,
     required this.title,
+    this.onTitleTap,
     this.actions = const [],
     this.compactHeader = true,
     this.actionsSpacing = 8,
@@ -58,6 +66,7 @@ class MenuPage extends StatelessWidget {
     required this.child,
   });
   final String title;
+  final VoidCallback? onTitleTap;
   final List<Widget> actions;
   final bool compactHeader;
   final double actionsSpacing;
@@ -76,6 +85,7 @@ class MenuPage extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: MenuAppBar(
                 title: title,
+                onTitleTap: onTitleTap,
                 actions: actions,
                 compact: compactHeader,
                 actionsSpacing: actionsSpacing,
@@ -280,6 +290,10 @@ class SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(top: 24, bottom: 12),
     child: Row(
+      crossAxisAlignment: trailing is Text
+          ? CrossAxisAlignment.baseline
+          : CrossAxisAlignment.center,
+      textBaseline: TextBaseline.alphabetic,
       children: [
         Expanded(
           child: Text(

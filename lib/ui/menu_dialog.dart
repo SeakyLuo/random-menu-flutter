@@ -90,11 +90,13 @@ class MenuDialogButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.role = MenuDialogRole.primary,
+    this.busy = false,
   });
 
   final String label;
   final VoidCallback onPressed;
   final MenuDialogRole role;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +119,7 @@ class MenuDialogButton extends StatelessWidget {
       ),
     };
     return TextButton(
-      onPressed: onPressed,
+      onPressed: busy ? null : onPressed,
       style: TextButton.styleFrom(
         foregroundColor: foreground,
         backgroundColor: background,
@@ -130,7 +132,23 @@ class MenuDialogButton extends StatelessWidget {
           fontWeight: FontWeight.w500,
         ),
       ),
-      child: Text(label, textAlign: TextAlign.center),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (busy) ...[
+            SizedBox.square(
+              dimension: 15,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: foreground,
+              ),
+            ),
+            const SizedBox(width: 7),
+          ],
+          Flexible(child: Text(label, textAlign: TextAlign.center)),
+        ],
+      ),
     );
   }
 }

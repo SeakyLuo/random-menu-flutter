@@ -85,8 +85,12 @@ class _BackupPageState extends State<BackupPage> {
   Widget build(BuildContext context) => PopScope(
     canPop: !_busy,
     child: Scaffold(
-      appBar: AppBar(titleSpacing: 0, title: const Text('资料导入与备份')),
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: MenuScrollTitle(child: const Text('资料导入与备份')),
+      ),
       body: ListView(
+        primary: true,
         padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
         children: [
           const Text(

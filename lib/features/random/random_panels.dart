@@ -55,7 +55,7 @@ class HomeSheetHeader extends StatelessWidget {
         Expanded(
           child: DefaultTextStyle.merge(
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-            child: Row(
+            child: MenuTitleLine(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(title),

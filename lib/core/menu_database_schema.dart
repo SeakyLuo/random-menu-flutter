@@ -3,10 +3,11 @@ part of 'menu_database.dart';
 const _schema = [
   _couponSchema,
   _packageSchema,
+  _restaurantCategoryLinksSchema,
   '''CREATE TABLE recipes (id TEXT PRIMARY KEY, position INTEGER NOT NULL,
  name TEXT NOT NULL, note TEXT NOT NULL, hidden_rounds INTEGER NOT NULL, created_at TEXT NOT NULL)''',
   '''CREATE TABLE restaurants (id TEXT PRIMARY KEY, position INTEGER NOT NULL,
- name TEXT NOT NULL, category_id TEXT, note TEXT NOT NULL, link TEXT NOT NULL, addresses TEXT NOT NULL,
+ name TEXT NOT NULL, note TEXT NOT NULL, link TEXT NOT NULL, addresses TEXT NOT NULL,
  cover_dish_id TEXT)''',
   '''CREATE TABLE restaurant_addresses (
           restaurant_id TEXT NOT NULL, id TEXT NOT NULL,
@@ -49,7 +50,7 @@ const _schema = [
   '''CREATE TABLE recipe_tag_links (recipe_id TEXT NOT NULL, position INTEGER NOT NULL,
  tag_id TEXT NOT NULL, PRIMARY KEY (recipe_id,position))''',
   '''CREATE TABLE restaurant_visits (restaurant_id TEXT NOT NULL, id TEXT NOT NULL,
- position INTEGER NOT NULL, date TEXT NOT NULL, total_cost REAL NOT NULL, address_id TEXT NOT NULL,
+ position INTEGER NOT NULL, date TEXT NOT NULL, total_cost REAL NOT NULL, currency TEXT NOT NULL DEFAULT 'CNY', address_id TEXT NOT NULL,
  address TEXT NOT NULL, auto_cost INTEGER NOT NULL CHECK (auto_cost IN (0,1)),
  note TEXT NOT NULL, dishes TEXT NOT NULL, PRIMARY KEY (restaurant_id,id))''',
   '''CREATE TABLE restaurant_visit_items (restaurant_id TEXT NOT NULL,
@@ -70,7 +71,7 @@ const _schema = [
   '''CREATE INDEX images_restaurant ON images (restaurant_id)''',
   '''CREATE INDEX images_owner ON images (kind,owner_id)''',
   '''CREATE INDEX recipe_tag_links_tag ON recipe_tag_links (tag_id)''',
-  '''CREATE INDEX restaurants_category ON restaurants (category_id)''',
+  '''CREATE INDEX restaurant_category_links_category ON restaurant_category_links (category_id)''',
   '''CREATE INDEX restaurant_visits_date ON restaurant_visits (date)''',
   '''CREATE INDEX visit_companions_name ON visit_companions (name)''',
 ];

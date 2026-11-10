@@ -48,9 +48,9 @@ class _RestaurantDishCoverMenuState extends State<RestaurantDishCoverMenu> {
       itemBuilder: (_) => [
         MenuPopupItem(
           value: 'cover',
-          icon: isCover ? Icons.restart_alt : Icons.image_outlined,
+          icon: isCover ? Icons.close : Icons.image_outlined,
           enabled: isCover || canSet,
-          child: Text(isCover ? '恢复默认封面' : '设为餐厅封面'),
+          child: Text(isCover ? '取消设为封面' : '设为餐厅封面'),
         ),
       ],
       onSelected: (_) async {

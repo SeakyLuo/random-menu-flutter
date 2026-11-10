@@ -9,14 +9,19 @@ class VisitCouponCard extends StatelessWidget {
   const VisitCouponCard({
     super.key,
     required this.coupon,
+    this.currency = MenuCurrency.cny,
     required this.notApplied,
     required this.onEdit,
     required this.onRemove,
+    required this.reorderIndex,
+    this.savedAmount,
   });
-
   final VisitCoupon coupon;
+  final MenuCurrency currency;
   final bool notApplied;
   final VoidCallback onEdit, onRemove;
+  final int reorderIndex;
+  final double? savedAmount;
 
   @override
   Widget build(BuildContext context) {
@@ -24,17 +29,32 @@ class VisitCouponCard extends StatelessWidget {
     final colors = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
     final border = colors.primary.withValues(alpha: dark ? .32 : .24);
+    final percentage = coupon.type == VisitCouponType.percentage;
+    final rate = coupon.rate?.toString().replaceFirst(RegExp(r'\.0$'), '');
     final amount = TextSpan(
-      children: [
-        const TextSpan(text: '￥', style: TextStyle(fontSize: 14)),
-        TextSpan(text: money(coupon.discount)),
-      ],
+      children: percentage
+          ? [
+              TextSpan(text: rate),
+              const TextSpan(text: ' 折', style: TextStyle(fontSize: 14)),
+            ]
+          : [
+              TextSpan(
+                text: currency.symbol,
+                style: const TextStyle(fontSize: 14),
+              ),
+              TextSpan(text: money(coupon.discount!)),
+            ],
       style: TextStyle(
         fontSize: 28,
         height: 1.1,
         fontWeight: FontWeight.w600,
         color: colors.primary,
       ),
+    );
+    final secondary = TextStyle(
+      fontSize: 12,
+      height: 1.5,
+      color: colors.onSurfaceVariant,
     );
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -79,13 +99,8 @@ class VisitCouponCard extends StatelessWidget {
                             Text.rich(amount, textAlign: TextAlign.center),
                             const SizedBox(height: 5),
                             Text(
-                              '每张优惠',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 11,
-                                height: 1.4,
-                                color: colors.onSurfaceVariant,
-                              ),
+                              percentage ? '折扣优惠' : '每张优惠',
+                              style: secondary.copyWith(fontSize: 11),
                             ),
                           ],
                         ),
@@ -93,91 +108,91 @@ class VisitCouponCard extends StatelessWidget {
                     ),
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 12, 8, 14),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        padding: const EdgeInsets.fromLTRB(14, 12, 0, 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Expanded(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Text(
-                                    coupon.threshold == null ? '立减券' : '满减券',
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      height: 1.4,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    coupon.threshold == null
-                                        ? '无门槛'
-                                        : '满 ￥${money(coupon.threshold!)} 可用',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      height: 1.5,
-                                      color: colors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${coupon.quantity} 张',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      height: 1.5,
-                                      color: colors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  if (notApplied) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '未达门槛，本次不抵扣',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        height: 1.5,
-                                        color: colors.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                ],
+                            Text(
+                              percentage
+                                  ? '折扣券'
+                                  : coupon.threshold == null
+                                  ? '立减券'
+                                  : '满减券',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                height: 1.4,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                            MenuPopupButton<String>(
-                              tooltip: '用券操作',
-                              buttonBuilder: (open) => IconButton(
-                                tooltip: '用券操作',
-                                constraints: const BoxConstraints.tightFor(
-                                  width: 44,
-                                  height: 44,
+                            const SizedBox(height: 6),
+                            Text(
+                              coupon.threshold == null
+                                  ? '无门槛'
+                                  : '抵扣前满 ${currency.symbol}${money(coupon.threshold!)} 可用',
+                              style: secondary.copyWith(fontSize: 13),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              percentage
+                                  ? coupon.maxDiscount == null
+                                        ? '优惠不封顶'
+                                        : '最多优惠 ${currency.symbol}${money(coupon.maxDiscount!)}'
+                                  : '${coupon.quantity} 张',
+                              style: secondary,
+                            ),
+                            if (notApplied) ...[
+                              const SizedBox(height: 4),
+                              Text('未达门槛，本次不抵扣', style: secondary),
+                            ] else if (savedAmount != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                '本步优惠 ${currency.symbol}${money(savedAmount!)}',
+                                style: secondary.copyWith(
+                                  color: colors.primary,
                                 ),
-                                style: IconButton.styleFrom(
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                alignment: Alignment.topCenter,
-                                padding: const EdgeInsets.only(top: 1),
-                                onPressed: open,
-                                icon: MenuIcon(
-                                  Icons.more_horiz,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        MenuPopupButton<String>(
+                          tooltip: '用券操作',
+                          icon: MenuIcon(
+                            Icons.more_horiz,
+                            size: 20,
+                            color: colors.onSurfaceVariant,
+                          ),
+                          onSelected: (_) => onRemove(),
+                          itemBuilder: (_) => const [
+                            MenuPopupItem(
+                              value: 'remove',
+                              icon: Icons.delete_outline,
+                              destructive: true,
+                              child: Text('移除用券'),
+                            ),
+                          ],
+                        ),
+                        ReorderableDragStartListener(
+                          index: reorderIndex,
+                          child: Semantics(
+                            label: '拖动调整优惠券顺序',
+                            child: SizedBox.square(
+                              dimension: 44,
+                              child: Center(
+                                child: MenuIcon(
+                                  Icons.drag_indicator,
                                   size: 20,
                                   color: colors.onSurfaceVariant,
                                 ),
                               ),
-                              onSelected: (_) => onRemove(),
-                              itemBuilder: (_) => const [
-                                MenuPopupItem(
-                                  value: 'remove',
-                                  icon: Icons.delete_outline,
-                                  destructive: true,
-                                  child: Text('移除用券'),
-                                ),
-                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),

@@ -438,12 +438,14 @@ class _RecipeEditorState extends State<_RecipeEditor> {
       child: Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
-          title: Text(
-            widget.fromDraft
-                ? '编辑草稿'
-                : widget.recipe == null
-                ? '添加菜谱'
-                : '编辑菜谱',
+          title: MenuScrollTitle(
+            child: Text(
+              widget.fromDraft
+                  ? '编辑草稿'
+                  : widget.recipe == null
+                  ? '添加菜谱'
+                  : '编辑菜谱',
+            ),
           ),
           leading: IconButton(
             tooltip: '返回',
@@ -503,6 +505,7 @@ class _RecipeEditorState extends State<_RecipeEditor> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),
             child: ListView(
+              primary: true,
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
               children: [
                 const MenuFieldLabel('菜名', isRequired: true),

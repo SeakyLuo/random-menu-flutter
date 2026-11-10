@@ -23,7 +23,7 @@ extension MenuDatabaseSql on MenuDatabase {
         'to_cook, to_eat and dislikes store one name per row, ordered by position. These are free-text names, not recipe/restaurant IDs.',
         'auto_tag_rules stores ordered literal (rule_key=tag) and pattern (rule_key=expression) rules. auto_tag_rule_values stores ordered keywords for literal rules and tags for pattern rules. Keep mode/rule_key associations consistent.',
         'menu_settings.payload contains ordinary settings and transient menu/draft state only. Collections and automatic tag rules live in their own tables. Historical import archives are not retained.',
-        'recipe_tags and restaurant_categories use stable id/name pairs. recipe_tag_links.tag_id and restaurants.category_id reference those identities. Rename the catalog name without rewriting associations. listed controls whether unused entries appear in the managed catalog.',
+        'recipe_tags and restaurant_categories use stable id/name pairs. recipe_tag_links.tag_id and restaurant_category_links.category_id reference those identities. Rename the catalog name without rewriting associations. listed controls whether unused entries appear in the managed catalog.',
         'images stores ordered paths for recipe/visit/item/draft/legacy owners. item owners use owner_id=visit ID and item_position=visit item position. Other owners use item_position=-1. restaurant_id is empty for recipe/draft/legacy. Remove or reorder image associations together with their owner.',
         'visit_companions stores ordered names per visit. search_history stores keyword/position per recipe or restaurant search. restaurants.addresses and restaurant_visits.dishes retain legacy string arrays as JSON; auto_cost is 0 or 1.',
         'restaurant_visit_coupons stores ordered coupons per visit (restaurant_id, visit_id, position). threshold is nullable; discount is the positive per-coupon amount, quantity is an integer from 1 to 100. Auto cost = item subtotal minus eligible (discount * quantity), capped at subtotal; all thresholds use the original subtotal. Manual total_cost is already paid and must not be discounted again.',
@@ -121,7 +121,10 @@ extension MenuDatabaseSql on MenuDatabase {
         'SELECT tag_id FROM recipe_tag_links WHERE NOT EXISTS (SELECT 1 FROM recipe_tags WHERE recipe_tags.id = recipe_tag_links.tag_id) LIMIT 1',
       ),
       txn.rawQuery(
-        'SELECT category_id FROM restaurants WHERE category_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM restaurant_categories WHERE restaurant_categories.id = restaurants.category_id) LIMIT 1',
+        'SELECT category_id FROM restaurant_category_links WHERE NOT EXISTS (SELECT 1 FROM restaurant_categories WHERE restaurant_categories.id = restaurant_category_links.category_id) LIMIT 1',
+      ),
+      txn.rawQuery(
+        'SELECT restaurant_id FROM restaurant_category_links WHERE NOT EXISTS (SELECT 1 FROM restaurants WHERE restaurants.id = restaurant_category_links.restaurant_id) LIMIT 1',
       ),
       txn.rawQuery(
         'SELECT visit_id FROM visit_companions WHERE NOT EXISTS (SELECT 1 FROM restaurant_visits WHERE restaurant_visits.restaurant_id = visit_companions.restaurant_id AND restaurant_visits.id = visit_companions.visit_id) LIMIT 1',

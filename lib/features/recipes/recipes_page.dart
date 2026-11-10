@@ -1,3 +1,4 @@
+import '../../ui/search_page_route.dart';
 import '../../ui/library_layout.dart';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
@@ -76,16 +77,15 @@ class RecipesPageState extends State<RecipesPage>
     return MenuPage(
       maxWidth: LibraryLayout.maxWidth,
       title: '菜谱',
+      onTitleTap: scrollToTop,
       compactHeader: true,
       actions: [
         PageActionButton(
           icon: Icons.search,
           label: '搜索菜谱',
           size: 40,
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute<void>(builder: (_) => const RecipeSearchPage()),
-          ),
+          onPressed: () =>
+              pushSearchPage<void>(context, const RecipeSearchPage()),
         ),
         PageAddButton(label: '添加菜谱', onPressed: () => editRecipe(context)),
       ],

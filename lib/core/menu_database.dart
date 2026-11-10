@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:developer';
 import 'package:sqflite/sqflite.dart';
 import 'models.dart';
 import 'menu_sql_statement.dart';
 import 'menu_write_scope.dart';
 import 'visit_coupon_migration.dart';
 import 'dish_identity_upgrade.dart';
+import 'record_conflicts.dart';
 
 part 'menu_database_sql.dart';
 part 'menu_database_schema.dart';
@@ -16,6 +18,10 @@ part 'menu_database_coupon_upgrade.dart';
 part 'menu_database_package_upgrade.dart';
 part 'menu_database_coupon_quantity_upgrade.dart';
 part 'menu_database_dish_identity_upgrade.dart';
+part 'menu_database_discount_coupon_upgrade.dart';
+part 'menu_database_restaurant_details.dart';
+part 'menu_database_visit.dart';
+part 'menu_database_restaurant_tags_upgrade.dart';
 
 class MenuDatabase {
   MenuDatabase._(this._database);
@@ -24,7 +30,7 @@ class MenuDatabase {
   static Future<MenuDatabase> open(Directory directory) async {
     final database = await openDatabase(
       '${directory.path}/menu.db',
-      version: 8,
+      version: 11,
       onCreate: (db, _) async {
         for (final statement in _schema) {
           await db.execute(statement);
@@ -63,6 +69,20 @@ class MenuDatabase {
           }, where: 'id = 1');
         }
         if (oldVersion < 8) await _upgradeDishIdentities(db);
+        if (oldVersion < 9) await _upgradeDiscountCoupons(db);
+        if (oldVersion < 10) {
+          await db.execute(
+            "ALTER TABLE restaurant_visits ADD COLUMN currency TEXT NOT NULL DEFAULT 'CNY'",
+          );
+          final row = (await db.query('menu_settings')).single;
+          final payload =
+              jsonDecode(row['payload'] as String) as Map<String, dynamic>;
+          payload['version'] = 10;
+          await db.update('menu_settings', {
+            'payload': jsonEncode(payload),
+          }, where: 'id = 1');
+        }
+        if (oldVersion < 11) await _upgradeRestaurantTags(db);
       },
     );
     final result = MenuDatabase._(database);
@@ -107,27 +127,44 @@ class MenuDatabase {
     MenuWriteScope scope,
     void Function(MenuData) edit,
   ) => _database.transaction((txn) async {
-    final data = await _read(txn, scope: scope, current: current);
-    final previous = _tables(data, scope: scope);
+    final snapshot = scope.visitId == null
+        ? (
+            data: await _read(txn, scope: scope, current: current),
+            position: null,
+            coverInVisit: false,
+          )
+        : await _readVisit(txn, current, scope);
+    final data = snapshot.data;
+    final previous = _tables(
+      data,
+      scope: scope,
+      visitPosition: snapshot.position,
+    );
     edit(data);
-    final next = _tables(data, scope: scope);
+    final next = _tables(
+      data,
+      scope: scope,
+      visitPosition: snapshot.position,
+      validateVisitCover: snapshot.coverInVisit,
+    );
     final batch = txn.batch();
     for (var i = 0; i < next.length; i++) {
       final before = previous[i];
       final after = next[i];
       final oldRows = {for (final row in before.rows) before.key(row): row};
       final newRows = {for (final row in after.rows) after.key(row): row};
-      for (final row in before.rows) {
-        if (!newRows.containsKey(before.key(row))) {
+      for (final entry in oldRows.entries) {
+        if (!newRows.containsKey(entry.key)) {
           batch.delete(
             before.name,
             where: before.where,
-            whereArgs: before.arguments(row),
+            whereArgs: before.arguments(entry.value),
           );
         }
       }
-      for (final row in after.rows) {
-        final old = oldRows[after.key(row)];
+      for (final entry in newRows.entries) {
+        final row = entry.value;
+        final old = oldRows[entry.key];
         if (old == null) {
           batch.insert(after.name, row);
         } else if (!_sameRow(old, row)) {
@@ -143,6 +180,17 @@ class MenuDatabase {
     await batch.commit(noResult: true);
     return data;
   });
+
+  Future<RestaurantDetailsResult> editRestaurantDetails({
+    required Map<String, dynamic> before,
+    required Restaurant details,
+    required bool updateFavorite,
+  }) => _editRestaurantDetails(
+    _database,
+    before: before,
+    details: details,
+    updateFavorite: updateFavorite,
+  );
 }
 
 bool _sameRow(Map<String, Object?> before, Map<String, Object?> after) =>

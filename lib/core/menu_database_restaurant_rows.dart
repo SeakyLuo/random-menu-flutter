@@ -28,8 +28,11 @@ Map<String, List<Visit>> _visitGroups(
             [])
         .add(
           VisitCoupon(
+            type: VisitCouponType.values.byName(row['type'] as String),
             threshold: (row['threshold'] as num?)?.toDouble(),
-            discount: (row['discount'] as num).toDouble(),
+            discount: (row['discount'] as num?)?.toDouble(),
+            rate: (row['rate'] as num?)?.toDouble(),
+            maxDiscount: (row['max_discount'] as num?)?.toDouble(),
             quantity: row['quantity'] as int,
           ),
         );
@@ -65,6 +68,7 @@ Map<String, List<Visit>> _visitGroups(
         id: id,
         date: DateTime.parse(row['date'] as String),
         totalCost: (row['total_cost'] as num).toDouble(),
+        currency: MenuCurrency.fromCode(row['currency'] as String),
         addressId: row['address_id'] as String,
         address: row['address'] as String,
         autoCost: row['auto_cost'] == 1,
@@ -123,6 +127,9 @@ List<_TableRows> _restaurantRows(List<Restaurant> restaurants) {
                 'position': position,
                 'threshold': coupon.threshold,
                 'discount': coupon.discount,
+                'type': coupon.type.name,
+                'rate': coupon.rate,
+                'max_discount': coupon.maxDiscount,
                 'quantity': coupon.quantity,
               },
       ],
@@ -139,6 +146,7 @@ List<_TableRows> _restaurantRows(List<Restaurant> restaurants) {
               'position': i,
               'date': v.date.toIso8601String(),
               'total_cost': v.totalCost,
+              'currency': v.currency.code,
               'address_id': v.addressId,
               'address': v.address,
               'auto_cost': v.autoCost ? 1 : 0,

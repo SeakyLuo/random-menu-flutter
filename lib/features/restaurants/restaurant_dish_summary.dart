@@ -3,6 +3,7 @@ import '../../core/models.dart';
 class RestaurantDishSummary {
   RestaurantDishSummary(this.name);
   final String name;
+  MenuCurrency get currency => history.first.visit.currency;
   final history = <({Visit visit, VisitDish dish, int index})>[];
   final paths = <String>[];
   double get price => package == null ? history.first.dish.price : 0;

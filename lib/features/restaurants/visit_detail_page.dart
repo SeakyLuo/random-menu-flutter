@@ -9,6 +9,7 @@ import '../media/media_actions.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'restaurant_dish_card.dart';
 import 'visit_dish_sheet.dart';
+import 'restaurant_detail_page.dart';
 
 Future<bool> removeRestaurantVisit(
   BuildContext context,
@@ -19,7 +20,7 @@ Future<bool> removeRestaurantVisit(
   if (!await confirmAction(
     context,
     title: '删除消费记录？',
-    message: '删除 ${dayLabel(visit.date)} 的记录及本次菜品明细和照片引用。餐厅菜单仍会保留，记录无法恢复。',
+    message: '删除 ${dayLabel(visit.date)} 的记录及本次菜品明细和照片引用，记录无法恢复。',
   )) {
     return false;
   }
@@ -27,7 +28,7 @@ Future<bool> removeRestaurantVisit(
   return performAction(
     context,
     () => store.update(
-      MenuWriteScope.restaurant(restaurantId),
+      MenuWriteScope.visit(restaurantId, visit.id),
       (draft) => draft.restaurants
           .firstWhere((r) => r.id == restaurantId)
           .records
@@ -42,9 +43,11 @@ class VisitDetailPage extends StatelessWidget {
     super.key,
     required this.restaurantId,
     required this.visitId,
+    this.fromRestaurantDetail = false,
   });
   final String restaurantId;
   final String visitId;
+  final bool fromRestaurantDetail;
   @override
   Widget build(BuildContext context) {
     final r = MenuScope.of(
@@ -53,13 +56,13 @@ class VisitDetailPage extends StatelessWidget {
     final visit = r.records.where((v) => v.id == visitId).firstOrNull;
     if (visit == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('消费记录')),
+        appBar: AppBar(title: MenuScrollTitle(child: const Text('消费记录'))),
         body: const SizedBox.shrink(),
       );
     }
     return Scaffold(
       appBar: AppBar(
-        title: const Text('消费记录'),
+        title: MenuScrollTitle(child: const Text('消费记录')),
         actions: [
           IconButton(
             tooltip: '编辑记录',
@@ -92,6 +95,7 @@ class VisitDetailPage extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 960),
           child: ListView(
+            primary: true,
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
             children: [
               Material(
@@ -103,12 +107,28 @@ class VisitDetailPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        r.name,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          height: 1.35,
-                          fontWeight: FontWeight.w600,
+                      Semantics(
+                        button: !fromRestaurantDetail,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: fromRestaurantDetail
+                              ? null
+                              : () => Navigator.push<void>(
+                                  context,
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => RestaurantDetailPage(
+                                      restaurantId: restaurantId,
+                                    ),
+                                  ),
+                                ),
+                          child: Text(
+                            r.name,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              height: 1.35,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -136,7 +156,7 @@ class VisitDetailPage extends StatelessWidget {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            '¥${money(visit.totalCost)}',
+                            '${visit.currency.symbol}${money(visit.totalCost)}',
                             style: TextStyle(
                               fontSize: 13,
                               height: 1.5,
@@ -252,7 +272,7 @@ class VisitDetailPage extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
-                      '${package.name} · 套餐总价 ¥${money(package.totalPrice)}',
+                      '${package.name} · 套餐总价 ${visit.currency.symbol}${money(package.totalPrice)}',
                     ),
                   ),
               ],
@@ -272,6 +292,7 @@ class VisitDetailPage extends StatelessWidget {
                       final dish = visit.items[index];
                       return RestaurantDishCard(
                         name: dish.name,
+                        currency: visit.currency,
                         paths: dish.imagePaths,
                         price: dish.price,
                         note: dish.note,

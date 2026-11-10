@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 import 'menu_icon.dart';
+import '../core/currency.dart';
+import 'menu_currency_picker.dart';
 
 class MenuPriceField extends StatelessWidget {
   const MenuPriceField({
     super.key,
     required this.controller,
     this.hintText = '填写单价',
+    this.currency = MenuCurrency.cny,
+    this.onCurrencyChanged,
   });
 
   final TextEditingController controller;
   final String hintText;
+  final MenuCurrency currency;
+  final ValueChanged<MenuCurrency>? onCurrencyChanged;
 
   @override
   Widget build(BuildContext context) => TextField(
@@ -20,15 +26,9 @@ class MenuPriceField extends StatelessWidget {
     decoration: InputDecoration(
       hintText: hintText,
       prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-      prefixIcon: Padding(
-        padding: const EdgeInsets.only(left: 16, right: 6),
-        child: Text(
-          '￥',
-          style: TextStyle(
-            fontSize: 15,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
+      prefixIcon: MenuCurrencyPrefix(
+        currency: currency,
+        onChanged: onCurrencyChanged,
       ),
     ),
   );

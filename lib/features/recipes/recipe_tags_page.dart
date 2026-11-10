@@ -90,7 +90,7 @@ class RecipeTagsPage extends StatelessWidget {
     final tags = orderedRecipeTags(store.data);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('标签管理'),
+        title: MenuScrollTitle(child: const Text('标签管理')),
         actions: [
           TextButton(
             onPressed: () => _rename(context),
@@ -136,6 +136,7 @@ class RecipeTagsPage extends StatelessWidget {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 720),
                 child: ListView.separated(
+                  primary: true,
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
                   itemCount: tags.length,
                   separatorBuilder: (_, _) => const Divider(),

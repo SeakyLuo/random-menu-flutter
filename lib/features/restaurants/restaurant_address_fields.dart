@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/models.dart';
+import '../../core/menu_store.dart';
+import '../../ui/menu_suggestion_input.dart';
 import '../../ui/widgets.dart';
 import 'restaurant_filter_pickers.dart';
 
@@ -41,6 +43,49 @@ class RestaurantAddressFields extends StatefulWidget {
 
 class _RestaurantAddressFieldsState extends State<RestaurantAddressFields> {
   late final _detail = TextEditingController(text: widget.address.detail);
+
+  @override
+  void initState() {
+    super.initState();
+    _detail.addListener(_detailChanged);
+  }
+
+  void _detailChanged() => _changed(_detail.text);
+
+  List<RestaurantAddress> _suggestions() {
+    final address = widget.address;
+    if (address.city.isEmpty) return [];
+    return MenuScope.of(context).data.restaurants
+        .expand((restaurant) => restaurant.addressEntries)
+        .where(
+          (candidate) =>
+              candidate.detail.isNotEmpty &&
+              candidate.province == address.province &&
+              candidate.city == address.city &&
+              candidate.county == address.county,
+        )
+        .toList();
+  }
+
+  void _selectSuggestion(String detail) {
+    final matches = _suggestions().where(
+      (candidate) => candidate.detail == detail,
+    );
+    final selected =
+        matches.where((candidate) => candidate.location != null).firstOrNull ??
+        matches.first;
+    final address = widget.address;
+    widget.onChanged(
+      RestaurantAddress(
+        id: address.id,
+        province: address.province,
+        city: address.city,
+        county: address.county,
+        detail: selected.detail,
+        location: selected.location,
+      ),
+    );
+  }
 
   void _selectRegion() => showRestaurantRegionWheel(
     context,
@@ -93,6 +138,7 @@ class _RestaurantAddressFieldsState extends State<RestaurantAddressFields> {
 
   @override
   void dispose() {
+    _detail.removeListener(_detailChanged);
     _detail.dispose();
     super.dispose();
   }
@@ -146,11 +192,16 @@ class _RestaurantAddressFieldsState extends State<RestaurantAddressFields> {
               ?widget.trailing,
             ],
           ),
-          TextField(
+          MenuSuggestionInput(
             controller: _detail,
+            choices: _suggestions()
+                .map((address) => address.detail)
+                .toSet()
+                .toList(),
+            hintText: '街道、门牌号或商场楼层',
+            adaptToAvailableSpace: true,
+            onSelected: _selectSuggestion,
             autofocus: widget.autofocus,
-            onChanged: _changed,
-            minLines: 1,
             maxLines: 3,
             style: const TextStyle(fontSize: 15, height: 1.5),
             decoration: const InputDecoration(

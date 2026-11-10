@@ -1,4 +1,5 @@
 import '../../ui/menu_bottom_sheet.dart';
+import '../../ui/menu_currency_picker.dart';
 import '../../ui/menu_icon.dart';
 import '../../ui/menu_field_label.dart';
 import 'dart:convert';
@@ -20,6 +21,7 @@ import 'restaurant_record_draft.dart';
 import '../photo_import/import_models.dart';
 
 part 'restaurant_visit_editor_form.dart';
+part 'restaurant_visit_editor_foods.dart';
 
 class RestaurantVisitEditor extends StatefulWidget {
   const RestaurantVisitEditor({
@@ -45,12 +47,17 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
     text: widget.visit?.companions.join('，') ?? '',
   );
   late final note = TextEditingController(text: widget.visit?.note ?? '');
+  late final Visit? _savedVisit = widget.visit == null
+      ? null
+      : Visit.fromJson(widget.visit!.toJson());
+  bool get _independentFoods => widget.visit != null && !widget.draftOnly;
   late List<VisitDish> items =
       widget.visit?.items.map((i) => VisitDish.fromJson(i.toJson())).toList() ??
       [];
   late List<String> images = [...?widget.visit?.imagePaths];
   late List<VisitCoupon> coupons = [...?widget.visit?.coupons];
   late List<VisitPackage> packages = [...?widget.visit?.packages];
+  late MenuCurrency currency = widget.visit?.currency ?? MenuCurrency.cny;
   late bool autoCost = widget.visit?.autoCost ?? true;
   late String addressId =
       widget.visit?.addressId ??
@@ -72,39 +79,46 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
             .addressEntries;
   bool saving = false;
   bool picking = false;
-  bool get busy => saving || picking;
+  bool foodSaving = false;
+  bool get busy => saving || picking || foodSaving;
   bool leaving = false;
   VoidCallback? dismissDishUndo;
+  late final _initialFoodsJson = jsonEncode({
+    'items': _savedVisit?.items.map((item) => item.toJson()).toList() ?? [],
+    'packages':
+        _savedVisit?.packages.map((package) => package.toJson()).toList() ?? [],
+  });
   bool get dirty =>
-      jsonEncode(packages.map((p) => p.toJson()).toList()) !=
-          jsonEncode(
-            widget.visit?.packages.map((p) => p.toJson()).toList() ?? [],
-          ) ||
+      currency != (_savedVisit?.currency ?? MenuCurrency.cny) ||
       date != initialDate ||
       total.text !=
-          (widget.visit == null ? '0' : money(widget.visit!.totalCost)) ||
-      companions.text != (widget.visit?.companions.join('，') ?? '') ||
-      note.text != (widget.visit?.note ?? '') ||
-      autoCost != (widget.visit?.autoCost ?? true) ||
+          (_savedVisit == null ? '0' : money(_savedVisit.totalCost)) ||
+      companions.text != (_savedVisit?.companions.join('，') ?? '') ||
+      note.text != (_savedVisit?.note ?? '') ||
+      autoCost != (_savedVisit?.autoCost ?? true) ||
       jsonEncode(coupons.map((c) => c.toJson()).toList()) !=
           jsonEncode(
-            widget.visit?.coupons.map((c) => c.toJson()).toList() ?? [],
+            _savedVisit?.coupons.map((c) => c.toJson()).toList() ?? [],
           ) ||
       addressId !=
-          (widget.visit?.addressId ??
+          (_savedVisit?.addressId ??
               (widget.restaurant.addressEntries.length == 1
                   ? widget.restaurant.addressEntries.single.id
                   : '')) ||
       address !=
-          (widget.visit?.address ??
+          (_savedVisit?.address ??
               (widget.restaurant.addressEntries.length == 1
                   ? widget.restaurant.addressEntries.single.fullAddress
                   : '')) ||
-      jsonEncode(items.map((i) => i.toJson()).toList()) !=
-          jsonEncode(
-            widget.visit?.items.map((i) => i.toJson()).toList() ?? [],
-          ) ||
-      jsonEncode(images) != jsonEncode(widget.visit?.imagePaths ?? []) ||
+      (!_independentFoods &&
+          jsonEncode({
+                'items': items.map((item) => item.toJson()).toList(),
+                'packages': packages
+                    .map((package) => package.toJson())
+                    .toList(),
+              }) !=
+              _initialFoodsJson) ||
+      jsonEncode(images) != jsonEncode(_savedVisit?.imagePaths ?? []) ||
       (widget.draftOnly &&
           jsonEncode(draftAddresses.map((a) => a.toJson()).toList()) !=
               jsonEncode(
@@ -276,7 +290,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
           context,
           title: '按菜品重新计算？',
           message:
-              '菜品合计 ¥${money(bill.subtotal)}，用券抵扣 ¥${money(bill.discount)}，实付将改为 ¥${money(bill.total)}。',
+              '菜品合计 ${currency.symbol}${money(bill.subtotal)}，用券抵扣 ${currency.symbol}${money(bill.discount)}，实付将改为 ${currency.symbol}${money(bill.total)}。',
           confirmLabel: '使用自动计算',
           destructive: false,
         )) {
@@ -289,140 +303,14 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
     });
   }
 
-  Future<void> addItem({String? packageId}) async {
-    final item = await editVisitDish(
-      context,
-      VisitDish(dishId: newId(), name: '', packageId: packageId),
-      packages: packages,
-      restaurantId: widget.draftOnly ? null : widget.restaurant.id,
-    );
-    if (item != null && mounted) {
-      setState(() {
-        items.add(item);
-        recalculate();
-      });
-    }
-  }
-
-  Future<void> editItem(int index) async {
-    final original = items[index];
-    final item = await editVisitDish(
-      context,
-      original,
-      packages: packages,
-      restaurantId: widget.draftOnly ? null : widget.restaurant.id,
-    );
-    if (item != null && mounted) {
-      setState(() {
-        items[items.indexOf(original)] = item;
-        recalculate();
-      });
-    }
-  }
-
-  Future<void> addPhotoItems({String? packageId}) async {
-    setState(() => picking = true);
-    await performAction(context, () async {
-      final paths = await MenuScope.of(context).photos.pick();
-      final photos = <ImportPhoto>[];
-      for (var offset = 0; offset < paths.length; offset += 8) {
-        photos.addAll(
-          await Future.wait(paths.skip(offset).take(8).map(readImportPhoto)),
-        );
-      }
-      if (!mounted) return;
-      setState(() {
-        if (items.isEmpty && widget.visit == null) {
-          final dates = photos.map((p) => p.date).whereType<DateTime>().toList()
-            ..sort();
-          if (dates.isNotEmpty) date = dates.first;
-        }
-        items.addAll(
-          photos.map(
-            (photo) => VisitDish(
-              dishId: newId(),
-              name: '',
-              packageId: packageId,
-              imagePaths: [photo.path],
-            ),
-          ),
-        );
-        recalculate();
-      });
-    });
-    if (mounted) setState(() => picking = false);
-  }
-
-  Future<void> editPackage([VisitPackage? package]) async {
-    final result = await showVisitPackageEditor(context, package: package);
-    if (!mounted || result == null) return;
-    setState(() {
-      if (package == null) {
-        packages.add(result);
-      } else {
-        packages[packages.indexWhere((p) => p.id == package.id)] = result;
-      }
-      recalculate();
-    });
-  }
-
-  void moveGroupItem(String? packageId, int from, int to) => setState(() {
-    final positions = [
-      for (var i = 0; i < items.length; i++)
-        if (items[i].packageId == packageId) i,
-    ];
-    final ordered = [for (final position in positions) items[position]];
-    final dish = ordered.removeAt(from);
-    ordered.insert(to, dish);
-    for (var i = 0; i < positions.length; i++) {
-      items[positions[i]] = ordered[i];
-    }
-  });
-  Future<void> removePackage(VisitPackage package) async {
-    final count = items.where((i) => i.packageId == package.id).length;
-    final remaining = packages.where((p) => p.id != package.id).toList();
-    final unbound = items.map((i) {
-      final item = VisitDish.fromJson(i.toJson());
-      if (item.packageId == package.id) item.packageId = null;
-      return item;
-    }).toList();
-    final after = VisitBill(visitSubtotal(unbound, remaining), coupons);
-    if (!await confirmAction(
-      context,
-      title: '解除“${package.name}”？',
-      message:
-          '${count > 0 ? '保留 $count 道菜并改为单点，恢复各自单价。' : '套餐总价将不再计入消费。'}'
-          '${autoCost ? '自动实付将从 ¥${money(bill.total)} 改为 ¥${money(after.total)}。' : '手填实付金额保持不变。'}',
-      confirmLabel: '解除套餐',
-    )) {
+  Future<void> save() async {
+    if (_independentFoods && !dirty) {
+      dismissDishUndo?.call();
+      setState(() => leaving = true);
+      Navigator.pop(context);
       return;
     }
-    if (!mounted) return;
-    dismissDishUndo?.call();
-    setState(() {
-      packages = remaining;
-      items = unbound;
-      recalculate();
-    });
-  }
 
-  void removeItem(VisitDish dish) {
-    final index = items.indexOf(dish);
-    setState(() {
-      items.removeAt(index);
-      recalculate();
-    });
-    dismissDishUndo = showToast(
-      context,
-      dish.name.isEmpty ? '已移除菜品' : '已移除“${dish.name}”',
-      onAction: () => setState(() {
-        items.insert(index.clamp(0, items.length), dish);
-        recalculate();
-      }),
-    );
-  }
-
-  Future<void> save() async {
     if (address.isEmpty) {
       showToast(context, '请选择或添加本次用餐地址');
       return;
@@ -444,6 +332,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
         id: widget.visit?.id ?? newId(),
         date: date,
         totalCost: value,
+        currency: currency,
         companions: people,
         note: note.text.trim(),
         items: items,
@@ -468,61 +357,78 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
           ? path
           : await store.keepImage(path);
       final savedImages = await Future.wait(images.map(keep));
-      final savedItems = await Future.wait(
-        items.map(
-          (i) async => VisitDish(
-            dishId: i.dishId,
-            isDish: i.isDish,
-            packageId: i.packageId,
-            name: i.name,
-            price: i.price,
-            quantity: i.quantity,
-            note: i.note,
-            imagePaths: await Future.wait(i.imagePaths.map(keep)),
-          ),
-        ),
-      );
-      await store.update(MenuWriteScope.restaurant(widget.restaurant.id), (
-        draft,
-      ) {
-        final r = draft.restaurants.firstWhere(
-          (r) => r.id == widget.restaurant.id,
-        );
-        if (widget.visit != null) {
-          requireUnchangedRecord(
-            widget.visit!.toJson(),
-            r.records
-                .where((v) => v.id == widget.visit!.id)
-                .firstOrNull
-                ?.toJson(),
+      final savedItems = _independentFoods
+          ? items
+          : await Future.wait(
+              items.map(
+                (i) async => VisitDish(
+                  dishId: i.dishId,
+                  isDish: i.isDish,
+                  packageId: i.packageId,
+                  name: i.name,
+                  price: i.price,
+                  quantity: i.quantity,
+                  note: i.note,
+                  imagePaths: await Future.wait(i.imagePaths.map(keep)),
+                ),
+              ),
+            );
+      await store.update(
+        widget.visit == null
+            ? MenuWriteScope.restaurant(widget.restaurant.id)
+            : MenuWriteScope.visit(widget.restaurant.id, widget.visit!.id),
+        (draft) {
+          final r = draft.restaurants.firstWhere(
+            (r) => r.id == widget.restaurant.id,
           );
-        }
-        if (addressId.isNotEmpty &&
-            !r.addressEntries.any((a) => a.id == addressId)) {
-          throw StateError('餐厅地址已变化，请重新选择分店');
-        }
-        final edited = Visit(
-          id: widget.visit?.id ?? newId(),
-          date: date,
-          totalCost: value,
-          companions: people,
-          note: note.text.trim(),
-          dishes: savedItems.map((i) => i.name).toList(),
-          items: savedItems,
-          coupons: coupons,
-          packages: packages,
-          autoCost: autoCost,
-          addressId: addressId,
-          address: address,
-          imagePaths: savedImages,
-        );
-        if (widget.visit == null) {
-          r.records.add(edited);
-        } else {
-          r.records[r.records.indexWhere((v) => v.id == widget.visit!.id)] =
-              edited;
-        }
-      });
+          final current = widget.visit == null
+              ? null
+              : r.records
+                    .where((visit) => visit.id == widget.visit!.id)
+                    .firstOrNull;
+          if (widget.visit != null) {
+            requireUnchangedRecord(
+              _visitMetadata(_savedVisit!),
+              current == null ? null : _visitMetadata(current),
+            );
+          }
+          final actualItems = _independentFoods ? current!.items : savedItems;
+          final actualPackages = _independentFoods
+              ? current!.packages
+              : packages;
+          if (addressId.isNotEmpty &&
+              !r.addressEntries.any((a) => a.id == addressId)) {
+            throw StateError('餐厅地址已变化，请重新选择分店');
+          }
+          final edited = Visit(
+            id: widget.visit?.id ?? newId(),
+            date: date,
+            totalCost: autoCost
+                ? VisitBill(
+                    visitSubtotal(actualItems, actualPackages),
+                    coupons,
+                  ).total
+                : value,
+            currency: currency,
+            companions: people,
+            note: note.text.trim(),
+            dishes: actualItems.map((i) => i.name).toList(),
+            items: actualItems,
+            coupons: coupons,
+            packages: actualPackages,
+            autoCost: autoCost,
+            addressId: addressId,
+            address: address,
+            imagePaths: savedImages,
+          );
+          if (widget.visit == null) {
+            r.records.add(edited);
+          } else {
+            r.records[r.records.indexWhere((v) => v.id == widget.visit!.id)] =
+                edited;
+          }
+        },
+      );
     });
     if (!mounted) return;
     if (success) {

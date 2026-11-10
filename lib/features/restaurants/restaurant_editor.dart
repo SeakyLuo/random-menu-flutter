@@ -3,7 +3,6 @@ import '../../ui/menu_icon.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
-import '../../core/record_conflicts.dart';
 import '../../core/models.dart';
 import '../../ui/widgets.dart';
 import '../../ui/menu_field_label.dart';
@@ -12,6 +11,9 @@ import 'restaurant_categories_page.dart';
 import 'restaurant_category_input.dart';
 import 'restaurant_record_draft.dart';
 import 'restaurant_record_section.dart';
+import 'restaurant_entries.dart';
+import 'visit_detail_page.dart';
+import '../photo_import/photo_import_page.dart';
 import 'restaurant_visit_editor.dart';
 import 'visit_dish_editor.dart';
 import 'restaurant_quick_create.dart';
@@ -58,9 +60,58 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
       (widget.restaurant?.addressEntries ?? widget.initialAddresses)
           .map((entry) => RestaurantAddress.fromJson(entry.toJson()))
           .toList();
-  late final recordDraft = RestaurantRecordDraft(
-    widget.restaurant?.records ?? [],
-  )..records.addAll(widget.initialRecords);
+  late final recordDraft = RestaurantRecordDraft([])
+    ..records.addAll(widget.initialRecords);
+  late final _savedAddresses =
+      widget.restaurant?.addressEntries
+          .map((address) => RestaurantAddress.fromJson(address.toJson()))
+          .toList() ??
+      <RestaurantAddress>[];
+  late final _detailsBefore = widget.restaurant?.toJson(includeRecords: false);
+  bool get _addressesChanged =>
+      jsonEncode(addresses.map((a) => a.toJson()).toList()) !=
+      jsonEncode(_savedAddresses.map((a) => a.toJson()).toList());
+  List<Visit> get _currentRecords => widget.restaurant == null
+      ? recordDraft.records
+      : MenuScope.of(
+          context,
+        ).data.restaurants.firstWhere((r) => r.id == draftId).records;
+
+  Future<void> _openSavedRecord(
+    Future<void> Function(Restaurant restaurant) open,
+  ) async {
+    final store = MenuScope.of(context);
+    final beforeIds = store.data.restaurants
+        .firstWhere((r) => r.id == draftId)
+        .addressEntries
+        .map((address) => address.id)
+        .toSet();
+    await open(store.data.restaurants.firstWhere((r) => r.id == draftId));
+    if (!mounted) return;
+    final added = store.data.restaurants
+        .firstWhere((r) => r.id == draftId)
+        .addressEntries
+        .where((address) => !beforeIds.contains(address.id))
+        .toList();
+    setState(() {
+      addresses.addAll(
+        added.map((address) => RestaurantAddress.fromJson(address.toJson())),
+      );
+      _savedAddresses.addAll(
+        added.map((address) => RestaurantAddress.fromJson(address.toJson())),
+      );
+      if (added.isNotEmpty) {
+        final detailsBefore = _detailsBefore!;
+        detailsBefore['addressEntries'] = _savedAddresses
+            .map((address) => address.toJson())
+            .toList();
+        detailsBefore['addresses'] = _savedAddresses
+            .map((address) => address.fullAddress)
+            .toList();
+      }
+    });
+  }
+
   late final draftId = widget.restaurant?.id ?? newId();
   late bool favorite = widget.restaurant?.favorite ?? false;
   late String _storedCategory = widget.restaurant?.category ?? '';
@@ -75,11 +126,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
       note.text != (widget.restaurant?.note ?? '') ||
       link.text != (widget.restaurant?.link ?? '') ||
       favorite != (widget.restaurant?.favorite ?? false) ||
-      jsonEncode(addresses.map((a) => a.toJson()).toList()) !=
-          jsonEncode(
-            widget.restaurant?.addressEntries.map((a) => a.toJson()).toList() ??
-                [],
-          );
+      _addressesChanged;
   @override
   void initState() {
     super.initState();
@@ -146,9 +193,12 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
 
   Future<void> removeAddress(int index) async {
     final address = addresses[index];
-    final records = recordDraft.records;
-    if (records.any((r) => r.addressId == address.id)) {
-      showToast(context, '已有消费记录使用这个地址，请保留该分店');
+    final linked = _currentRecords
+        .where((r) => r.addressId == address.id)
+        .toList();
+    if (linked.isNotEmpty) {
+      showToast(context, '此地址有 ${linked.length} 条消费记录，请先修改分店或删除相关记录');
+      await editRecord(linked.first);
       return;
     }
     if (address.fullAddress.trim().isNotEmpty &&
@@ -164,6 +214,18 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
   }
 
   Future<void> addRecordPhotos() async {
+    if (widget.restaurant != null) {
+      await _openSavedRecord(
+        (restaurant) => Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PhotoImportPage(restaurantId: restaurant.id),
+          ),
+        ),
+      );
+      return;
+    }
+
     setState(() => picking = true);
     await performAction(context, () async {
       final paths = await MenuScope.of(context).photos.pick(readLocation: true);
@@ -200,6 +262,13 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
   }
 
   Future<void> editRecord([Visit? visit]) async {
+    if (widget.restaurant != null) {
+      await _openSavedRecord(
+        (restaurant) => editRestaurantVisit(context, restaurant, visit: visit),
+      );
+      return;
+    }
+
     final snapshot = Restaurant(
       id: draftId,
       name: name.text.trim(),
@@ -231,24 +300,60 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
     });
   }
 
+  Future<bool> _saveRecordDish(
+    Visit before,
+    int index,
+    VisitDish dish,
+    MenuCurrency currency,
+  ) async {
+    final changes = RestaurantRecordDraft([before]);
+    final edited = changes.records.single;
+    edited.items[index] = dish;
+    edited.currency = currency;
+    edited.dishes = edited.items.map((item) => item.name).toList();
+    if (edited.autoCost) edited.totalCost = edited.bill.total;
+    final store = MenuScope.of(context);
+    return performAction(context, () async {
+      final prepared = await changes.prepare(store);
+      await store.update(MenuWriteScope.visit(draftId, before.id), (data) {
+        final restaurant = data.restaurants.firstWhere((r) => r.id == draftId);
+        restaurant.records = changes.merge(restaurant.records, prepared);
+      });
+    }, success: '消费记录已保存');
+  }
+
   Future<void> editRecordDish(Visit visit, int index) async {
+    final edited = Visit.fromJson(visit.toJson());
     final dish = await editVisitDish(
       context,
-      visit.items[index],
-      packages: visit.packages,
+      edited.items[index],
+      packages: edited.packages,
+      currency: edited.currency,
+      onCurrencyChanged: (value) => edited.currency = value,
       restaurantId: widget.restaurant?.id,
+      onSave: widget.restaurant == null
+          ? null
+          : (dish, currency) => _saveRecordDish(visit, index, dish, currency),
     );
-    if (dish == null || !mounted) return;
-    setState(() {
-      visit.items[index] = dish;
-      visit.dishes = visit.items.map((item) => item.name).toList();
-      if (visit.autoCost) {
-        visit.totalCost = visit.bill.total;
-      }
-    });
+    if (dish == null || !mounted || widget.restaurant != null) return;
+    edited.items[index] = dish;
+    edited.dishes = edited.items.map((item) => item.name).toList();
+    if (edited.autoCost) edited.totalCost = edited.bill.total;
+    setState(
+      () =>
+          recordDraft.records[recordDraft.records.indexWhere(
+                (record) => record.id == visit.id,
+              )] =
+              edited,
+    );
   }
 
   Future<void> removeRecord(Visit visit) async {
+    if (widget.restaurant != null) {
+      await removeRestaurantVisit(context, draftId, visit);
+      return;
+    }
+
     if (!await confirmAction(
       context,
       title: '删除消费记录？',
@@ -275,39 +380,45 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
       return;
     }
     if (!validateRestaurantAddresses(context, addresses)) return;
-    for (final visit in recordDraft.records) {
-      if (!recordDraft.changed(visit)) continue;
-      if (visit.address.isEmpty) {
-        showToast(context, '请补充 ${dayLabel(visit.date)} 的消费分店');
-        await editRecord(visit);
-        return;
+    final recordsChanged = recordDraft.dirty;
+    if (recordsChanged) {
+      for (final visit in recordDraft.records) {
+        if (!recordDraft.changed(visit)) continue;
+        if (visit.address.isEmpty) {
+          showToast(context, '请补充 ${dayLabel(visit.date)} 的消费分店');
+          await editRecord(visit);
+          return;
+        }
       }
     }
     setState(() => saving = true);
     final store = MenuScope.of(context);
     final savedId = draftId;
     final success = await performAction(context, () async {
-      final preparedRecords = await recordDraft.prepare(store);
+      if (widget.restaurant != null) {
+        await store.updateRestaurantDetails(
+          before: {..._detailsBefore!, 'category': _storedCategory},
+          details: Restaurant(
+            id: savedId,
+            name: name.text.trim(),
+            category: category.text.trim(),
+            note: note.text.trim(),
+            link: link.text.trim(),
+            favorite: favorite,
+            addressEntries: addresses,
+          ),
+          updateFavorite: favorite != widget.restaurant!.favorite,
+        );
+        return;
+      }
+      final preparedRecords = recordsChanged
+          ? await recordDraft.prepare(store)
+          : const <Visit>[];
       await store.update(MenuWriteScope.restaurant(savedId), (draft) {
-        if (widget.restaurant != null) {
-          requireUnchangedRecord(
-            widget.restaurant!.toJson()..['category'] = _storedCategory,
-            draft.restaurants
-                .where((r) => r.id == widget.restaurant!.id)
-                .firstOrNull
-                ?.toJson(),
-            ignored: {
-              'records',
-              if (favorite == widget.restaurant!.favorite) 'favorite',
-            },
-          );
-        }
-        final restaurant = widget.restaurant == null
-            ? Restaurant(id: savedId, name: name.text.trim())
-            : draft.restaurants.firstWhere(
-                (r) => r.id == widget.restaurant!.id,
-              );
-        final records = recordDraft.merge(restaurant.records, preparedRecords);
+        final restaurant = Restaurant(id: savedId, name: name.text.trim());
+        final records = recordsChanged
+            ? recordDraft.merge(restaurant.records, preparedRecords)
+            : restaurant.records;
         if (records.any(
           (v) =>
               v.addressId.isNotEmpty &&
@@ -324,13 +435,10 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
         }
         restaurant.note = note.text.trim();
         restaurant.link = link.text.trim();
-        if (widget.restaurant == null ||
-            favorite != widget.restaurant!.favorite) {
-          restaurant.favorite = favorite;
-        }
+        restaurant.favorite = favorite;
         restaurant.addressEntries = addresses;
         restaurant.addresses = addresses.map((a) => a.fullAddress).toList();
-        if (widget.restaurant == null) draft.restaurants.add(restaurant);
+        draft.restaurants.add(restaurant);
       });
     });
     if (!mounted) return;
@@ -353,7 +461,9 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
       child: Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
-          title: Text(widget.restaurant == null ? '添加餐厅' : '编辑餐厅'),
+          title: MenuScrollTitle(
+            child: Text(widget.restaurant == null ? '添加餐厅' : '编辑餐厅'),
+          ),
           leading: IconButton(
             tooltip: '返回',
             onPressed: busy ? null : leave,
@@ -391,9 +501,22 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: busy ? null : save,
-                    child: Text(
-                      saving ? '保存中…' : '保存餐厅',
-                      style: const TextStyle(fontSize: 15),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (saving) ...[
+                          const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          saving ? '保存中…' : '保存餐厅',
+                          style: const TextStyle(fontSize: 15),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -407,6 +530,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
               child: ListView(
+                primary: true,
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                 children: [
                   const MenuFieldLabel(
@@ -544,7 +668,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                   ),
                   const SizedBox(height: 16),
                   RestaurantRecordSection(
-                    records: recordDraft.records,
+                    records: _currentRecords,
                     onAdd: () => editRecord(),
                     onPhotos: addRecordPhotos,
                     onEdit: editRecord,

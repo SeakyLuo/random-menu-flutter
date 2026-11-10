@@ -194,17 +194,10 @@ class _RestaurantCardState extends State<RestaurantCard> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    if (r.averageCost > 0)
-                      RestaurantPrice(r.averageCost)
-                    else
-                      Text(
-                        '未记录人均',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
+                    if (r.averageCosts.isNotEmpty) ...[
+                      const SizedBox(width: 12),
+                      RestaurantPrices(r),
+                    ],
                   ],
                 ),
               ),

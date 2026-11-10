@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/menu_icon.dart';
-import '../../ui/glass_surface.dart';
+import '../../ui/photo_page_indicator.dart';
 import '../../ui/menu_tag_colors.dart';
 import '../../ui/widgets.dart';
 import 'recipe_editor.dart';
@@ -114,7 +114,9 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
     ).data.recipes.where((r) => r.id == _recipeId).firstOrNull;
     if (recipe == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('菜谱')),
+        appBar: AppBar(
+          title: MenuScrollTitle(controller: _scroll, child: const Text('菜谱')),
+        ),
         body: EmptyState(
           icon: Icons.menu_book_outlined,
           title: '这道菜谱已移除',
@@ -139,11 +141,14 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      '菜谱详情',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
+                    child: MenuScrollTitle(
+                      controller: _scroll,
+                      child: Text(
+                        '菜谱详情',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -284,28 +289,9 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                               Positioned(
                                 right: 12,
                                 bottom: 12,
-                                child: IgnorePointer(
-                                  child: GlassSurface(
-                                    radius: 14,
-                                    blurSigma: 24,
-                                    color: const Color(0x25ffffff),
-                                    borderColor: const Color(0x48ffffff),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 5,
-                                      ),
-                                      child: Text(
-                                        '${_photo + 1}/${recipe.imagePaths.length}',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          height: 1.2,
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                child: PhotoPageIndicator(
+                                  index: _photo,
+                                  count: recipe.imagePaths.length,
                                 ),
                               ),
                           ],

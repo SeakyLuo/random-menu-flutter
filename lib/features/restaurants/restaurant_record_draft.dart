@@ -15,34 +15,61 @@ class RestaurantRecordDraft {
       records = source.map((visit) => Visit.fromJson(visit.toJson())).toList();
   final List<Visit> original;
   final List<Visit> records;
+  late final _originalJson = {
+    for (final visit in original) visit.id: jsonEncode(visit.toJson()),
+  };
   bool get dirty =>
-      jsonEncode(records.map((v) => v.toJson()).toList()) !=
-      jsonEncode(original.map((v) => v.toJson()).toList());
+      records.length != original.length ||
+      records.indexed.any(
+        (entry) => entry.$2.id != original[entry.$1].id || changed(entry.$2),
+      );
 
-  bool changed(Visit visit) {
-    final before = original
-        .where((record) => record.id == visit.id)
-        .firstOrNull;
-    return before == null ||
-        jsonEncode(before.toJson()) != jsonEncode(visit.toJson());
-  }
+  bool changed(Visit visit) =>
+      _originalJson[visit.id] != jsonEncode(visit.toJson());
 
   Future<List<Visit>> prepare(MenuStore store) async {
-    final retained = <String, Future<String>>{};
-    Future<String> keep(String path) => retained.putIfAbsent(
-      path,
-      () async => path.startsWith('${store.directory.path}/images/')
-          ? path
-          : store.keepImage(path),
-    );
-    final prepared = <Visit>[];
-    for (final source in records) {
-      final visit = Visit.fromJson(source.toJson());
-      visit.imagePaths = await Future.wait(visit.imagePaths.map(keep));
-      for (final dish in visit.items) {
-        dish.imagePaths = await Future.wait(dish.imagePaths.map(keep));
+    final prepared = [
+      for (final visit in records)
+        if (changed(visit)) Visit.fromJson(visit.toJson()),
+    ];
+    final existing = {
+      for (final visit in original) ...[
+        ...visit.imagePaths,
+        for (final dish in visit.items) ...dish.imagePaths,
+      ],
+    };
+    final imagesDirectory = '${store.directory.path}/images/';
+    final added =
+        {
+              for (final visit in prepared) ...[
+                ...visit.imagePaths,
+                for (final dish in visit.items) ...dish.imagePaths,
+              ],
+            }
+            .where(
+              (path) =>
+                  !existing.contains(path) && !path.startsWith(imagesDirectory),
+            )
+            .toList();
+    final retained = <String, String>{};
+    for (var offset = 0; offset < added.length; offset += 8) {
+      final batch = added.skip(offset).take(8).toList();
+      final saved = await Future.wait(batch.map(store.keepImage));
+      for (var i = 0; i < batch.length; i++) {
+        retained[batch[i]] = saved[i];
       }
-      prepared.add(visit);
+    }
+    if (retained.isNotEmpty) {
+      for (final visit in prepared) {
+        visit.imagePaths = [
+          for (final path in visit.imagePaths) retained[path] ?? path,
+        ];
+        for (final dish in visit.items) {
+          dish.imagePaths = [
+            for (final path in dish.imagePaths) retained[path] ?? path,
+          ];
+        }
+      }
     }
     return prepared;
   }

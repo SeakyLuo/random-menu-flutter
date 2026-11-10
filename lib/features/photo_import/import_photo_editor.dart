@@ -1,5 +1,6 @@
 import 'dart:convert';
 import '../../ui/menu_bottom_sheet.dart';
+import '../../ui/menu_currency_picker.dart';
 import '../../ui/menu_icon.dart';
 import 'package:flutter/material.dart';
 import '../../core/models.dart';
@@ -10,8 +11,9 @@ import '../restaurants/restaurant_address_fields.dart';
 import 'import_models.dart';
 
 class ImportPhotoEdit {
-  ImportPhotoEdit(this.photo, this.addresses);
+  ImportPhotoEdit(this.photo, this.addresses, this.currency);
   final ImportPhoto photo;
+  final MenuCurrency currency;
   final List<RestaurantAddress> addresses;
 }
 
@@ -83,10 +85,12 @@ class ImportPhotoEditor extends StatefulWidget {
   const ImportPhotoEditor({
     super.key,
     required this.photo,
+    required this.currency,
     required this.addresses,
     required this.lockedAddressIds,
   });
   final ImportPhoto photo;
+  final MenuCurrency currency;
   final List<RestaurantAddress> addresses;
   final Set<String> lockedAddressIds;
   @override
@@ -94,6 +98,7 @@ class ImportPhotoEditor extends StatefulWidget {
 }
 
 class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
+  late MenuCurrency currency = widget.currency;
   late final photo = widget.photo.copy();
   late final addresses = [...widget.addresses];
   late final name = TextEditingController(text: photo.name);
@@ -104,6 +109,7 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
   bool busy = false;
   bool leaving = false;
   bool get dirty =>
+      currency != widget.currency ||
       photo.date != widget.photo.date ||
       photo.addressId != widget.photo.addressId ||
       photo.kind != widget.photo.kind ||
@@ -223,7 +229,7 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
       photo.quantity = count!;
     }
     setState(() => leaving = true);
-    Navigator.pop(context, ImportPhotoEdit(photo, addresses));
+    Navigator.pop(context, ImportPhotoEdit(photo, addresses, currency));
   }
 
   @override
@@ -236,7 +242,7 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('照片设置'),
+          title: MenuScrollTitle(child: const Text('照片设置')),
           leading: IconButton(
             tooltip: '返回',
             onPressed: busy ? null : leave,
@@ -249,6 +255,7 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
         body: AbsorbPointer(
           absorbing: busy,
           child: ListView(
+            primary: true,
             padding: const EdgeInsets.all(24),
             children: [
               SizedBox(
@@ -353,9 +360,16 @@ class _ImportPhotoEditorState extends State<ImportPhotoEditor> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: '本次单价',
-                    prefixText: '¥ ',
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 0,
+                      minHeight: 0,
+                    ),
+                    prefixIcon: MenuCurrencyPrefix(
+                      currency: currency,
+                      onChanged: (value) => setState(() => currency = value),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),

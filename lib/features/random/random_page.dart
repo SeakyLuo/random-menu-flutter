@@ -32,6 +32,7 @@ class _RandomPageState extends State<RandomPage> {
   final _deck = GlobalKey<RandomDeckState>();
   final _target = GlobalKey();
   final _rail = ScrollController();
+  final _pageScroll = ScrollController();
   final _arrival = ValueNotifier(0.0);
   final _random = Random();
   bool _busy = false;
@@ -72,6 +73,7 @@ class _RandomPageState extends State<RandomPage> {
   @override
   void dispose() {
     _rail.dispose();
+    _pageScroll.dispose();
     _arrival.dispose();
     super.dispose();
   }
@@ -292,6 +294,7 @@ class _RandomPageState extends State<RandomPage> {
                 final minHeight = scale > 1.3 ? 760.0 * scale / 1.3 : 600.0;
                 final height = max(constraints.maxHeight, minHeight);
                 return SingleChildScrollView(
+                  controller: _pageScroll,
                   child: SizedBox(
                     height: height,
                     child: Padding(
@@ -301,6 +304,8 @@ class _RandomPageState extends State<RandomPage> {
                         children: [
                           MenuAppBar(
                             title: '随机菜单',
+                            onTitleTap: () =>
+                                scrollMenuToTop(context, _pageScroll),
                             actions: [
                               PageActionButton(
                                 icon: Icons.filter_alt_outlined,

@@ -5,6 +5,9 @@ Future<MenuData> _read(
   MenuWriteScope scope = MenuWriteScope.all,
   MenuData? current,
 }) async {
+  if (scope.visitId != null) {
+    return (await _readVisit(txn, current!, scope)).data;
+  }
   final batch = txn.batch();
   final tables = <String>[];
   final rows = <String, List<Map<String, Object?>>>{};
@@ -56,6 +59,10 @@ Future<MenuData> _read(
   for (final row in rows['recipe_tag_links']!) {
     (links[row['recipe_id'] as String] ??= []).add(tags[row['tag_id']]!);
   }
+  final restaurantTags = <String, List<String>>{};
+  for (final row in rows['restaurant_category_links']!) {
+    (restaurantTags[row['restaurant_id'] as String] ??= []).add(categories[row['category_id']]!);
+  }
   final recipes = [
     for (final row in rows['recipes']!)
       Recipe(
@@ -99,9 +106,7 @@ Future<MenuData> _read(
         name: row['name'] as String,
         note: row['note'] as String,
         link: row['link'] as String,
-        category: row['category_id'] == null
-            ? ''
-            : categories[row['category_id']]!,
+        categories: restaurantTags[row['id']] ?? [],
         addresses: List<String>.from(
           jsonDecode(row['addresses'] as String) as List,
         ),
@@ -215,6 +220,7 @@ bool _queueReadTable(Batch batch, String table, MenuWriteScope scope) {
     'auto_tag_rules' => 'mode, position',
     'auto_tag_rule_values' => 'mode, rule_key, position',
     'recipe_tag_links' => 'recipe_id, position',
+    'restaurant_category_links' => 'restaurant_id, position',
     'restaurant_addresses' || 'restaurant_visits' => 'restaurant_id, position',
     'restaurant_visit_items' ||
     'restaurant_visit_coupons' ||
@@ -250,6 +256,7 @@ bool _queueReadTable(Batch batch, String table, MenuWriteScope scope) {
   if ([
     'restaurants',
     'restaurant_addresses',
+    'restaurant_category_links',
     'restaurant_visits',
     'restaurant_visit_items',
     'restaurant_visit_coupons',

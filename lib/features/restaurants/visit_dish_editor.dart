@@ -14,16 +14,22 @@ Future<VisitDish?> editVisitDish(
   BuildContext context,
   VisitDish item, {
   bool requirePrice = false,
+  MenuCurrency currency = MenuCurrency.cny,
+  ValueChanged<MenuCurrency>? onCurrencyChanged,
   List<VisitPackage> packages = const [],
   String? restaurantId,
+  Future<bool> Function(VisitDish item, MenuCurrency currency)? onSave,
 }) => Navigator.push<VisitDish>(
   context,
   MaterialPageRoute(
     builder: (_) => _VisitDishEditor(
       item: item,
+      currency: currency,
+      onCurrencyChanged: onCurrencyChanged,
       requirePrice: requirePrice,
       packages: packages,
       restaurantId: restaurantId,
+      onSave: onSave,
     ),
   ),
 );
@@ -31,19 +37,26 @@ Future<VisitDish?> editVisitDish(
 class _VisitDishEditor extends StatefulWidget {
   const _VisitDishEditor({
     required this.item,
+    required this.currency,
+    this.onCurrencyChanged,
     this.requirePrice = false,
     required this.packages,
     required this.restaurantId,
+    this.onSave,
   });
   final bool requirePrice;
   final List<VisitPackage> packages;
   final VisitDish item;
+  final MenuCurrency currency;
+  final ValueChanged<MenuCurrency>? onCurrencyChanged;
   final String? restaurantId;
+  final Future<bool> Function(VisitDish item, MenuCurrency currency)? onSave;
   @override
   State<_VisitDishEditor> createState() => _VisitDishEditorState();
 }
 
 class _VisitDishEditorState extends State<_VisitDishEditor> {
+  late MenuCurrency currency = widget.currency;
   late final name = TextEditingController(text: widget.item.name);
   late final price = TextEditingController(
     text: widget.requirePrice ? '' : money(widget.item.price),
@@ -55,7 +68,10 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
   late bool isDish = widget.item.isDish;
   bool leaving = false;
   bool picking = false;
+  bool saving = false;
+  bool get busy => picking || saving;
   bool get dirty =>
+      currency != widget.currency ||
       isDish != widget.item.isDish ||
       name.text != widget.item.name ||
       price.text != (widget.requirePrice ? '' : money(widget.item.price)) ||
@@ -81,7 +97,7 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
   }
 
   Future<void> leave() async {
-    if (picking) return;
+    if (busy) return;
     if (dirty &&
         !await confirmAction(
           context,
@@ -96,7 +112,7 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
     Navigator.pop(context);
   }
 
-  void save() {
+  Future<void> save() async {
     final cost = packageId == null
         ? double.tryParse(price.text.trim())
         : widget.item.price;
@@ -109,20 +125,30 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
       showToast(context, '数量应为 1 到 100 份');
       return;
     }
-    setState(() => leaving = true);
-    Navigator.pop(
-      context,
-      VisitDish(
-        dishId: widget.item.dishId,
-        isDish: isDish,
-        packageId: packageId,
-        name: name.text.trim(),
-        price: cost,
-        quantity: count,
-        note: note.text.trim(),
-        imagePaths: images,
-      ),
+    final item = VisitDish(
+      dishId: widget.item.dishId,
+      isDish: isDish,
+      packageId: packageId,
+      name: name.text.trim(),
+      price: cost,
+      quantity: count,
+      note: note.text.trim(),
+      imagePaths: images,
     );
+    if (widget.onSave != null) {
+      FocusScope.of(context).unfocus();
+      setState(() => saving = true);
+      final success = await widget.onSave!(item, currency);
+      if (!mounted) return;
+      if (!success) {
+        setState(() => saving = false);
+        return;
+      }
+    }
+    if (!mounted) return;
+    widget.onCurrencyChanged?.call(currency);
+    setState(() => leaving = true);
+    Navigator.pop(context, item);
   }
 
   @override
@@ -130,24 +156,24 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
     final amount = double.tryParse(price.text) ?? 0;
     final count = int.tryParse(quantity.text) ?? 0;
     return PopScope(
-      canPop: leaving || (!dirty && !picking),
+      canPop: leaving || (!dirty && !busy),
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) leave();
       },
       child: Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
-          title: const Text('本次点单'),
+          title: MenuScrollTitle(child: const Text('本次点单')),
           actions: [
             RestaurantDishCoverMenu(
               restaurantId: widget.restaurantId,
               dishId: widget.item.dishId,
-              enabled: !picking,
+              enabled: !busy,
             ),
           ],
           leading: IconButton(
             tooltip: '返回',
-            onPressed: picking ? null : leave,
+            onPressed: busy ? null : leave,
             icon: const MenuIcon(Icons.arrow_back),
           ),
         ),
@@ -165,8 +191,27 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: picking ? null : save,
-                    child: const Text('完成', style: TextStyle(fontSize: 15)),
+                    onPressed: busy ? null : save,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (saving) ...[
+                          const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          saving
+                              ? '保存中…'
+                              : widget.onSave == null
+                              ? '完成'
+                              : '保存菜品',
+                          style: const TextStyle(fontSize: 15),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -174,11 +219,12 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
           ),
         ),
         body: AbsorbPointer(
-          absorbing: picking,
+          absorbing: busy,
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
               child: ListView(
+                primary: true,
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                 children: [
                   MenuFieldLabel(
@@ -248,7 +294,9 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
                             value: package.id,
                             icon: Icons.receipt_long_outlined,
                             selected: packageId == package.id,
-                            child: Text(visitPackageLabel(package)),
+                            child: Text(
+                              visitPackageLabel(package, currency: currency),
+                            ),
                           ),
                       ],
                       onSelected: (value) => setState(
@@ -266,6 +314,7 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
                                         widget.packages.firstWhere(
                                           (package) => package.id == packageId,
                                         ),
+                                        currency: currency,
                                       ),
                                 style: const TextStyle(fontSize: 15),
                                 maxLines: 1,
@@ -304,7 +353,13 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
                   ],
                   if (packageId == null) ...[
                     MenuFieldLabel('本次单价', isRequired: widget.requirePrice),
-                    MenuPriceField(controller: price),
+                    MenuPriceField(
+                      controller: price,
+                      currency: currency,
+                      onCurrencyChanged: widget.onCurrencyChanged == null
+                          ? null
+                          : (value) => setState(() => currency = value),
+                    ),
                     const SizedBox(height: 24),
                   ],
                   const MenuFieldLabel('数量'),
@@ -329,7 +384,7 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
                             ),
                           ),
                           Text(
-                            '¥${money(amount * count)}',
+                            '${currency.symbol}${money(amount * count)}',
                             style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w500,

@@ -42,6 +42,7 @@ class RestaurantDishSliver extends StatelessWidget {
               final dish = dishes[index];
               return RestaurantDishCard(
                 name: dish.name,
+                currency: dish.currency,
                 paths: dish.paths,
                 price: dish.price,
                 note: dish.note,

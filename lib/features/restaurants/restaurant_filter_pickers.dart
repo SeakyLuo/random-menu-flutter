@@ -78,7 +78,7 @@ void showRestaurantRegionWheel(
     initCity: pickerCity,
     initTown: depth == 3 ? county : null,
     addAllItem: false,
-    pickerStyle: _style(context, depth == 3 ? '选择省市区' : '选择城市'),
+    pickerStyle: _style(context, depth == 3 ? '选择省市区县' : '选择城市'),
     onConfirm: (selectedProvince, selectedCity, selectedCounty) {
       final municipality = _municipalities.contains(selectedProvince);
       onConfirm(

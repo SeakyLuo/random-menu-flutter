@@ -68,19 +68,21 @@ class _PersonalListPageState extends State<PersonalListPage> {
       appBar: AppBar(
         titleSpacing: 0,
         toolbarHeight: 48,
-        title: Row(
-          children: [
-            Text(_label),
-            const SizedBox(width: 10),
-            Text(
-              '${items.length} ${widget.kind == PersonalListKind.toCook ? '道' : '条'}',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w400,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+        title: MenuScrollTitle(
+          child: MenuTitleLine(
+            children: [
+              Text(_label),
+              const SizedBox(width: 10),
+              Text(
+                '${items.length} ${widget.kind == PersonalListKind.toCook ? '道' : '条'}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       body: Center(
@@ -103,6 +105,7 @@ class _PersonalListPageState extends State<PersonalListPage> {
                       onAction: _edit,
                     )
                   : ListView(
+                      primary: true,
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
                       children: [
                         for (final item in displayed)

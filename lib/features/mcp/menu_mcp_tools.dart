@@ -71,6 +71,11 @@ class MenuMcpTools {
       'autoCost': _flag,
       'date': {..._text, 'description': 'ISO 8601 到店日期'},
       'totalCost': _number,
+      'currency': {
+        'type': 'string',
+        'enum': MenuCurrency.values.map((c) => c.code).toList(),
+        'description': '本次消费币种，默认 CNY；菜品、套餐和用券金额均使用此币种，不换算汇率。',
+      },
       'address': _text,
       'note': _text,
       'companions': _strings,
@@ -90,7 +95,7 @@ class MenuMcpTools {
         'type': 'array',
         'maxItems': 100,
         'description':
-            '整体替换本次用券列表。discount 为单张优惠减额、quantity 为使用张数（1–100），两者必填；threshold 为使用门槛（选填，省略表示无门槛）。实付由 autoCost 决定是否自动扣券。',
+            '整体替换用券列表，按列表顺序依次抵扣，每张券按抵扣前余额判断门槛。type=amount：discount为单张减额，quantity为张数；type=percentage：rate为几折（如8.8），quantity必须1，maxDiscount为优惠上限可空。实付由autoCost决定是否自动计算。',
         'items': {
           'type': 'object',
           'properties': {
@@ -98,10 +103,26 @@ class MenuMcpTools {
               'type': ['number', 'null'],
               'minimum': 0.01,
             },
-            'discount': {'type': 'number', 'minimum': 0.01},
+            'type': {
+              'type': 'string',
+              'enum': ['amount', 'percentage'],
+            },
+            'rate': {
+              'type': ['number', 'null'],
+              'exclusiveMinimum': 0,
+              'exclusiveMaximum': 10,
+            },
+            'maxDiscount': {
+              'type': ['number', 'null'],
+              'minimum': 0.01,
+            },
+            'discount': {
+              'type': ['number', 'null'],
+              'minimum': 0.01,
+            },
             'quantity': {'type': 'integer', 'minimum': 1, 'maximum': 100},
           },
-          'required': ['discount', 'quantity'],
+          'required': ['type', 'quantity'],
           'additionalProperties': false,
         },
       },
@@ -239,6 +260,7 @@ class MenuMcpTools {
               if (kind == 'visit') ...{
                 'date': r['date'],
                 'totalCost': r['totalCost'],
+                'currency': r['currency'],
               },
               if (kind == 'restaurant') ...{
                 'category': r['category'],
@@ -369,6 +391,11 @@ class MenuMcpTools {
                 : Visit.fromJson(old);
             if (args.containsKey('date')) {
               visit.date = DateTime.parse(args['date'] as String);
+            }
+            if (args.containsKey('currency')) {
+              visit.currency = MenuCurrency.fromCode(
+                args['currency'] as String,
+              );
             }
             if (args.containsKey('totalCost')) {
               visit.totalCost = (args['totalCost'] as num).toDouble();

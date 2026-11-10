@@ -100,9 +100,11 @@ class _RestaurantDetailInfoState extends State<RestaurantDetailInfo> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              if (restaurant.category.isNotEmpty || restaurant.averageCost > 0)
+              if (restaurant.category.isNotEmpty ||
+                  restaurant.averageCosts.isNotEmpty)
                 const SizedBox(height: 10),
-              if (restaurant.category.isNotEmpty || restaurant.averageCost > 0)
+              if (restaurant.category.isNotEmpty ||
+                  restaurant.averageCosts.isNotEmpty)
                 Row(
                   children: [
                     Expanded(
@@ -117,9 +119,9 @@ class _RestaurantDetailInfoState extends State<RestaurantDetailInfo> {
                             : const SizedBox.shrink(),
                       ),
                     ),
-                    if (restaurant.averageCost > 0) ...[
+                    if (restaurant.averageCosts.isNotEmpty) ...[
                       const SizedBox(width: 12),
-                      RestaurantPrice(restaurant.averageCost),
+                      RestaurantPrices(restaurant),
                     ],
                   ],
                 ),

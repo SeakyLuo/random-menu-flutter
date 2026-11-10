@@ -1,4 +1,6 @@
 import 'tag_patterns.dart';
+import 'currency.dart';
+export 'currency.dart';
 import 'geo_point.dart';
 import 'menu_schema.dart';
 import 'package:uuid/uuid.dart';
@@ -141,6 +143,7 @@ class Visit {
     required this.id,
     required this.date,
     this.totalCost = 0,
+    this.currency = MenuCurrency.cny,
     this.addressId = '',
     this.address = '',
     this.autoCost = false,
@@ -155,6 +158,7 @@ class Visit {
   String id;
   DateTime date;
   double totalCost;
+  MenuCurrency currency;
   String addressId;
   String address;
   bool autoCost;
@@ -181,6 +185,7 @@ class Visit {
     id: j['id'] as String,
     date: DateTime.parse(j['date'] as String),
     totalCost: (j['totalCost'] as num).toDouble(),
+    currency: MenuCurrency.fromCode(j['currency'] as String),
     addressId: j['addressId'] as String,
     address: j['address'] as String,
     autoCost: j['autoCost'] as bool,
@@ -198,19 +203,20 @@ class Visit {
     dishes: List<String>.from(j['dishes'] as List),
     imagePaths: List<String>.from(j['imagePaths'] as List),
   );
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson({bool includeFoods = true}) => {
     'id': id,
     'date': date.toIso8601String(),
     'totalCost': totalCost,
+    'currency': currency.code,
     'addressId': addressId,
     'address': address,
     'autoCost': autoCost,
-    'packages': packages.map((p) => p.toJson()).toList(),
+    if (includeFoods) 'packages': packages.map((p) => p.toJson()).toList(),
     'coupons': coupons.map((coupon) => coupon.toJson()).toList(),
-    'items': items.map((e) => e.toJson()).toList(),
+    if (includeFoods) 'items': items.map((e) => e.toJson()).toList(),
     'companions': companions,
     'note': note,
-    'dishes': dishes,
+    if (includeFoods) 'dishes': dishes,
     'imagePaths': imagePaths,
   };
 }
@@ -219,7 +225,7 @@ class Restaurant {
   Restaurant({
     required this.id,
     required this.name,
-    this.category = '',
+    this.categories = const [],
     this.addresses = const [],
     this.addressEntries = const [],
     this.note = '',
@@ -230,7 +236,7 @@ class Restaurant {
   });
   String id;
   String name;
-  String category;
+  List<String> categories;
   List<String> addresses;
   List<RestaurantAddress> addressEntries;
   String note;
@@ -238,16 +244,39 @@ class Restaurant {
   bool favorite;
   String? coverDishId;
   List<Visit> records;
-  double get averageCost {
-    final paid = records.where((v) => v.totalCost > 0);
-    final people = paid.fold(0, (n, v) => n + v.companions.length + 1);
-    return people == 0 ? 0 : paid.fold(0.0, (n, v) => n + v.totalCost) / people;
+  Map<MenuCurrency, double> get averageCosts {
+    final totals = <MenuCurrency, double>{};
+    final people = <MenuCurrency, int>{};
+    for (final visit in records) {
+      if (visit.totalCost <= 0) continue;
+      totals.update(
+        visit.currency,
+        (value) => value + visit.totalCost,
+        ifAbsent: () => visit.totalCost,
+      );
+      people.update(
+        visit.currency,
+        (value) => value + visit.companions.length + 1,
+        ifAbsent: () => visit.companions.length + 1,
+      );
+    }
+    return totals.map(
+      (currency, total) => MapEntry(currency, total / people[currency]!),
+    );
   }
+
+  MenuCurrency get priceCurrency {
+    final paid = records.where((visit) => visit.totalCost > 0).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    return paid.isEmpty ? MenuCurrency.cny : paid.first.currency;
+  }
+
+  double get averageCost => averageCosts[priceCurrency] ?? 0;
 
   factory Restaurant.fromJson(Map<String, dynamic> j) => Restaurant(
     id: j['id'] as String,
     name: j['name'] as String,
-    category: j['category'] as String,
+    categories: List<String>.from(j['categories'] as List),
     note: j['note'] as String,
     link: j['link'] as String,
     favorite: j['favorite'] as bool,
@@ -260,17 +289,17 @@ class Restaurant {
         .map((e) => Visit.fromJson(e as Map<String, dynamic>))
         .toList(),
   );
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson({bool includeRecords = true}) => {
     'id': id,
     'name': name,
-    'category': category,
+    'categories': categories,
     'addresses': addresses,
     'addressEntries': addressEntries.map((e) => e.toJson()).toList(),
     'note': note,
     'link': link,
     'favorite': favorite,
     'coverDishId': coverDishId,
-    'records': records.map((e) => e.toJson()).toList(),
+    if (includeRecords) 'records': records.map((e) => e.toJson()).toList(),
   };
 }
 
@@ -344,7 +373,10 @@ class MenuData {
     if (j['version'] == 5) j = upgradeMenuV5(j);
     if (j['version'] == 6) j = upgradeMenuV6(j);
     if (j['version'] == 7) j = upgradeMenuV7(j);
-    if (j['version'] != 8) {
+    if (j['version'] == 8) j = upgradeMenuV8(j);
+    if (j['version'] == 9) j = upgradeMenuV9(j);
+    if (j['version'] == 10) j = upgradeMenuV10(j);
+    if (j['version'] != 11) {
       throw const FormatException('Unsupported menu format');
     }
     return MenuData(
@@ -384,7 +416,7 @@ class MenuData {
     );
   }
   Map<String, dynamic> toJson() => {
-    'version': 8,
+    'version': 11,
     'recipes': recipes.map((e) => e.toJson()).toList(),
     'restaurants': restaurants.map((e) => e.toJson()).toList(),
     'toCook': toCook,

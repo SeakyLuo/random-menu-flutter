@@ -20,7 +20,10 @@ class RestaurantFilterSheet extends StatefulWidget {
 class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
   late RestaurantQuery query = widget.query.copy();
   late final _category = TextEditingController(text: widget.query.category);
-  final _companion = TextEditingController();
+  late final _companion = TextEditingController(
+    text: query.alone ? '独自用餐' : query.companion,
+  );
+  late final _address = TextEditingController(text: query.address);
   late final _minPrice = TextEditingController(
     text: query.minPrice == null ? '' : money(query.minPrice!),
   );
@@ -32,6 +35,7 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
   void dispose() {
     _category.dispose();
     _companion.dispose();
+    _address.dispose();
     _minPrice.dispose();
     _maxPrice.dispose();
     super.dispose();
@@ -61,6 +65,9 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
       query.province = province;
       query.city = city;
       query.county = county;
+      query.withoutRegion = null;
+      query.address = '';
+      _address.clear();
     }),
   );
 
@@ -86,24 +93,9 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
     behavior: HitTestBehavior.opaque,
     onTap: () => _regions(level),
     child: InputDecorator(
-      decoration: InputDecoration(
+      decoration: const InputDecoration(
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 12,
-        ),
-        suffixIconConstraints: const BoxConstraints(
-          minWidth: 28,
-          minHeight: 20,
-        ),
-        suffixIcon: Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: MenuIcon(
-            Icons.expand_more,
-            size: 16,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
+        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       ),
       child: Text(
         value.isEmpty ? label : value,
@@ -164,19 +156,31 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
     );
   }
 
-  void _removeCompanion(String name) => setState(() {
-    query.companions.remove(name);
-    query.companionsOnly = query.companions.isNotEmpty;
-  });
-
   @override
   Widget build(BuildContext context) {
     final restaurants = MenuScope.of(context).data.restaurants;
     final categories = restaurantCategoryNames(MenuScope.of(context).data);
     List<String> unique(Iterable<String> values) =>
         values.where((value) => value.isNotEmpty).toSet().toList()..sort();
-    final people = unique(
-      restaurants.expand((r) => r.records).expand((visit) => visit.companions),
+    final people = [
+      '独自用餐',
+      ...unique(
+        restaurants
+            .expand((r) => r.records)
+            .expand((visit) => visit.companions),
+      ),
+    ];
+    final addresses = unique(
+      restaurants
+          .expand((r) => r.addressEntries)
+          .where(
+            (address) =>
+                (query.province.isEmpty ||
+                    address.province == query.province) &&
+                (query.city.isEmpty || address.city == query.city) &&
+                (query.county.isEmpty || address.county == query.county),
+          )
+          .map((address) => address.detail),
     );
     final scheme = Theme.of(context).colorScheme;
     return Padding(
@@ -216,12 +220,15 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                   children: [
                     _heading(
                       '城市',
-                      action: query.hasRegion
+                      action: query.hasLocation
                           ? TextButton(
                               onPressed: () => setState(() {
                                 query.province = '';
                                 query.city = '';
                                 query.county = '';
+                                query.address = '';
+                                query.withoutRegion = null;
+                                _address.clear();
                               }),
                               style: TextButton.styleFrom(
                                 minimumSize: const Size(0, 32),
@@ -243,7 +250,7 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                         final controls = [
                           _region('省', query.province, 1),
                           _region('市', query.city, 2),
-                          _region('区', query.county, 3),
+                          _region('区县', query.county, 3),
                         ];
                         return stacked
                             ? Column(
@@ -259,6 +266,32 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                                 ],
                               );
                       },
+                    ),
+                    if (query.withoutRegion != null) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: MenuTag(
+                          switch (query.withoutRegion!) {
+                            RestaurantRegionLevel.province => '未填写省份',
+                            RestaurantRegionLevel.city => '未填写城市',
+                            RestaurantRegionLevel.county => '未填写区县',
+                          },
+                          removable: true,
+                          onRemove: () =>
+                              setState(() => query.withoutRegion = null),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    _heading('地址'),
+                    const SizedBox(height: 6),
+                    MenuSuggestionInput(
+                      controller: _address,
+                      choices: addresses,
+                      hintText: '输入或选择地址，完全匹配',
+                      showSuggestionsWhenEmpty: true,
+                      adaptToAvailableSpace: true,
                     ),
                     const SizedBox(height: 18),
                     _heading('消费日期'),
@@ -278,6 +311,18 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                       choices: categories,
                       optionsViewOpenDirection: OptionsViewOpenDirection.up,
                     ),
+                    if (query.uncategorized) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: MenuTag(
+                          '未分类',
+                          removable: true,
+                          onRemove: () =>
+                              setState(() => query.uncategorized = false),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     _heading('人均价格'),
                     const SizedBox(height: 6),
@@ -287,6 +332,9 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                         Expanded(
                           child: MenuPriceField(
                             controller: _minPrice,
+                            currency: query.currency,
+                            onCurrencyChanged: (currency) =>
+                                setState(() => query.currency = currency),
                             hintText: '最低价',
                           ),
                         ),
@@ -297,6 +345,9 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                         Expanded(
                           child: MenuPriceField(
                             controller: _maxPrice,
+                            currency: query.currency,
+                            onCurrencyChanged: (currency) =>
+                                setState(() => query.currency = currency),
                             hintText: '最高价',
                           ),
                         ),
@@ -308,37 +359,17 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                     MenuSuggestionInput(
                       controller: _companion,
                       optionsViewOpenDirection: OptionsViewOpenDirection.up,
-                      choices: people
-                          .where((name) => !query.companions.contains(name))
-                          .toList(),
+                      choices: people,
                       hintText: '搜索并选择饭搭子',
                       showSuggestionsWhenEmpty: true,
                       emptyMessage: '没有找到这位饭搭子',
                       onSelected: (name) {
                         setState(() {
-                          query.companions.add(name);
-                          query.companionsOnly = true;
-                        });
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted) _companion.clear();
+                          query.alone = name == '独自用餐';
+                          query.companion = query.alone ? '' : name;
                         });
                       },
                     ),
-                    if (query.companions.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final person in query.companions)
-                            MenuTag(
-                              person,
-                              removable: true,
-                              onRemove: () => _removeCompanion(person),
-                            ),
-                        ],
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -394,6 +425,13 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                         query.minPrice = min;
                         query.maxPrice = max;
                         query.category = _category.text.trim();
+                        query.uncategorized =
+                            query.uncategorized && query.category.isEmpty;
+                        query.address = _address.text.trim();
+                        query.alone = _companion.text.trim() == '独自用餐';
+                        query.companion = query.alone
+                            ? ''
+                            : _companion.text.trim();
                         Navigator.pop(context, query);
                       },
                       child: const Text('应用筛选'),

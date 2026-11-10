@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../ui/widgets.dart';
+import '../../ui/library_widgets.dart';
 import '../../ui/library_layout.dart';
 import '../restaurants/restaurant_grid.dart';
 import '../recipes/recipe_grid.dart';
@@ -8,7 +9,7 @@ import '../restaurants/restaurants_page.dart';
 import '../restaurants/restaurant_filter.dart';
 export 'personal_list_page.dart';
 
-class FavoritesPage extends StatelessWidget {
+class FavoritesPage extends StatefulWidget {
   const FavoritesPage({
     super.key,
     required this.onBrowseRecipes,
@@ -16,6 +17,20 @@ class FavoritesPage extends StatelessWidget {
   });
   final VoidCallback onBrowseRecipes;
   final VoidCallback onBrowseRestaurants;
+  @override
+  State<FavoritesPage> createState() => _FavoritesPageState();
+}
+
+class _FavoritesPageState extends State<FavoritesPage> {
+  final _scrolls = [ScrollController(), ScrollController()];
+  @override
+  void dispose() {
+    for (final scroll in _scrolls) {
+      scroll.dispose();
+    }
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = MenuScope.of(context).data;
@@ -31,7 +46,15 @@ class FavoritesPage extends StatelessWidget {
         appBar: AppBar(
           titleSpacing: 0,
           toolbarHeight: 48,
-          title: const Text('我的收藏'),
+          title: Builder(
+            builder: (context) => MenuScrollTitle(
+              onTap: () => scrollMenuToTop(
+                context,
+                _scrolls[DefaultTabController.of(context).index],
+              ),
+              child: const Text('我的收藏'),
+            ),
+          ),
         ),
         body: Center(
           child: ConstrainedBox(
@@ -84,10 +107,11 @@ class FavoritesPage extends StatelessWidget {
                               actionLabel: '浏览全部菜谱',
                               onAction: () {
                                 Navigator.pop(context);
-                                onBrowseRecipes();
+                                widget.onBrowseRecipes();
                               },
                             )
                           : RecipeGrid(
+                              controller: _scrolls[0],
                               recipes: recipes,
                               bottom: 24,
                               scrollKey: const PageStorageKey(
@@ -102,10 +126,11 @@ class FavoritesPage extends StatelessWidget {
                               actionLabel: '浏览全部餐厅',
                               onAction: () {
                                 Navigator.pop(context);
-                                onBrowseRestaurants();
+                                widget.onBrowseRestaurants();
                               },
                             )
                           : CustomScrollView(
+                              controller: _scrolls[1],
                               key: const PageStorageKey('favorite-restaurants'),
                               slivers: [
                                 SliverPadding(

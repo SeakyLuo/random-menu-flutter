@@ -34,75 +34,104 @@ class SearchDiscovery extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return ListView(
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: EdgeInsets.fromLTRB(20, 12, 20, bottom),
-      children: [
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                '最近搜索',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-            if (history.isNotEmpty) ...[
-              if (managing)
-                TextButton(
-                  onPressed: busy ? null : onClear,
-                  child: const Text('清空'),
-                ),
-              TextButton(
-                onPressed: busy ? null : onManage,
-                child: Text(managing ? '完成' : '管理'),
-              ),
-            ],
-          ],
-        ),
-        if (history.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '搜索过的关键词会留在这里',
-              style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
-            ),
-          )
-        else
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
+    return _SearchEntrance(
+      child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: EdgeInsets.fromLTRB(20, 12, 20, bottom),
+        children: [
+          Row(
             children: [
-              for (final term in history)
-                _KeywordChip(
-                  label: term,
-                  onPressed: busy || managing ? null : () => onHistory(term),
-                  removable: managing,
-                  onDeleted: busy ? null : () => onRemove(term),
+              const Expanded(
+                child: Text(
+                  '最近搜索',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
+              ),
+              if (history.isNotEmpty) ...[
+                if (managing)
+                  TextButton(
+                    onPressed: busy ? null : onClear,
+                    child: const Text('清空'),
+                  ),
+                TextButton(
+                  onPressed: busy ? null : onManage,
+                  child: Text(managing ? '完成' : '管理'),
+                ),
+              ],
             ],
           ),
-        if (libraryEmpty) ...[
-          const SizedBox(height: 40),
-          Text(
-            emptyTitle,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            emptyMessage,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.5,
-              color: scheme.onSurfaceVariant,
+          if (history.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '搜索过的关键词会留在这里',
+                style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                for (final term in history)
+                  _KeywordChip(
+                    label: term,
+                    onPressed: busy || managing ? null : () => onHistory(term),
+                    removable: managing,
+                    onDeleted: busy ? null : () => onRemove(term),
+                  ),
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton(onPressed: onCreate, child: Text(createLabel)),
-          ),
+          if (libraryEmpty) ...[
+            const SizedBox(height: 40),
+            Text(
+              emptyTitle,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              emptyMessage,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton(
+                onPressed: onCreate,
+                child: Text(createLabel),
+              ),
+            ),
+          ],
         ],
-      ],
+      ),
+    );
+  }
+}
+
+class _SearchEntrance extends StatelessWidget {
+  const _SearchEntrance({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+    final animation = ModalRoute.of(context)!.animation!.drive(
+      CurveTween(curve: const Interval(.12, 1, curve: Curves.easeOutCubic)),
+    );
+    return FadeTransition(
+      opacity: animation,
+      child: AnimatedBuilder(
+        animation: animation,
+        child: child,
+        builder: (context, child) => Transform.translate(
+          offset: Offset(0, 24 * (1 - animation.value)),
+          child: child,
+        ),
+      ),
     );
   }
 }

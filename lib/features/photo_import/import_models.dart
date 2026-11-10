@@ -117,12 +117,14 @@ class ImportVisit {
     required this.photos,
     required this.items,
     required this.environments,
+    this.currency = MenuCurrency.cny,
   });
   DateTime date;
   RestaurantAddress address;
   List<ImportPhoto> photos;
   List<VisitDish> items;
   List<String> environments;
+  MenuCurrency currency;
   bool separateDishesConfirmed = false;
   bool get duplicateDishes =>
       items.where((i) => i.name.isNotEmpty).map((i) => i.name).toSet().length !=

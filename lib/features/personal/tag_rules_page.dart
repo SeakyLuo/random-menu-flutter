@@ -67,7 +67,14 @@ class _TagRulesPageState extends State<TagRulesPage> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
-        title: const Text('自动标签', maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: MenuScrollTitle(
+          controller: _scroll,
+          child: const Text(
+            '自动标签',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
         actions: [
           PageAddButton(label: '添加标签规则', onPressed: _add),
           const SizedBox(width: 8),

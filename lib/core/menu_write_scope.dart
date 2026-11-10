@@ -5,13 +5,15 @@ class MenuWriteScope {
     this.restaurantIds = const {},
     this.allRecipes = false,
     this.allRestaurants = false,
-  }) : _recipe = null,
+  }) : visitId = null,
+       _recipe = null,
        _restaurant = null;
   const MenuWriteScope.recipe(String id)
     : recipeIds = const {},
       restaurantIds = const {},
       allRecipes = false,
       allRestaurants = false,
+      visitId = null,
       _recipe = id,
       _restaurant = null;
   const MenuWriteScope.restaurant(String id)
@@ -19,8 +21,18 @@ class MenuWriteScope {
       restaurantIds = const {},
       allRecipes = false,
       allRestaurants = false,
+      visitId = null,
       _restaurant = id,
       _recipe = null;
+  const MenuWriteScope.visit(String restaurantId, String id)
+    : visitId = id,
+      recipeIds = const {},
+      restaurantIds = const {},
+      allRecipes = false,
+      allRestaurants = false,
+      _restaurant = restaurantId,
+      _recipe = null;
+  final String? visitId;
   final Set<String> recipeIds;
   final Set<String> restaurantIds;
   final bool allRecipes, allRestaurants;

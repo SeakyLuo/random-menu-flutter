@@ -71,8 +71,11 @@ class RestaurantVisitCard extends StatelessWidget {
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute<void>(
-            builder: (_) =>
-                VisitDetailPage(restaurantId: restaurant.id, visitId: visit.id),
+            builder: (_) => VisitDetailPage(
+              restaurantId: restaurant.id,
+              visitId: visit.id,
+              fromRestaurantDetail: true,
+            ),
           ),
         ),
         child: Padding(
@@ -92,7 +95,7 @@ class RestaurantVisitCard extends StatelessWidget {
                         maxWidth: constraints.maxWidth,
                       ),
                       child: Text(
-                        '总消费：¥${money(visit.totalCost)}',
+                        '总消费：${visit.currency.symbol}${money(visit.totalCost)}',
                         style: const TextStyle(
                           fontSize: 15,
                           height: 1.4,
@@ -131,6 +134,7 @@ class RestaurantVisitCard extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
                   child: VisitFoodList(
+                    currency: visit.currency,
                     restaurantId: restaurant.id,
                     visitId: visit.id,
                     items: visit.items,

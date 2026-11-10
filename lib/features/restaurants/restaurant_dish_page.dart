@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/menu_icon.dart';
+import '../../ui/photo_page_indicator.dart';
 import '../../ui/widgets.dart';
 import '../../ui/menu_popup.dart';
 import '../media/media_actions.dart';
@@ -19,12 +20,14 @@ class RestaurantDishPage extends StatefulWidget {
     required this.name,
     this.sourceVisitId,
     this.sourceItemIndex,
-  }) : previewDish = null,
+  }) : previewCurrency = MenuCurrency.cny,
+       previewDish = null,
        previewPackage = null;
   RestaurantDishPage.preview({
     super.key,
     required VisitDish dish,
     required VisitPackage package,
+    this.previewCurrency = MenuCurrency.cny,
   }) : restaurantId = '',
        name = dish.name,
        sourceVisitId = null,
@@ -36,6 +39,7 @@ class RestaurantDishPage extends StatefulWidget {
   final String? sourceVisitId;
   final int? sourceItemIndex;
   final VisitDish? previewDish;
+  final MenuCurrency previewCurrency;
   final VisitPackage? previewPackage;
   @override
   State<RestaurantDishPage> createState() => _RestaurantDishPageState();
@@ -90,7 +94,7 @@ class _RestaurantDishPageState extends State<RestaurantDishPage> {
       return Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(
-          title: const Text('菜品详情'),
+          title: MenuScrollTitle(child: const Text('菜品详情')),
           leading: IconButton(
             tooltip: '返回',
             onPressed: () => Navigator.pop(context),
@@ -110,6 +114,7 @@ class _RestaurantDishPageState extends State<RestaurantDishPage> {
     final package = preview == null ? dish.package : widget.previewPackage;
     final price = preview == null ? dish.price : 0.0;
     final note = preview == null ? dish.note : preview.note;
+    final currency = preview == null ? dish.currency : widget.previewCurrency;
     final scheme = Theme.of(context).colorScheme;
     final coverDishId = preview == null
         ? MenuScope.of(context).data.restaurants
@@ -126,7 +131,9 @@ class _RestaurantDishPageState extends State<RestaurantDishPage> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         titleSpacing: 0,
-        title: Text(dish.name.isEmpty ? '菜品详情' : dish.name),
+        title: MenuScrollTitle(
+          child: Text(dish.name.isEmpty ? '菜品详情' : dish.name),
+        ),
         actions: [
           if (preview == null && (coverSource != null || isCover))
             MenuPopupButton<String>(
@@ -144,8 +151,8 @@ class _RestaurantDishPageState extends State<RestaurantDishPage> {
               itemBuilder: (_) => [
                 MenuPopupItem(
                   value: 'cover',
-                  icon: isCover ? Icons.restart_alt : Icons.image_outlined,
-                  child: Text(isCover ? '恢复默认封面' : '设为餐厅封面'),
+                  icon: isCover ? Icons.close : Icons.image_outlined,
+                  child: Text(isCover ? '取消设为封面' : '设为餐厅封面'),
                 ),
               ],
             ),
@@ -160,6 +167,7 @@ class _RestaurantDishPageState extends State<RestaurantDishPage> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
           child: ListView(
+            primary: true,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               if (dish.paths.isNotEmpty) ...[
@@ -168,52 +176,54 @@ class _RestaurantDishPageState extends State<RestaurantDishPage> {
                     borderRadius: BorderRadius.circular(14),
                     child: SizedBox(
                       height: math.min(320, constraints.maxWidth / 1.25),
-                      child: PageView.builder(
-                        controller: _photos,
-                        itemCount: dish.paths.length,
-                        onPageChanged: (index) =>
-                            setState(() => _photo = index),
-                        itemBuilder: (_, index) => GestureDetector(
-                          onTap: () => showPhotoViewer(
-                            context,
-                            dish.paths,
-                            index,
-                            title: dish.name,
-                            heroTagForIndex: (i) => (this, i),
-                            onReturnIndex: (i) {
-                              setState(() => _photo = i);
-                              _photos.jumpToPage(i);
-                            },
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          PageView.builder(
+                            controller: _photos,
+                            itemCount: dish.paths.length,
+                            onPageChanged: (index) =>
+                                setState(() => _photo = index),
+                            itemBuilder: (_, index) => GestureDetector(
+                              onTap: () => showPhotoViewer(
+                                context,
+                                dish.paths,
+                                index,
+                                title: dish.name,
+                                heroTagForIndex: (i) => (this, i),
+                                onReturnIndex: (i) {
+                                  setState(() => _photo = i);
+                                  _photos.jumpToPage(i);
+                                },
+                              ),
+                              child: Hero(
+                                tag: (this, index),
+                                child: LocalPhoto(path: dish.paths[index]),
+                              ),
+                            ),
                           ),
-                          child: Hero(
-                            tag: (this, index),
-                            child: LocalPhoto(path: dish.paths[index]),
-                          ),
-                        ),
+                          if (dish.paths.length > 1)
+                            Positioned(
+                              right: 12,
+                              bottom: 12,
+                              child: PhotoPageIndicator(
+                                index: _photo,
+                                count: dish.paths.length,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-                if (dish.paths.length > 1)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      '${_photo + 1} / ${dish.paths.length}',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
                 const SizedBox(height: 20),
               ],
               if (price > 0 || dish.visits > 0 || package != null)
                 Text(
                   [
-                    if (price > 0) '¥${money(price)}',
+                    if (price > 0) '${currency.symbol}${money(price)}',
                     if (note.isEmpty && package != null)
-                      visitPackageLabel(package),
+                      visitPackageLabel(package, currency: currency),
                     if (dish.visits > 0) '吃过 ${dish.visits} 次',
                   ].join(' · '),
                   style: TextStyle(

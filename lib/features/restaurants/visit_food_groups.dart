@@ -11,6 +11,7 @@ class VisitFoodGroups extends StatelessWidget {
   const VisitFoodGroups({
     super.key,
     required this.items,
+    this.currency = MenuCurrency.cny,
     required this.packages,
     required this.onEdit,
     required this.onRemove,
@@ -22,6 +23,7 @@ class VisitFoodGroups extends StatelessWidget {
   });
 
   final List<VisitDish> items;
+  final MenuCurrency currency;
   final List<VisitPackage> packages;
   final ValueChanged<VisitDish> onEdit;
   final ValueChanged<VisitDish> onRemove;
@@ -42,6 +44,7 @@ class VisitFoodGroups extends StatelessWidget {
           return VisitDishEditorRow(
             key: ObjectKey(dish),
             dish: dish,
+            currency: currency,
             package: package,
             index: index,
             onEdit: () => onEdit(dish),
@@ -65,6 +68,7 @@ class VisitFoodGroups extends StatelessWidget {
               padding: const EdgeInsets.only(top: 8, bottom: 4),
               child: _PackageHeader(
                 package: package,
+                currency: currency,
                 count: grouped[package.id]?.length ?? 0,
                 onEdit: () => onEditPackage(package),
                 onRemove: () => onRemovePackage(package),
@@ -99,6 +103,7 @@ class VisitFoodGroups extends StatelessWidget {
 class _PackageHeader extends StatelessWidget {
   const _PackageHeader({
     required this.package,
+    required this.currency,
     required this.count,
     required this.onEdit,
     required this.onRemove,
@@ -107,6 +112,7 @@ class _PackageHeader extends StatelessWidget {
   });
 
   final VisitPackage package;
+  final MenuCurrency currency;
   final int count;
   final VoidCallback onEdit, onRemove, onAdd, onQuickAdd;
 
@@ -174,7 +180,7 @@ class _PackageHeader extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    '¥${money(package.totalPrice)}',
+                    '${currency.symbol}${money(package.totalPrice)}',
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,

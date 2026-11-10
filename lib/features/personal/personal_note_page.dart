@@ -11,6 +11,7 @@ class PersonalNotePage extends StatefulWidget {
 
 class _PersonalNotePageState extends State<PersonalNotePage> {
   late final TextEditingController _text;
+  final _scroll = ScrollController();
   late String _baseline;
   bool _initialized = false;
   bool _saving = false;
@@ -30,6 +31,7 @@ class _PersonalNotePageState extends State<PersonalNotePage> {
   @override
   void dispose() {
     _text.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -82,7 +84,7 @@ class _PersonalNotePageState extends State<PersonalNotePage> {
     child: Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
-        title: const Text('随手记'),
+        title: MenuScrollTitle(controller: _scroll, child: const Text('随手记')),
         leading: IconButton(
           tooltip: '返回',
           onPressed: _saving ? null : _leave,
@@ -99,6 +101,7 @@ class _PersonalNotePageState extends State<PersonalNotePage> {
                 Expanded(
                   child: TextField(
                     controller: _text,
+                    scrollController: _scroll,
                     enabled: !_saving,
                     expands: true,
                     maxLines: null,

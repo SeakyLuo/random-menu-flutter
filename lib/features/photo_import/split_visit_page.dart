@@ -14,8 +14,9 @@ class _SplitVisitPageState extends State<SplitVisitPage> {
   final selected = <int>{};
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('拆分消费记录')),
+    appBar: AppBar(title: MenuScrollTitle(child: const Text('拆分消费记录'))),
     body: ListView(
+      primary: true,
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
       children: [
         Text('勾选属于另一次用餐的照片', style: Theme.of(context).textTheme.titleLarge),

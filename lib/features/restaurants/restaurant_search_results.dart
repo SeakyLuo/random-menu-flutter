@@ -133,6 +133,7 @@ class RestaurantSearchResults extends StatelessWidget {
             hit: hit,
             query: query,
             onOpen: () => onDish(hit),
+            onOpenRestaurant: () => onRestaurant(hit.restaurant),
           );
         },
       );

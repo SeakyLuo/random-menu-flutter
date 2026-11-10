@@ -3,8 +3,11 @@ part of 'menu_database.dart';
 const _couponSchema = '''CREATE TABLE restaurant_visit_coupons (
  restaurant_id TEXT NOT NULL, visit_id TEXT NOT NULL, position INTEGER NOT NULL,
  threshold REAL CHECK (threshold IS NULL OR threshold > 0),
- discount REAL NOT NULL CHECK (discount > 0),
- quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 100),
+ discount REAL, quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 100),
+ type TEXT NOT NULL DEFAULT 'amount' CHECK (type IN ('amount','percentage')),
+ rate REAL, max_discount REAL CHECK (max_discount IS NULL OR max_discount > 0),
+ CHECK ((type = 'amount' AND discount > 0 AND discount IS NOT NULL AND rate IS NULL AND max_discount IS NULL)
+ OR (type = 'percentage' AND discount IS NULL AND rate > 0 AND rate < 10 AND rate IS NOT NULL AND quantity = 1)),
  PRIMARY KEY (restaurant_id,visit_id,position))''';
 
 Future<void> _upgradeVisitCoupons(DatabaseExecutor db) async {

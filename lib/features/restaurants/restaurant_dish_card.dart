@@ -9,6 +9,7 @@ class RestaurantDishCard extends StatelessWidget {
   const RestaurantDishCard({
     super.key,
     required this.name,
+    this.currency = MenuCurrency.cny,
     required this.paths,
     required this.price,
     required this.note,
@@ -18,6 +19,7 @@ class RestaurantDishCard extends StatelessWidget {
   });
 
   final String name;
+  final MenuCurrency currency;
   final List<String> paths;
   final double price;
   final String note;
@@ -88,9 +90,9 @@ class RestaurantDishCard extends StatelessWidget {
                   Text.rich(
                     TextSpan(
                       children: [
-                        const TextSpan(
-                          text: '¥',
-                          style: TextStyle(fontSize: 10),
+                        TextSpan(
+                          text: currency.symbol,
+                          style: const TextStyle(fontSize: 10),
                         ),
                         TextSpan(text: money(price)),
                         if (quantity > 1)
@@ -116,7 +118,9 @@ class RestaurantDishCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  note.isNotEmpty ? '“$note”' : visitPackageLabel(package!),
+                  note.isNotEmpty
+                      ? '“$note”'
+                      : visitPackageLabel(package!, currency: currency),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

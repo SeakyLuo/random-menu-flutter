@@ -1,4 +1,5 @@
 import '../../ui/menu_popup.dart';
+import '../../ui/menu_currency_picker.dart';
 import '../../ui/menu_dialog.dart';
 import '../../ui/menu_icon.dart';
 import 'package:flutter/material.dart';
@@ -51,7 +52,12 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
   }
 
   Future<void> editItem(ImportVisit group, int index) async {
-    final result = await editVisitDish(context, group.items[index]);
+    final result = await editVisitDish(
+      context,
+      group.items[index],
+      currency: group.currency,
+      onCurrencyChanged: (value) => group.currency = value,
+    );
     if (result != null && mounted) {
       setState(() {
         group.items[index] = result;
@@ -89,6 +95,8 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
         imagePaths: same.expand((i) => i.imagePaths).toList(),
       ),
       requirePrice: prices.length > 1,
+      currency: group.currency,
+      onCurrencyChanged: (value) => group.currency = value,
     );
     if (result == null || !mounted) return;
     setState(() {
@@ -134,7 +142,12 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
 
   Future<void> mergeRecords(ImportVisit group) async {
     final candidates = groups
-        .where((g) => g != group && g.address.id == group.address.id)
+        .where(
+          (g) =>
+              g != group &&
+              g.address.id == group.address.id &&
+              g.currency == group.currency,
+        )
         .toList();
     final target = await showDialog<ImportVisit>(
       context: context,
@@ -211,8 +224,14 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
         .toList();
     setState(() {
       groups.remove(group);
-      groups.add(importVisitFromPhotos(selected, group.address));
-      groups.add(importVisitFromPhotos(remaining, group.address));
+      groups.add(
+        importVisitFromPhotos(selected, group.address)
+          ..currency = group.currency,
+      );
+      groups.add(
+        importVisitFromPhotos(remaining, group.address)
+          ..currency = group.currency,
+      );
       groups.sort((a, b) => a.date.compareTo(b.date));
       changed = true;
     });
@@ -304,6 +323,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
               address: group.address.fullAddress,
               autoCost: true,
               totalCost: group.total,
+              currency: group.currency,
               items: items,
               dishes: items.map((i) => i.name).toList(),
               imagePaths: group.environments
@@ -342,7 +362,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
     },
     child: Scaffold(
       appBar: AppBar(
-        title: const Text('核对导入记录'),
+        title: MenuScrollTitle(child: const Text('核对导入记录')),
         leading: IconButton(
           tooltip: '返回照片设置',
           onPressed: saving ? null : leave,
@@ -352,6 +372,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
       body: AbsorbPointer(
         absorbing: saving,
         child: ListView(
+          primary: true,
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
           children: [
             Text(
@@ -391,7 +412,8 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
                               groups.any(
                                 (g) =>
                                     g != group &&
-                                    g.address.id == group.address.id,
+                                    g.address.id == group.address.id &&
+                                    g.currency == group.currency,
                               ))
                             MenuPopupButton<String>(
                               icon: const MenuIcon(Icons.more_horiz),
@@ -407,7 +429,8 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
                                 if (groups.any(
                                   (g) =>
                                       g != group &&
-                                      g.address.id == group.address.id,
+                                      g.address.id == group.address.id &&
+                                      g.currency == group.currency,
                                 ))
                                   const MenuPopupItem(
                                     icon: Icons.call_merge,
@@ -427,11 +450,24 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
                       const SizedBox(height: 8),
                       Text(group.address.fullAddress),
                       const SizedBox(height: 10),
-                      Text(
-                        '菜品合计 ¥${money(group.total)} · ${group.items.length} 条菜品明细',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                      Row(
+                        children: [
+                          MenuCurrencyPrefix(
+                            currency: group.currency,
+                            onChanged: (value) => setState(() {
+                              group.currency = value;
+                              changed = true;
+                            }),
+                          ),
+                          Expanded(
+                            child: Text(
+                              '菜品合计 ${group.currency.symbol}${money(group.total)} · ${group.items.length} 条菜品明细',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       for (var i = 0; i < group.items.length; i++)
                         ListTile(
@@ -442,7 +478,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
                                 : group.items[i].name,
                           ),
                           subtitle: Text(
-                            '¥${money(group.items[i].price)} × ${group.items[i].quantity} 份 = ¥${money(group.items[i].cost)} · ${group.items[i].imagePaths.length} 张照片',
+                            '${group.currency.symbol}${money(group.items[i].price)} × ${group.items[i].quantity} 份 = ${group.currency.symbol}${money(group.items[i].cost)} · ${group.items[i].imagePaths.length} 张照片',
                           ),
                           onTap: () => editItem(group, i),
                           trailing: MenuPopupButton<String>(

@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../ui/widgets.dart';
+import '../../core/models.dart';
 
 class RestaurantPrice extends StatelessWidget {
-  const RestaurantPrice(this.value, {super.key, this.showUnit = true});
+  const RestaurantPrice(
+    this.value, {
+    super.key,
+    this.showUnit = true,
+    this.currency = MenuCurrency.cny,
+  });
 
   final double value;
+  final MenuCurrency currency;
   final bool showUnit;
 
   @override
@@ -12,7 +19,7 @@ class RestaurantPrice extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return Text.rich(
       TextSpan(
-        text: '¥${money(value)}',
+        text: '${currency.symbol}${money(value)}',
         children: [
           if (showUnit)
             TextSpan(
@@ -32,4 +39,17 @@ class RestaurantPrice extends StatelessWidget {
       ),
     );
   }
+}
+
+class RestaurantPrices extends StatelessWidget {
+  const RestaurantPrices(this.restaurant, {super.key});
+  final Restaurant restaurant;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.end,
+    children: [
+      for (final price in restaurant.averageCosts.entries)
+        RestaurantPrice(price.value, currency: price.key),
+    ],
+  );
 }

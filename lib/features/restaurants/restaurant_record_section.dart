@@ -8,7 +8,7 @@ import '../media/photo_widget.dart';
 import 'restaurant_food_summary.dart';
 import 'restaurant_gallery_data.dart';
 
-class RestaurantRecordSection extends StatelessWidget {
+class RestaurantRecordSection extends StatefulWidget {
   const RestaurantRecordSection({
     super.key,
     required this.records,
@@ -24,7 +24,31 @@ class RestaurantRecordSection extends StatelessWidget {
   final void Function(Visit, int) onDish;
 
   @override
+  State<RestaurantRecordSection> createState() =>
+      _RestaurantRecordSectionState();
+}
+
+class _RestaurantRecordSectionState extends State<RestaurantRecordSection> {
+  Expando<double> _foodHeights = Expando();
+  (TextScaler, TextDirection, TextStyle)? _metrics;
+  List<Visit> get records => widget.records;
+  VoidCallback get onAdd => widget.onAdd;
+  VoidCallback get onPhotos => widget.onPhotos;
+  ValueChanged<Visit> get onEdit => widget.onEdit;
+  ValueChanged<Visit> get onRemove => widget.onRemove;
+  void Function(Visit, int) get onDish => widget.onDish;
+
+  @override
   Widget build(BuildContext context) {
+    final metrics = (
+      MediaQuery.textScalerOf(context),
+      Directionality.of(context),
+      DefaultTextStyle.of(context).style,
+    );
+    if (_metrics != metrics) {
+      _metrics = metrics;
+      _foodHeights = Expando();
+    }
     final scheme = Theme.of(context).colorScheme;
     final nameStyle = const TextStyle(fontSize: 14, height: 1.4);
     final summaryStyle = TextStyle(
@@ -49,11 +73,14 @@ class RestaurantRecordSection extends StatelessWidget {
     }
 
     double foodHeight(Visit visit) {
+      final cached = _foodHeights[visit];
+      if (cached != null) return cached;
       var height = 0.0;
       for (final dish in visit.items) {
         final summary = restaurantFoodSummary(
           dish,
           package: visit.packageFor(dish),
+          currency: visit.currency,
         );
         final measured =
             84 +
@@ -62,6 +89,7 @@ class RestaurantRecordSection extends StatelessWidget {
             (summary.isEmpty ? 0 : 2 + textHeight(summary, summaryStyle));
         if (measured > height) height = measured;
       }
+      _foodHeights[visit] = height;
       return height;
     }
 
@@ -176,7 +204,7 @@ class RestaurantRecordSection extends StatelessWidget {
                           ],
                           Expanded(
                             child: Text(
-                              '${visit.address.isEmpty ? '' : '${localAddressText(visit.address)} · '}¥${money(visit.totalCost)}',
+                              '${visit.address.isEmpty ? '' : '${localAddressText(visit.address)} · '}${visit.currency.symbol}${money(visit.totalCost)}',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: summaryStyle,
@@ -221,6 +249,7 @@ class RestaurantRecordSection extends StatelessWidget {
                               final summary = restaurantFoodSummary(
                                 dish,
                                 package: visit.packageFor(dish),
+                                currency: visit.currency,
                               );
                               return SizedBox(
                                 width: 124,

@@ -83,6 +83,52 @@ class MenuStore extends ChangeNotifier {
     draft.patternTagRules = source.patternTagRules;
   });
 
+  Future<void> updateRestaurantDetails({
+    required Map<String, dynamic> before,
+    required Restaurant details,
+    required bool updateFavorite,
+  }) {
+    final result = _pending.then((_) async {
+      final saved = await _database.editRestaurantDetails(
+        before: before,
+        details: details,
+        updateFavorite: updateFavorite,
+      );
+      final current = _data.restaurants.firstWhere((r) => r.id == details.id);
+      saved.restaurant.records = [
+        for (final visit in current.records)
+          if (saved.changedAddresses.containsKey(visit.addressId))
+            Visit(
+              id: visit.id,
+              date: visit.date,
+              totalCost: visit.totalCost,
+              currency: visit.currency,
+              addressId: visit.addressId,
+              address: saved.changedAddresses[visit.addressId]!,
+              autoCost: visit.autoCost,
+              items: visit.items,
+              coupons: visit.coupons,
+              packages: visit.packages,
+              companions: visit.companions,
+              note: visit.note,
+              dishes: visit.dishes,
+              imagePaths: visit.imagePaths,
+            )
+          else
+            visit,
+      ];
+      _data.restaurants = [
+        for (final restaurant in _data.restaurants)
+          restaurant.id == details.id ? saved.restaurant : restaurant,
+      ];
+      _data.restaurantCategories = saved.categories;
+      _data.restaurantCategoryIds = saved.categoryIds;
+      notifyListeners();
+    });
+    _pending = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return result;
+  }
+
   Future<Map<String, Object?>> inspectSqlDatabase() =>
       _scheduleSql(_database.inspectSql);
 
