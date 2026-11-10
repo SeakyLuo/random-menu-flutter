@@ -1,3 +1,4 @@
+import '../../core/tag_path.dart';
 import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../ui/menu_icon.dart';
@@ -100,21 +101,28 @@ class _RestaurantDetailInfoState extends State<RestaurantDetailInfo> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              if (restaurant.category.isNotEmpty ||
+              if (restaurant.categories.isNotEmpty ||
                   restaurant.averageCosts.isNotEmpty)
                 const SizedBox(height: 10),
-              if (restaurant.category.isNotEmpty ||
+              if (restaurant.categories.isNotEmpty ||
                   restaurant.averageCosts.isNotEmpty)
                 Row(
                   children: [
                     Expanded(
                       child: Align(
                         alignment: AlignmentDirectional.centerStart,
-                        child: restaurant.category.isNotEmpty
-                            ? MenuTag(
-                                restaurant.category,
-                                selected: true,
-                                compact: true,
+                        child: restaurant.categories.isNotEmpty
+                            ? Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  for (final tag in restaurant.categories)
+                                    MenuTag(
+                                      tagPathLabel(tag),
+                                      selected: true,
+                                      compact: true,
+                                    ),
+                                ],
                               )
                             : const SizedBox.shrink(),
                       ),

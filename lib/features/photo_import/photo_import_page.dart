@@ -9,6 +9,8 @@ import '../restaurants/restaurant_address_editor.dart';
 import 'import_models.dart';
 import 'import_photo_editor.dart';
 import 'photo_import_preview.dart';
+import '../../ui/tag_selection_field.dart';
+import '../restaurants/restaurant_categories_page.dart';
 
 class PhotoImportPage extends StatefulWidget {
   const PhotoImportPage({super.key, this.restaurantId});
@@ -19,7 +21,7 @@ class PhotoImportPage extends StatefulWidget {
 
 class _PhotoImportPageState extends State<PhotoImportPage> {
   final name = TextEditingController();
-  final category = TextEditingController();
+  List<String> categories = [];
   final photos = <ImportPhoto>[];
   final selected = <int>{};
   List<RestaurantAddress> addresses = [];
@@ -32,7 +34,7 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
   bool get dirty =>
       photos.isNotEmpty ||
       name.text.isNotEmpty ||
-      category.text.isNotEmpty ||
+      categories.isNotEmpty ||
       addresses.length != initialAddressCount;
   @override
   void didChangeDependencies() {
@@ -54,14 +56,12 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
   void initState() {
     super.initState();
     name.addListener(changed);
-    category.addListener(changed);
   }
 
   void changed() => setState(() {});
   @override
   void dispose() {
     name.dispose();
-    category.dispose();
     super.dispose();
   }
 
@@ -240,7 +240,7 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
         builder: (_) => PhotoImportPreview(
           restaurantId: widget.restaurantId,
           name: name.text.trim(),
-          category: category.text.trim(),
+          categories: [...categories],
           addresses: addresses,
           groups: groups,
         ),
@@ -295,12 +295,12 @@ class _PhotoImportPageState extends State<PhotoImportPage> {
                   decoration: const InputDecoration(labelText: '餐厅名称'),
                 ),
                 const SizedBox(height: 18),
-                TextField(
-                  controller: category,
-                  decoration: const InputDecoration(
-                    labelText: '分类',
-                    hintText: '如川菜、咖啡',
-                  ),
+                TagSelectionField(
+                  label: '菜系',
+                  selected: categories,
+                  hierarchical: true,
+                  choices: restaurantCategoryNames(MenuScope.of(context).data),
+                  onChanged: (value) => setState(() => categories = value),
                 ),
               ] else
                 Text(

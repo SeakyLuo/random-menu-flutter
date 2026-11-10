@@ -1,3 +1,5 @@
+import 'restaurant_cover_batch.dart';
+import '../../core/tag_path.dart';
 import 'restaurant_price.dart';
 import 'package:flutter/material.dart';
 import '../../core/models.dart';
@@ -38,6 +40,29 @@ class _RestaurantCardState extends State<RestaurantCard> {
     widget.restaurant,
   ).where((photo) => !photo.isEnvironment).toList();
   bool _initialized = false;
+  RestaurantCoverBatchState? _coverBatch;
+  Object? _coverTicket;
+  String? _loadingCover;
+  bool _backCardsReady = false;
+
+  void _waitForCover() {
+    if (_coverTicket case final ticket?) _coverBatch!.remove(ticket);
+    _coverTicket = null;
+    _loadingCover = _photos.isEmpty ? null : _photos[_index].path;
+    _backCardsReady = _photos.isEmpty;
+    if (_loadingCover != null) {
+      _coverTicket = _coverBatch!.begin(() {
+        if (mounted) setState(() => _backCardsReady = true);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_coverTicket case final ticket?) _coverBatch!.remove(ticket);
+    super.dispose();
+  }
+
   bool _savingFavorite = false;
   String? _selected;
   String get _photoStorageKey =>
@@ -58,10 +83,24 @@ class _RestaurantCardState extends State<RestaurantCard> {
       }
       _initialized = true;
     }
+    final batch = RestaurantCoverBatch.of(context);
+    if (batch != _coverBatch) {
+      if (_coverTicket case final ticket?) _coverBatch!.remove(ticket);
+      _coverTicket = null;
+      _coverBatch = batch;
+      _waitForCover();
+    }
   }
 
   void _select(int index) {
-    setState(() => _selected = _photos[index].key);
+    setState(() {
+      _selected = _photos[index].key;
+      if (!_backCardsReady) {
+        _waitForCover();
+      } else {
+        _loadingCover = _photos[index].path;
+      }
+    });
     PageStorage.of(
       context,
     ).writeState(context, _selected, identifier: _photoStorageKey);
@@ -83,6 +122,8 @@ class _RestaurantCardState extends State<RestaurantCard> {
       if (_selected != null && !_photos.any((p) => p.key == _selected)) {
         _selected = null;
       }
+      final path = _photos.isEmpty ? null : _photos[_index].path;
+      if (path != _loadingCover) _waitForCover();
     }
   }
 
@@ -152,6 +193,7 @@ class _RestaurantCardState extends State<RestaurantCard> {
                     Object.hashAll(_photos.map((photo) => photo.key)),
                   ),
                   itemCount: _photos.length,
+                  showBackCards: _backCardsReady,
                   index: _index,
                   onChanged: _select,
                   onTap: _open,
@@ -217,6 +259,8 @@ class _RestaurantCardState extends State<RestaurantCard> {
 
   Widget _cover(BuildContext context, int index) {
     final r = widget.restaurant;
+    final batch = _coverBatch;
+    final ticket = _coverTicket;
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
@@ -260,7 +304,12 @@ class _RestaurantCardState extends State<RestaurantCard> {
                     )
                   : AspectRatio(
                       aspectRatio: 1.65,
-                      child: RetainedLocalPhoto(path: _photos[index].path),
+                      child: RetainedLocalPhoto(
+                        path: _photos[index].path,
+                        onReady: _photos[index].path == _loadingCover
+                            ? () => batch!.complete(ticket!)
+                            : null,
+                      ),
                     ),
             ),
           ),
@@ -285,7 +334,7 @@ class _RestaurantCardState extends State<RestaurantCard> {
                 ),
               ),
             ),
-          if (r.category.isNotEmpty)
+          if (r.categories.isNotEmpty)
             Positioned(
               left: 13,
               right: r.favorite ? 55 : 13,
@@ -308,7 +357,11 @@ class _RestaurantCardState extends State<RestaurantCard> {
                         vertical: 5,
                       ),
                       child: Text(
-                        r.category,
+                        [
+                          ...r.categories.take(2).map(tagPathLabel),
+                          if (r.categories.length > 2)
+                            '+${r.categories.length - 2}',
+                        ].join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

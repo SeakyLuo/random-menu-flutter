@@ -1,3 +1,4 @@
+import 'tag_path.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:developer';
@@ -8,6 +9,7 @@ import 'menu_write_scope.dart';
 import 'visit_coupon_migration.dart';
 import 'dish_identity_upgrade.dart';
 import 'record_conflicts.dart';
+import 'restaurant_tag_upgrade.dart';
 
 part 'menu_database_sql.dart';
 part 'menu_database_schema.dart';

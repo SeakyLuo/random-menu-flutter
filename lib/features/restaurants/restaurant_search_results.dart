@@ -1,3 +1,4 @@
+import 'restaurant_cover_batch.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -212,15 +213,17 @@ class RestaurantSearchResults extends StatelessWidget {
         slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 28)));
       }
     }
-    return CustomScrollView(
-      controller: controller,
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      slivers: [
-        SliverPadding(
-          padding: EdgeInsets.fromLTRB(16, 0, 16, bottom),
-          sliver: SliverMainAxisGroup(slivers: slivers),
-        ),
-      ],
+    return RestaurantCoverBatch(
+      child: CustomScrollView(
+        controller: controller,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, bottom),
+            sliver: SliverMainAxisGroup(slivers: slivers),
+          ),
+        ],
+      ),
     );
   }
 }

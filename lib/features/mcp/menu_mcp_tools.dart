@@ -55,7 +55,11 @@ class MenuMcpTools {
     },
     'restaurant' => {
       'name': _text,
-      'category': _text,
+      'categories': {
+        ..._strings,
+        'maxItems': 10,
+        'description': '餐厅的多选标签；用 / 表示父子标签，如烤肉/日本烤肉。日本料理等独立标签仅在用户明确选择时添加。',
+      },
       'note': _text,
       'link': _text,
       'favorite': _flag,
@@ -263,7 +267,7 @@ class MenuMcpTools {
                 'currency': r['currency'],
               },
               if (kind == 'restaurant') ...{
-                'category': r['category'],
+                'categories': r['categories'],
                 'visitCount': (r['records'] as List).length,
               },
             },
@@ -357,8 +361,10 @@ class MenuMcpTools {
             if (args.containsKey('note')) {
               restaurant.note = args['note'] as String;
             }
-            if (args.containsKey('category')) {
-              restaurant.category = args['category'] as String;
+            if (args.containsKey('categories')) {
+              restaurant.categories = List<String>.from(
+                args['categories'] as List,
+              ).toSet().toList();
             }
             if (args.containsKey('link')) {
               restaurant.link = args['link'] as String;

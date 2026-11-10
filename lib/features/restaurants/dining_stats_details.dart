@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/menu_icon.dart';
-import '../../ui/menu_segmented.dart';
+import '../../ui/menu_pill_tabs.dart';
 import '../../ui/retained_tab_view.dart';
 import '../../ui/widgets.dart';
 import 'dining_statistics.dart';
@@ -23,9 +23,11 @@ class DiningStatsDetails extends StatefulWidget {
   State<DiningStatsDetails> createState() => _DiningStatsDetailsState();
 }
 
-class _DiningStatsDetailsState extends State<DiningStatsDetails> {
+class _DiningStatsDetailsState extends State<DiningStatsDetails>
+    with SingleTickerProviderStateMixin {
   late MenuCurrency _currency = widget.initialCurrency;
   bool _showRatio = false;
+  final _expandedCuisines = <String>{};
   DiningTimeUnit _timeUnit = DiningTimeUnit.quarter;
   RestaurantRegionLevel _regionLevel = RestaurantRegionLevel.county;
 
@@ -37,8 +39,38 @@ class _DiningStatsDetailsState extends State<DiningStatsDetails> {
     _ => 0,
   };
 
+  late final TabController _tabs;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(
+      length: switch (widget.kind) {
+        DiningBreakdown.counties || DiningBreakdown.quarters => 3,
+        _ => 1,
+      },
+      initialIndex: _pageIndex,
+      vsync: this,
+    )..addListener(_tabChanged);
+  }
+
+  void _tabChanged() {
+    if (_tabs.index == _pageIndex) return;
+    setState(() {
+      switch (widget.kind) {
+        case DiningBreakdown.counties:
+          _regionLevel = RestaurantRegionLevel.values[_tabs.index];
+        case DiningBreakdown.quarters:
+          _timeUnit = DiningTimeUnit.values[_tabs.index];
+        default:
+          break;
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _tabs.dispose();
     for (final controller in _scrollControllers) {
       controller.dispose();
     }
@@ -83,7 +115,9 @@ class _DiningStatsDetailsState extends State<DiningStatsDetails> {
         actions: [
           Semantics(
             button: true,
-            label: _showRatio ? '占比，点击切换为次数' : '次数，点击切换为占比',
+            label: _showRatio
+                ? '按占比，点击切换为按${widget.kind == DiningBreakdown.cuisines ? '家数' : '次数'}'
+                : '按${widget.kind == DiningBreakdown.cuisines ? '家数' : '次数'}，点击切换为按占比',
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => setState(() => _showRatio = !_showRatio),
@@ -94,7 +128,11 @@ class _DiningStatsDetailsState extends State<DiningStatsDetails> {
                   child: Center(
                     child: ExcludeSemantics(
                       child: Text(
-                        _showRatio ? '占比' : '次数',
+                        _showRatio
+                            ? '按占比'
+                            : widget.kind == DiningBreakdown.cuisines
+                            ? '按家数'
+                            : '按次数',
                         style: TextStyle(
                           fontSize: 14,
                           color: colors.onSurfaceVariant,
@@ -115,39 +153,22 @@ class _DiningStatsDetailsState extends State<DiningStatsDetails> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (quarterStats || regionStats)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                  child: Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 12,
-                    runSpacing: 4,
-                    children: [
-                      if (regionStats)
-                        MenuSegmented<RestaurantRegionLevel>(
-                          compact: true,
-                          labels: const {
-                            RestaurantRegionLevel.province: '省',
-                            RestaurantRegionLevel.city: '市',
-                            RestaurantRegionLevel.county: '区县',
-                          },
-                          selected: _regionLevel,
-                          onChanged: (value) =>
-                              setState(() => _regionLevel = value),
+                MenuPillTabs(
+                  controller: _tabs,
+                  tabs: [
+                    for (final label in switch (widget.kind) {
+                      DiningBreakdown.counties => ['省', '市', '区县'],
+                      DiningBreakdown.quarters => ['年', '季度', '月'],
+                      _ => <String>[],
+                    })
+                      Tab(
+                        height: 38,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(label),
                         ),
-                      if (quarterStats)
-                        MenuSegmented<DiningTimeUnit>(
-                          compact: true,
-                          labels: const {
-                            DiningTimeUnit.year: '年',
-                            DiningTimeUnit.quarter: '季度',
-                            DiningTimeUnit.month: '月',
-                          },
-                          selected: _timeUnit,
-                          onChanged: (value) =>
-                              setState(() => _timeUnit = value),
-                        ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               if (_showRatio && companionStats)
                 Padding(
@@ -164,15 +185,9 @@ class _DiningStatsDetailsState extends State<DiningStatsDetails> {
                 child: quarterStats || regionStats
                     ? RetainedTabView(
                         index: _pageIndex,
-                        onChanged: (index) => setState(() {
-                          if (regionStats) {
-                            _regionLevel = RestaurantRegionLevel.values[index];
-                          } else {
-                            _timeUnit = DiningTimeUnit.values[index];
-                          }
-                        }),
+                        onChanged: (index) => _tabs.animateTo(index),
                         children: [
-                          for (var index = 0; index < 3; index++)
+                          for (var index = 0; index < _tabs.length; index++)
                             _list(context, stats, index),
                         ],
                       )
@@ -192,6 +207,7 @@ class _DiningStatsDetailsState extends State<DiningStatsDetails> {
     final regionLevel = widget.kind == DiningBreakdown.counties
         ? RestaurantRegionLevel.values[index]
         : _regionLevel;
+    final cuisineStats = widget.kind == DiningBreakdown.cuisines;
     final groups = stats.groups(
       widget.kind,
       _currency,
@@ -203,8 +219,61 @@ class _DiningStatsDetailsState extends State<DiningStatsDetails> {
     final quarterStats = widget.kind == DiningBreakdown.quarters;
     final amountStats = widget.kind == DiningBreakdown.amounts;
     if (companionStats) groups.insert(0, DiningGroup('', '独自用餐', stats.alone));
+    final children = <String, List<DiningGroup>>{};
+    if (cuisineStats) {
+      for (final group in stats.groups(
+        DiningBreakdown.cuisines,
+        _currency,
+        detailedTags: true,
+      )) {
+        final parent = group.key.substring(0, group.key.lastIndexOf('/'));
+        children.putIfAbsent(parent, () => []).add(group);
+      }
+    }
+    final rows = <(DiningGroup, int, int?)>[];
+    void addRow(DiningGroup group, int depth, int? rank) {
+      rows.add((group, depth, rank));
+      if (_expandedCuisines.contains(group.key)) {
+        for (final child in children[group.key] ?? <DiningGroup>[]) {
+          addRow(child, depth + 1, null);
+        }
+        if (children.containsKey(group.key)) {
+          final other = group.entries
+              .where((entry) => entry.restaurant.categories.contains(group.key))
+              .toList();
+          if (other.isNotEmpty) {
+            rows.add((
+              DiningGroup(
+                group.key,
+                '其他',
+                other,
+                exactCuisine: true,
+                countRestaurants: true,
+              ),
+              depth + 1,
+              null,
+            ));
+          }
+        }
+      }
+    }
+
+    for (final (position, group) in groups.indexed) {
+      final alone = companionStats && group.key.isEmpty;
+      addRow(
+        group,
+        0,
+        alone
+            ? null
+            : companionStats
+            ? position
+            : position + 1,
+      );
+    }
     final total = amountStats
         ? groups.fold<int>(0, (sum, group) => sum + group.count)
+        : cuisineStats
+        ? stats.restaurantCount
         : stats.entries.length;
     final colors = Theme.of(context).colorScheme;
     final maximum = groups.fold<int>(
@@ -226,7 +295,7 @@ class _DiningStatsDetailsState extends State<DiningStatsDetails> {
               'dining-details-${widget.kind.name}-${timeUnit.name}-${regionLevel.name}',
             ),
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
-            itemCount: groups.length,
+            itemCount: rows.length,
             separatorBuilder: (_, _) => ColoredBox(
               color: colors.surface,
               child: Divider(
@@ -238,13 +307,7 @@ class _DiningStatsDetailsState extends State<DiningStatsDetails> {
               ),
             ),
             itemBuilder: (context, index) {
-              final group = groups[index];
-              final alone = companionStats && group.key.isEmpty;
-              final rank = alone
-                  ? null
-                  : companionStats
-                  ? index
-                  : index + 1;
+              final (group, depth, rank) = rows[index];
               final highlighted =
                   !amountStats && !quarterStats && rank != null && rank <= 3;
               final barColor = colors.primary.withValues(
@@ -257,10 +320,11 @@ class _DiningStatsDetailsState extends State<DiningStatsDetails> {
                     : .55,
               );
               return Material(
+                key: ValueKey((group.key, group.exactCuisine)),
                 color: colors.surface,
                 borderRadius: BorderRadius.vertical(
                   top: index == 0 ? const Radius.circular(18) : Radius.zero,
-                  bottom: index == groups.length - 1
+                  bottom: index == rows.length - 1
                       ? const Radius.circular(18)
                       : Radius.zero,
                 ),
@@ -270,12 +334,22 @@ class _DiningStatsDetailsState extends State<DiningStatsDetails> {
                   value: _showRatio
                       ? (group.count / total * 100).toStringAsFixed(1)
                       : '${group.count}',
-                  unit: _showRatio ? '%' : ' 次',
+                  unit: _showRatio ? '%' : ' ${group.unit}',
                   label: amountStats
                       ? '${_currency.symbol}${group.label}'
                       : group.label,
                   rank: rank,
-                  showRank: !quarterStats,
+                  showRank: !quarterStats && depth == 0,
+                  reserveRankSpace: cuisineStats && depth > 0,
+                  expanded: _expandedCuisines.contains(group.key),
+                  onExpand:
+                      !group.exactCuisine && children.containsKey(group.key)
+                      ? () => setState(() {
+                          if (!_expandedCuisines.add(group.key)) {
+                            _expandedCuisines.remove(group.key);
+                          }
+                        })
+                      : null,
                   highlighted: highlighted,
                   barColor: barColor,
                   fraction: group.count / maximum,
@@ -312,6 +386,9 @@ class _RankingRow extends StatelessWidget {
     required this.barColor,
     required this.fraction,
     required this.onTap,
+    this.onExpand,
+    this.expanded = false,
+    this.reserveRankSpace = false,
   });
 
   final DiningGroup group;
@@ -322,18 +399,21 @@ class _RankingRow extends StatelessWidget {
   final bool highlighted;
   final Color barColor;
   final double fraction;
-  final VoidCallback? onTap;
+  final VoidCallback? onTap, onExpand;
+  final bool expanded;
+  final bool reserveRankSpace;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Semantics(
       label:
-          '${!showRank || rank == null ? '' : '$rank，'}$label，${group.detail}，${group.count}次',
+          '${!showRank || rank == null ? '' : '$rank，'}$label，${group.detail}，${group.count}${group.unit}',
       button: onTap != null,
-      excludeSemantics: true,
+      excludeSemantics: onExpand == null,
       onTap: onTap,
-      child: InkWell(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 64),
@@ -341,11 +421,13 @@ class _RankingRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                if (showRank)
+                if (showRank || reserveRankSpace)
                   SizedBox(
                     width: 28,
                     child: Center(
-                      child: rank == null
+                      child: !showRank
+                          ? null
+                          : rank == null
                           ? MenuIcon(
                               Icons.person_outline,
                               size: 18,
@@ -357,13 +439,14 @@ class _RankingRow extends StatelessWidget {
                             ),
                     ),
                   ),
-                if (showRank) const SizedBox(width: 12),
+                if (showRank || reserveRankSpace) const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
                         children: [
                           Expanded(
                             child: Text(
@@ -376,31 +459,28 @@ class _RankingRow extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text.rich(
-                              TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: value,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                          Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: value,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                  TextSpan(
-                                    text: unit,
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                ],
-                              ),
-                              style: TextStyle(
-                                fontSize: 14,
-                                height: 1.5,
-                                color: colors.onSurfaceVariant,
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures(),
-                                ],
-                              ),
+                                ),
+                                TextSpan(
+                                  text: unit,
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ],
+                            ),
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.5,
+                              color: colors.onSurfaceVariant,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
                             ),
                           ),
                         ],
@@ -440,8 +520,33 @@ class _RankingRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 SizedBox(
-                  width: 17,
-                  child: onTap == null
+                  width: 20,
+                  child: onExpand != null
+                      ? Semantics(
+                          button: true,
+                          label: '${expanded ? '收起' : '展开'}$label细分',
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: onExpand,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: AnimatedRotation(
+                                turns: expanded ? .5 : 0,
+                                duration:
+                                    MediaQuery.disableAnimationsOf(context)
+                                    ? Duration.zero
+                                    : const Duration(milliseconds: 200),
+                                curve: Curves.easeInOutCubic,
+                                child: MenuIcon(
+                                  Icons.expand_more,
+                                  size: 18,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      : onTap == null
                       ? null
                       : MenuIcon(
                           Icons.chevron_right,

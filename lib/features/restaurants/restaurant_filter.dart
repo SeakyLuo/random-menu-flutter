@@ -1,3 +1,4 @@
+import '../../core/tag_path.dart';
 import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../ui/menu_bottom_sheet.dart';
@@ -9,7 +10,8 @@ enum RestaurantSort { recent, visits, price, nearest }
 
 class RestaurantQuery {
   RestaurantQuery({
-    this.category = '',
+    this.categories = const [],
+    this.exactCategories = false,
     this.companion = '',
     this.province = '',
     this.city = '',
@@ -26,7 +28,8 @@ class RestaurantQuery {
     this.favorite = false,
     this.sort = RestaurantSort.recent,
   });
-  String category;
+  List<String> categories;
+  bool exactCategories;
   String companion;
   String province;
   String city;
@@ -46,14 +49,15 @@ class RestaurantQuery {
       province.isNotEmpty || city.isNotEmpty || county.isNotEmpty;
   bool get hasLocation =>
       hasRegion || address.isNotEmpty || withoutRegion != null;
-  bool get hasCategory => category.isNotEmpty || uncategorized;
+  bool get hasCategory => categories.isNotEmpty || uncategorized;
   bool get hasRecords =>
       start != null || end != null || companion.isNotEmpty || alone;
   bool get hasPrice => minPrice != null || maxPrice != null;
   bool get active =>
       hasLocation || hasRecords || hasPrice || favorite || hasCategory;
   RestaurantQuery copy() => RestaurantQuery(
-    category: category,
+    categories: [...categories],
+    exactCategories: exactCategories,
     companion: companion,
     province: province,
     city: city,
@@ -108,8 +112,14 @@ class RestaurantQuery {
 
   bool matches(Restaurant r) =>
       (!favorite || r.favorite) &&
-      (category.isEmpty || r.category == category) &&
-      (!uncategorized || r.category.isEmpty) &&
+      categories.every(
+        (selected) => r.categories.any(
+          (tag) => exactCategories
+              ? tag == selected
+              : tagPathContains(selected, tag),
+        ),
+      ) &&
+      (!uncategorized || r.categories.isEmpty) &&
       matchesPrice(r) &&
       (hasRecords || (hasLocation && r.records.isNotEmpty)
           ? r.records.any((v) => matchesVisit(r, v))
@@ -117,7 +127,7 @@ class RestaurantQuery {
   String get sortLabel => switch (sort) {
     RestaurantSort.recent => '最近到店',
     RestaurantSort.visits => '消费次数降序',
-    RestaurantSort.price => '按币种 · 人均降序',
+    RestaurantSort.price => '按人均降序',
     RestaurantSort.nearest => '离我最近',
   };
 }

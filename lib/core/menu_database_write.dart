@@ -39,8 +39,11 @@ List<_TableRows> _tables(
   assignPositions(data.restaurantPositions, restaurants.map((r) => r.id));
   final tags = {...data.recipeTags, for (final r in data.recipes) ...r.tags};
   final categories = {
-    ...data.restaurantCategories,
-    for (final r in data.restaurants) ...r.categories,
+    for (final tag in [
+      ...data.restaurantCategories,
+      for (final r in data.restaurants) ...r.categories,
+    ])
+      ...tagPathPrefixes(tag),
   };
   for (final tag in tags) {
     data.recipeTagIds.putIfAbsent(tag, newId);

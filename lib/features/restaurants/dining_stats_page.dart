@@ -66,11 +66,11 @@ class _DiningStatsPageState extends State<DiningStatsPage> {
                 child: ListView(
                   primary: true,
                   key: const PageStorageKey('dining-statistics'),
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
                   children: [
                     _Overview(stats: stats, currency: _currency),
                     DiningChartCard(
-                      title: '菜系偏好',
+                      title: '菜系',
                       badge: 'TOP10',
                       onDetails: () => _details(DiningBreakdown.cuisines),
                       children: [
@@ -91,7 +91,10 @@ class _DiningStatsPageState extends State<DiningStatsPage> {
                       children: [
                         if (amounts.isEmpty)
                           Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 16,
+                            ),
                             child: Text(
                               '暂无${_currency.label}消费记录，可切换币种查看。',
                               style: TextStyle(color: colors.onSurfaceVariant),
@@ -118,7 +121,7 @@ class _DiningStatsPageState extends State<DiningStatsPage> {
                       ],
                     ),
                     DiningChartCard(
-                      title: '按时间分组',
+                      title: '消费时间',
                       badge: '最近6个季度',
                       onDetails: () => _details(DiningBreakdown.quarters),
                       children: [
@@ -144,7 +147,10 @@ class _DiningStatsPageState extends State<DiningStatsPage> {
                       children: [
                         if (companions.isEmpty)
                           Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 12,
+                            ),
                             child: Text(
                               '还没有填写饭搭子',
                               style: TextStyle(color: colors.onSurfaceVariant),

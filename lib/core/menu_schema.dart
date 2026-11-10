@@ -1,12 +1,26 @@
+import 'tag_path.dart';
 import 'models.dart';
 import 'visit_coupon_migration.dart';
 import 'dish_identity_upgrade.dart';
+import 'restaurant_tag_upgrade.dart';
 
 Map<String, dynamic> upgradeMenuV10(Map<String, dynamic> source) {
   for (final restaurant in source['restaurants'] as List) {
     final category = restaurant.remove('category') as String;
-    restaurant['categories'] = category.isEmpty ? <String>[] : [category];
+    restaurant['categories'] = upgradedRestaurantTags(
+      restaurant['name'] as String,
+      category.isEmpty ? [] : [category],
+    );
   }
+  final tags = {
+    for (final category in source['restaurantCategories'] as List)
+      ...restaurantCategoryTagChanges[category] ?? [category as String],
+    for (final restaurant in source['restaurants'] as List)
+      ...List<String>.from(restaurant['categories'] as List),
+  };
+  source['restaurantCategories'] = {
+    for (final tag in tags) ...tagPathPrefixes(tag),
+  }.toList();
   return {...source, 'version': 11};
 }
 

@@ -7,7 +7,7 @@ import 'restaurant_filter_pickers.dart';
 import '../../ui/menu_tag.dart';
 import '../../ui/menu_suggestion_input.dart';
 import 'restaurant_filter.dart';
-import 'restaurant_category_input.dart';
+import '../../ui/tag_selection_field.dart';
 import 'restaurant_categories_page.dart';
 
 class RestaurantFilterSheet extends StatefulWidget {
@@ -19,7 +19,6 @@ class RestaurantFilterSheet extends StatefulWidget {
 
 class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
   late RestaurantQuery query = widget.query.copy();
-  late final _category = TextEditingController(text: widget.query.category);
   late final _companion = TextEditingController(
     text: query.alone ? '独自用餐' : query.companion,
   );
@@ -33,7 +32,6 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
 
   @override
   void dispose() {
-    _category.dispose();
     _companion.dispose();
     _address.dispose();
     _minPrice.dispose();
@@ -304,13 +302,31 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                       ],
                     ),
                     const SizedBox(height: 18),
-                    _heading('菜系'),
-                    const SizedBox(height: 6),
-                    RestaurantCategoryInput(
-                      controller: _category,
+                    TagSelectionField(
+                      label: '菜系',
+                      selected: query.categories,
+                      hierarchical: true,
                       choices: categories,
-                      optionsViewOpenDirection: OptionsViewOpenDirection.up,
+                      allowCreate: false,
+                      onChanged: (value) => setState(() {
+                        query.categories = value;
+                        query.exactCategories = false;
+                        if (value.isNotEmpty) query.uncategorized = false;
+                      }),
                     ),
+                    if (query.categories.length > 1)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          '同时满足所选菜系',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
                     if (query.uncategorized) ...[
                       const SizedBox(height: 8),
                       Align(
@@ -424,9 +440,8 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                         FocusScope.of(context).unfocus();
                         query.minPrice = min;
                         query.maxPrice = max;
-                        query.category = _category.text.trim();
                         query.uncategorized =
-                            query.uncategorized && query.category.isEmpty;
+                            query.uncategorized && query.categories.isEmpty;
                         query.address = _address.text.trim();
                         query.alone = _companion.text.trim() == '独自用餐';
                         query.companion = query.alone

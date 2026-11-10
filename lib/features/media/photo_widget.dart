@@ -30,14 +30,30 @@ ImageProvider<Object> _provider(
 Widget _photo(
   BuildContext context,
   ImageProvider<Object> provider,
-  BoxFit fit,
-) => Image(
+  BoxFit fit, {
+  VoidCallback? onReady,
+}) => Image(
   image: provider,
   fit: fit,
-  errorBuilder: (_, _, _) => ColoredBox(
-    color: Theme.of(context).colorScheme.surfaceContainer,
-    child: const Center(child: MenuIcon(Icons.broken_image_outlined, size: 32)),
-  ),
+  frameBuilder: onReady == null
+      ? null
+      : (context, child, frame, synchronous) {
+          if (frame != null || synchronous) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => onReady());
+          }
+          return child;
+        },
+  errorBuilder: (_, _, _) {
+    if (onReady != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => onReady());
+    }
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainer,
+      child: const Center(
+        child: MenuIcon(Icons.broken_image_outlined, size: 32),
+      ),
+    );
+  },
 );
 
 class LocalPhoto extends StatelessWidget {
@@ -68,14 +84,17 @@ class RetainedLocalPhoto extends StatelessWidget {
     super.key,
     required this.path,
     this.fullResolution = false,
+    this.onReady,
   });
 
   final String path;
+  final VoidCallback? onReady;
   final bool fullResolution;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) => _RetainedPhoto(
+      onReady: onReady,
       provider: _provider(
         context,
         path,
@@ -88,7 +107,8 @@ class RetainedLocalPhoto extends StatelessWidget {
 }
 
 class _RetainedPhoto extends StatefulWidget {
-  const _RetainedPhoto({required this.provider});
+  const _RetainedPhoto({required this.provider, this.onReady});
+  final VoidCallback? onReady;
   final ImageProvider<Object> provider;
   @override
   State<_RetainedPhoto> createState() => _RetainedLocalPhotoState();
@@ -126,5 +146,5 @@ class _RetainedLocalPhotoState extends State<_RetainedPhoto> {
 
   @override
   Widget build(BuildContext context) =>
-      _photo(context, widget.provider, BoxFit.cover);
+      _photo(context, widget.provider, BoxFit.cover, onReady: widget.onReady);
 }

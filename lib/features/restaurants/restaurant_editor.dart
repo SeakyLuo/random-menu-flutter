@@ -1,3 +1,4 @@
+import '../../core/tag_path.dart';
 import '../../ui/menu_popup.dart';
 import '../../ui/menu_icon.dart';
 import 'dart:convert';
@@ -8,7 +9,7 @@ import '../../ui/widgets.dart';
 import '../../ui/menu_field_label.dart';
 import 'restaurant_address_fields.dart';
 import 'restaurant_categories_page.dart';
-import 'restaurant_category_input.dart';
+import '../../ui/tag_selection_field.dart';
 import 'restaurant_record_draft.dart';
 import 'restaurant_record_section.dart';
 import 'restaurant_entries.dart';
@@ -51,9 +52,7 @@ class _RestaurantEditor extends StatefulWidget {
 
 class _RestaurantEditorState extends State<_RestaurantEditor> {
   late final name = TextEditingController(text: widget.restaurant?.name ?? '');
-  late final category = TextEditingController(
-    text: widget.restaurant?.category ?? '',
-  );
+  late List<String> categories = [...?widget.restaurant?.categories];
   late final note = TextEditingController(text: widget.restaurant?.note ?? '');
   late final link = TextEditingController(text: widget.restaurant?.link ?? '');
   late List<RestaurantAddress> addresses =
@@ -114,7 +113,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
 
   late final draftId = widget.restaurant?.id ?? newId();
   late bool favorite = widget.restaurant?.favorite ?? false;
-  late String _storedCategory = widget.restaurant?.category ?? '';
+  late List<String> _storedCategories = [...?widget.restaurant?.categories];
   bool saving = false;
   bool picking = false;
   bool get busy => saving || picking;
@@ -122,7 +121,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
   bool get dirty =>
       recordDraft.dirty ||
       name.text != (widget.restaurant?.name ?? '') ||
-      category.text != _storedCategory ||
+      jsonEncode(categories) != jsonEncode(_storedCategories) ||
       note.text != (widget.restaurant?.note ?? '') ||
       link.text != (widget.restaurant?.link ?? '') ||
       favorite != (widget.restaurant?.favorite ?? false) ||
@@ -130,7 +129,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
   @override
   void initState() {
     super.initState();
-    for (final controller in [name, category, note, link]) {
+    for (final controller in [name, note, link]) {
       controller.addListener(changed);
     }
   }
@@ -138,7 +137,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
   void changed() => setState(() {});
   @override
   void dispose() {
-    for (final controller in [name, category, note, link]) {
+    for (final controller in [name, note, link]) {
       controller.dispose();
     }
     super.dispose();
@@ -176,14 +175,20 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
         builder: (_) => RestaurantCategoriesPage(
           onRenamed: (oldName, newName) {
             if (!mounted) return;
-            if (_storedCategory == oldName) _storedCategory = newName;
-            if (category.text == oldName) category.text = newName;
+            _storedCategories = [
+              for (final tag in _storedCategories)
+                renamedTagPath(tag, oldName, newName),
+            ];
+            categories = [
+              for (final tag in categories)
+                renamedTagPath(tag, oldName, newName),
+            ];
             changed();
           },
           onDeleted: (name) {
             if (!mounted) return;
-            if (_storedCategory == name) _storedCategory = '';
-            if (category.text == name) category.clear();
+            _storedCategories.removeWhere((tag) => tagPathContains(name, tag));
+            categories.removeWhere((tag) => tagPathContains(name, tag));
             changed();
           },
         ),
@@ -397,11 +402,11 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
     final success = await performAction(context, () async {
       if (widget.restaurant != null) {
         await store.updateRestaurantDetails(
-          before: {..._detailsBefore!, 'category': _storedCategory},
+          before: {..._detailsBefore!, 'categories': _storedCategories},
           details: Restaurant(
             id: savedId,
             name: name.text.trim(),
-            category: category.text.trim(),
+            categories: [...categories],
             note: note.text.trim(),
             link: link.text.trim(),
             favorite: favorite,
@@ -428,11 +433,11 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
         }
         restaurant.records = records;
         restaurant.name = name.text.trim();
-        restaurant.category = category.text.trim();
-        if (restaurant.category.isNotEmpty &&
-            !draft.restaurantCategories.contains(restaurant.category)) {
-          draft.restaurantCategories.add(restaurant.category);
-        }
+        restaurant.categories = [...categories];
+        draft.restaurantCategories = {
+          ...draft.restaurantCategories,
+          ...categories,
+        }.toList();
         restaurant.note = note.text.trim();
         restaurant.link = link.text.trim();
         restaurant.favorite = favorite;
@@ -546,23 +551,18 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                     decoration: const InputDecoration(hintText: '记下一家值得再去的店'),
                   ),
                   const SizedBox(height: 16),
-                  MenuFieldLabel(
-                    '菜系',
-                    minHeight: 44,
-                    bottomSpacing: 4,
-                    trailing: TextButton(
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(48, 44),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      onPressed: manageCategories,
-                      child: const Text('管理'),
-                    ),
-                  ),
-                  RestaurantCategoryInput(
-                    controller: category,
+                  TagSelectionField(
+                    label: '菜系',
+                    selected: categories,
+                    hierarchical: true,
                     choices: restaurantCategoryNames(
                       MenuScope.of(context).data,
+                    ),
+                    busy: busy,
+                    onChanged: (value) => setState(() => categories = value),
+                    trailing: TextButton(
+                      onPressed: busy ? null : manageCategories,
+                      child: const Text('管理'),
                     ),
                   ),
                   const SizedBox(height: 16),

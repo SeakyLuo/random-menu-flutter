@@ -1,3 +1,4 @@
+import '../../core/tag_path.dart';
 import 'dart:convert';
 import '../../core/models.dart';
 import 'restaurant_filter.dart';
@@ -33,6 +34,8 @@ class DiningGroup {
     this.key,
     this.label,
     this.entries, {
+    this.exactCuisine = false,
+    this.countRestaurants = false,
     this.detail = '',
     this.province = '',
     this.city = '',
@@ -42,13 +45,15 @@ class DiningGroup {
     this.start,
     this.end,
   });
+  final bool exactCuisine, countRestaurants;
   final String key, label;
   final String detail, province, city, county;
   final List<DiningEntry> entries;
   final DiningAmountBand? amountBand;
   final DateTime? start, end;
   final RestaurantRegionLevel regionLevel;
-  int get count => entries.length;
+  int get count => countRestaurants ? restaurantCount : entries.length;
+  String get unit => countRestaurants ? '家' : '次';
   int get restaurantCount => entries.map((e) => e.restaurant.id).toSet().length;
 }
 
@@ -78,7 +83,8 @@ class DiningAmountBand {
     DiningAmountBand(200, 300, '200–300'),
     DiningAmountBand(300, 400, '300–400'),
     DiningAmountBand(400, 500, '400–500'),
-    DiningAmountBand(500, 800, '500–800'),
+    DiningAmountBand(500, 600, '500–600'),
+    DiningAmountBand(600, 800, '600–800'),
     DiningAmountBand(800, 1000, '800–1000'),
     DiningAmountBand(1000, null, '1k+'),
   ];
@@ -94,7 +100,16 @@ class DiningStatistics {
       for (final visit in restaurant.records) {
         final entry = DiningEntry(restaurant, visit);
         entries.add(entry);
-        _cuisines.putIfAbsent(restaurant.category, () => []).add(entry);
+        if (restaurant.categories.isEmpty) {
+          _cuisines.putIfAbsent('', () => []).add(entry);
+        } else {
+          for (final tag in {
+            for (final selected in restaurant.categories)
+              ...tagPathPrefixes(selected),
+          }) {
+            _cuisines.putIfAbsent(tag, () => []).add(entry);
+          }
+        }
         final branch = addresses[visit.addressId];
         _places.add((
           entry,
@@ -119,7 +134,9 @@ class DiningStatistics {
   final _places = <(DiningEntry, (String, String, String))>[];
 
   int get restaurantCount => entries.map((e) => e.restaurant.id).toSet().length;
-  int get cuisineCount => _cuisines.keys.where((key) => key.isNotEmpty).length;
+  int get cuisineCount => _cuisines.keys
+      .where((key) => key.isNotEmpty && !key.contains('/'))
+      .length;
 
   double averageVisitsPerPeriod(DiningTimeUnit unit) =>
       entries.length / _timeGroups(unit).length;
@@ -136,13 +153,21 @@ class DiningStatistics {
     return diners == 0 ? null : total / diners;
   }
 
-  List<DiningGroup> _rank(Map<String, List<DiningEntry>> groups) =>
+  List<DiningGroup> _rank(
+    Map<String, List<DiningEntry>> groups, {
+    bool tagLabels = false,
+  }) =>
       [
         for (final entry in groups.entries)
           DiningGroup(
             entry.key,
-            entry.key.isEmpty ? '未分类' : entry.key,
+            entry.key.isEmpty
+                ? '未分类'
+                : tagLabels
+                ? tagPathLabel(entry.key)
+                : entry.key,
             entry.value,
+            countRestaurants: tagLabels,
           ),
       ]..sort((a, b) {
         final count = b.count.compareTo(a.count);
@@ -155,10 +180,14 @@ class DiningStatistics {
     List<DiningAmountBand> amountBands = DiningAmountBand.values,
     DiningTimeUnit timeUnit = DiningTimeUnit.quarter,
     int? recentPeriods,
+    bool detailedTags = false,
     RestaurantRegionLevel regionLevel = RestaurantRegionLevel.county,
   }) => switch (kind) {
     DiningBreakdown.companions => _rank(_companions),
-    DiningBreakdown.cuisines => _rank(_cuisines),
+    DiningBreakdown.cuisines => _rank({
+      for (final entry in _cuisines.entries)
+        if (entry.key.contains('/') == detailedTags) entry.key: entry.value,
+    }, tagLabels: true),
     DiningBreakdown.counties => _regionGroups(regionLevel),
     DiningBreakdown.quarters => _timeGroups(timeUnit, recentPeriods),
     DiningBreakdown.amounts => [
@@ -288,8 +317,9 @@ RestaurantQuery diningGroupFilter(
       query.alone = group.key.isEmpty;
       query.companion = group.key;
     case DiningBreakdown.cuisines:
-      query.category = group.key;
+      query.categories = group.key.isEmpty ? [] : [group.key];
       query.uncategorized = group.key.isEmpty;
+      query.exactCategories = group.exactCuisine;
     case DiningBreakdown.counties:
       query.province = group.province;
       query.city = group.city;

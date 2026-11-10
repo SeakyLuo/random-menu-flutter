@@ -1,3 +1,4 @@
+import '../core/tag_path.dart';
 import 'package:flutter/material.dart';
 import 'menu_icon.dart';
 import 'menu_tag.dart';
@@ -12,6 +13,9 @@ class TagSelectionField extends StatelessWidget {
     this.busy = false,
     this.label = '标签',
     this.limit = 10,
+    this.allowCreate = true,
+    this.hierarchical = false,
+    this.trailing,
   });
   final List<String> selected;
   final List<String> choices;
@@ -19,6 +23,9 @@ class TagSelectionField extends StatelessWidget {
   final bool busy;
   final String label;
   final int limit;
+  final bool allowCreate;
+  final bool hierarchical;
+  final Widget? trailing;
 
   Future<void> _open(BuildContext context) async {
     FocusScope.of(context).unfocus();
@@ -28,6 +35,9 @@ class TagSelectionField extends StatelessWidget {
           selected: selected,
           choices: choices,
           limit: limit,
+          label: label,
+          allowCreate: allowCreate,
+          hierarchical: hierarchical,
         ),
       ),
     );
@@ -46,6 +56,7 @@ class TagSelectionField extends StatelessWidget {
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
             ),
           ),
+          ?trailing,
           TextButton.icon(
             onPressed: busy ? null : () => _open(context),
             style: TextButton.styleFrom(
@@ -66,7 +77,7 @@ class TagSelectionField extends StatelessWidget {
           children: [
             for (final tag in selected)
               MenuTag(
-                tag,
+                hierarchical ? tagPathLabel(tag) : tag,
                 removable: true,
                 onRemove: busy
                     ? null

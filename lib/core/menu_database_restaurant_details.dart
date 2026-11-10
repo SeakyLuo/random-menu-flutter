@@ -38,7 +38,12 @@ Future<RestaurantDetailsResult> _editRestaurantDetails(
         whereArgs: [details.id],
         distinct: true,
       );
-      reads.query('restaurant_category_links', where: 'restaurant_id = ?', whereArgs: [details.id], orderBy: 'position');
+      reads.query(
+        'restaurant_category_links',
+        where: 'restaurant_id = ?',
+        whereArgs: [details.id],
+        orderBy: 'position',
+      );
       final results = await reads.commit();
       timeline.instant('read.end');
       List<Map<String, Object?>> rows(int index) =>
@@ -55,7 +60,10 @@ Future<RestaurantDetailsResult> _editRestaurantDetails(
           : Restaurant(
               id: details.id,
               name: row['name'] as String,
-              categories: [for (final link in rows(5)) categoryNames[link['category_id']]! as String],
+              categories: [
+                for (final link in rows(5))
+                  categoryNames[link['category_id']]! as String,
+              ],
               note: row['note'] as String,
               link: row['link'] as String,
               addresses: List<String>.from(
@@ -104,21 +112,44 @@ Future<RestaurantDetailsResult> _editRestaurantDetails(
           if (category['listed'] == 1) category['name'] as String,
       ];
       final writes = txn.batch();
-      var nextCategoryPosition = categories.isEmpty ? 0 : (categories.last['position'] as int) + 1;
-      for (final category in details.categories.toSet()) {
+      var nextCategoryPosition = categories.isEmpty
+          ? 0
+          : (categories.last['position'] as int) + 1;
+      final categoryPaths = {
+        for (final tag in details.categories) ...tagPathPrefixes(tag),
+      };
+      for (final category in categoryPaths) {
         if (listed.contains(category)) continue;
         if (categoryIds.containsKey(category)) {
-          writes.update('restaurant_categories', {'listed': 1}, where: 'id = ?', whereArgs: [categoryIds[category]]);
+          writes.update(
+            'restaurant_categories',
+            {'listed': 1},
+            where: 'id = ?',
+            whereArgs: [categoryIds[category]],
+          );
         } else {
           final id = newId();
           categoryIds[category] = id;
-          writes.insert('restaurant_categories', {'id': id, 'name': category, 'position': nextCategoryPosition++, 'listed': 1});
+          writes.insert('restaurant_categories', {
+            'id': id,
+            'name': category,
+            'position': nextCategoryPosition++,
+            'listed': 1,
+          });
         }
         listed.add(category);
       }
-      writes.delete('restaurant_category_links', where: 'restaurant_id = ?', whereArgs: [details.id]);
+      writes.delete(
+        'restaurant_category_links',
+        where: 'restaurant_id = ?',
+        whereArgs: [details.id],
+      );
       for (final (position, category) in details.categories.toSet().indexed) {
-        writes.insert('restaurant_category_links', {'restaurant_id': details.id, 'position': position, 'category_id': categoryIds[category]});
+        writes.insert('restaurant_category_links', {
+          'restaurant_id': details.id,
+          'position': position,
+          'category_id': categoryIds[category],
+        });
       }
       writes.update(
         'restaurants',

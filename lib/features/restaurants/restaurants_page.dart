@@ -1,3 +1,4 @@
+import 'restaurant_cover_batch.dart';
 import '../../ui/search_page_route.dart';
 import 'restaurant_grid.dart';
 import '../../ui/library_layout.dart';
@@ -307,15 +308,17 @@ class RestaurantsPageState extends State<RestaurantsPage> {
               (_standalone ? 24 : 120) +
                   MediaQuery.viewPaddingOf(context).bottom,
             ),
-            sliver: SliverRestaurantGrid(
-              mainAxisSpacing: 10,
-              itemCount: results.length,
-              itemBuilder: (_, index) => RestaurantCard(
-                key: ValueKey(results[index].id),
-                restaurant: results[index],
-                showReview: true,
-                distance: distances[results[index].id],
-                showDistance: _query.sort == RestaurantSort.nearest,
+            sliver: RestaurantCoverBatch(
+              child: SliverRestaurantGrid(
+                mainAxisSpacing: 10,
+                itemCount: results.length,
+                itemBuilder: (_, index) => RestaurantCard(
+                  key: ValueKey(results[index].id),
+                  restaurant: results[index],
+                  showReview: true,
+                  distance: distances[results[index].id],
+                  showDistance: _query.sort == RestaurantSort.nearest,
+                ),
               ),
             ),
           ),

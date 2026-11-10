@@ -17,13 +17,13 @@ class PhotoImportPreview extends StatefulWidget {
     super.key,
     this.restaurantId,
     required this.name,
-    required this.category,
+    required this.categories,
     required this.addresses,
     required this.groups,
   });
   final String? restaurantId;
   final String name;
-  final String category;
+  final List<String> categories;
   final List<RestaurantAddress> addresses;
   final List<ImportVisit> groups;
   @override
@@ -263,7 +263,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
             ? Restaurant(
                 id: savedRestaurantId,
                 name: widget.name,
-                category: widget.category,
+                categories: [...widget.categories],
                 addressEntries: [...widget.addresses],
                 addresses: widget.addresses.map((a) => a.fullAddress).toList(),
                 records: [],

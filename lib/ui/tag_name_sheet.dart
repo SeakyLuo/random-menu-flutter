@@ -1,3 +1,4 @@
+import '../core/tag_path.dart';
 import 'package:flutter/material.dart';
 import 'menu_bottom_sheet.dart';
 import 'menu_icon.dart';
@@ -6,17 +7,29 @@ import 'widgets.dart';
 Future<String?> showTagNameSheet(
   BuildContext context, {
   required List<String> existing,
+  bool hierarchical = false,
+  String label = '标签',
 }) => showMenuBottomSheet<String>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
   constraints: const BoxConstraints(maxWidth: 560),
-  builder: (_) => _TagNameSheet(existing: existing),
+  builder: (_) => _TagNameSheet(
+    existing: existing,
+    hierarchical: hierarchical,
+    label: label,
+  ),
 );
 
 class _TagNameSheet extends StatefulWidget {
-  const _TagNameSheet({required this.existing});
+  const _TagNameSheet({
+    required this.existing,
+    required this.hierarchical,
+    required this.label,
+  });
   final List<String> existing;
+  final bool hierarchical;
+  final String label;
 
   @override
   State<_TagNameSheet> createState() => _TagNameSheetState();
@@ -34,18 +47,26 @@ class _TagNameSheetState extends State<_TagNameSheet> {
   void _submit() {
     final name = _name.text.trim();
     if (name.isEmpty) {
-      showToast(context, '请填写标签名称');
+      showToast(context, '请填写${widget.label}名称');
       return;
     }
     if (RegExp('[,，、]').hasMatch(name)) {
-      showToast(context, '标签名称不能包含逗号或顿号');
+      showToast(context, '${widget.label}名称不能包含逗号或顿号');
       return;
     }
-    if (widget.existing.contains(name)) {
-      showToast(context, '该标签已存在');
+    if (widget.hierarchical &&
+        name.split('/').any((part) => part.isEmpty || part.trim() != part)) {
+      showToast(context, '请填写完整的${widget.label}名称，例如：烤肉/日本烤肉');
       return;
     }
-    Navigator.pop(context, name);
+    final value = widget.hierarchical
+        ? inferredTagPath(name, widget.existing)
+        : name;
+    if (widget.existing.contains(value)) {
+      showToast(context, '该${widget.label}已存在');
+      return;
+    }
+    Navigator.pop(context, value);
   }
 
   @override
@@ -61,9 +82,9 @@ class _TagNameSheetState extends State<_TagNameSheet> {
           children: [
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    '新建标签',
+                    '新建${widget.label}',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -80,9 +101,9 @@ class _TagNameSheetState extends State<_TagNameSheet> {
               autofocus: true,
               maxLength: 20,
               textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(
-                labelText: '标签名称',
-                hintText: '例如：下饭菜',
+              decoration: InputDecoration(
+                labelText: '${widget.label}名称',
+                hintText: widget.hierarchical ? '例如：日本烤肉' : '例如：下饭菜',
               ),
               onSubmitted: (_) => _submit(),
             ),

@@ -1,3 +1,4 @@
+import '../../core/tag_path.dart';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
@@ -8,9 +9,11 @@ import '../../ui/menu_icon.dart';
 import '../../ui/widgets.dart';
 
 List<String> restaurantCategoryNames(MenuData data) => {
-  ...data.restaurantCategories,
-  for (final restaurant in data.restaurants)
-    if (restaurant.category.isNotEmpty) restaurant.category,
+  for (final tag in [
+    ...data.restaurantCategories,
+    for (final restaurant in data.restaurants) ...restaurant.categories,
+  ])
+    ...tagPathPrefixes(tag),
 }.toList()..sort();
 
 class RestaurantCategoriesPage extends StatefulWidget {
@@ -47,17 +50,23 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
           throw StateError('该菜系已存在');
         }
         if (oldName != null) {
-          data.restaurantCategoryIds[result] = data.restaurantCategoryIds
-              .remove(oldName)!;
+          final renamed = {
+            for (final entry in data.restaurantCategoryIds.entries)
+              renamedTagPath(entry.key, oldName, result): entry.value,
+          };
+          data.restaurantCategoryIds = renamed;
         }
         data.restaurantCategories = {
           for (final name in restaurantCategoryNames(data))
-            name == oldName ? result : name,
+            oldName == null ? name : renamedTagPath(name, oldName, result),
           result,
         }.toList();
         if (oldName != null) {
           for (final restaurant in data.restaurants) {
-            if (restaurant.category == oldName) restaurant.category = result;
+            restaurant.categories = [
+              for (final tag in restaurant.categories)
+                renamedTagPath(tag, oldName, result),
+            ];
           }
         }
       }),
@@ -71,12 +80,14 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
   Future<void> _delete(String name) async {
     final store = MenuScope.of(context);
     final count = store.data.restaurants
-        .where((r) => r.category == name)
+        .where((r) => r.categories.any((tag) => tagPathContains(name, tag)))
         .length;
     if (!await confirmAction(
       context,
-      title: '删除菜系“$name”？',
-      message: count == 0 ? '删除后不再出现在菜系建议中。' : '会清空 $count 家餐厅的菜系，餐厅和消费记录仍然保留。',
+      title: '删除菜系“$name”及其细分菜系？',
+      message: count == 0
+          ? '删除后不再出现在菜系建议中。'
+          : '会从 $count 家餐厅移除此菜系及其细分菜系，其他菜系、餐厅和消费记录保留。',
     )) {
       return;
     }
@@ -85,9 +96,13 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
     final saved = await performAction(
       context,
       () => store.update(MenuWriteScope.restaurantsAll, (data) {
-        data.restaurantCategories.remove(name);
+        data.restaurantCategories.removeWhere(
+          (tag) => tagPathContains(name, tag),
+        );
         for (final restaurant in data.restaurants) {
-          if (restaurant.category == name) restaurant.category = '';
+          restaurant.categories.removeWhere(
+            (tag) => tagPathContains(name, tag),
+          );
         }
       }),
       success: '菜系已删除',
@@ -103,8 +118,11 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
     final names = restaurantCategoryNames(data);
     final counts = {for (final name in names) name: 0};
     for (final restaurant in data.restaurants) {
-      if (restaurant.category.isNotEmpty) {
-        counts[restaurant.category] = counts[restaurant.category]! + 1;
+      for (final tag in {
+        for (final selected in restaurant.categories)
+          ...tagPathPrefixes(selected),
+      }) {
+        counts[tag] = counts[tag]! + 1;
       }
     }
     final colors = Theme.of(context).colorScheme;
@@ -130,8 +148,8 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
                           borderRadius: BorderRadius.circular(2),
                           clipBehavior: Clip.antiAlias,
                           child: ListTile(
-                            contentPadding: const EdgeInsets.only(
-                              left: 16,
+                            contentPadding: EdgeInsets.only(
+                              left: 16 + 12.0 * (name.split('/').length - 1),
                               right: 4,
                             ),
                             onTap: _saving
@@ -141,7 +159,7 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
                               TextSpan(
                                 children: [
                                   TextSpan(
-                                    text: name,
+                                    text: tagPathLabel(name),
                                     style: const TextStyle(
                                       fontSize: 16,
                                       height: 1.5,
@@ -226,11 +244,18 @@ class _CategoryNameDialogState extends State<_CategoryNameDialog> {
       showToast(context, '请填写菜系名称');
       return;
     }
-    if (name != widget.initialName && widget.existing.contains(name)) {
+    if (name.split('/').any((part) => part.isEmpty || part.trim() != part)) {
+      showToast(context, '请填写完整的菜系名称，例如：烤肉/日本烤肉');
+      return;
+    }
+    final value = widget.initialName == null
+        ? inferredTagPath(name, widget.existing)
+        : name;
+    if (value != widget.initialName && widget.existing.contains(value)) {
       showToast(context, '该菜系已存在');
       return;
     }
-    Navigator.pop(context, name);
+    Navigator.pop(context, value);
   }
 
   @override
@@ -242,7 +267,7 @@ class _CategoryNameDialogState extends State<_CategoryNameDialog> {
       maxLength: 30,
       textInputAction: TextInputAction.done,
       onSubmitted: (_) => _submit(),
-      decoration: const InputDecoration(hintText: '输入菜系名称'),
+      decoration: const InputDecoration(hintText: '例如：烤肉/日本烤肉'),
     ),
     actions: Row(
       children: [

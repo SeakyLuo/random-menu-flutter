@@ -26,59 +26,62 @@ class DiningChartCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             InkWell(
               onTap: onDetails,
               borderRadius: BorderRadius.circular(8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            title,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
-                        if (badge != null) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            badge!,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                          if (badge != null) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              badge!,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
                             ),
-                          ),
+                          ],
+                          ?headerAction,
                         ],
-                        ?headerAction,
-                      ],
+                      ),
                     ),
-                  ),
-                  SizedBox(
-                    width: 48,
-                    height: 40,
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        '详情',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                    SizedBox(
+                      width: 48,
+                      height: 40,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          '详情',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             ...children,
@@ -107,12 +110,29 @@ class DiningBarChart extends StatelessWidget {
       0,
       (value, group) => group.count > value ? group.count : value,
     );
+    final countStyle = DefaultTextStyle.of(context).style.merge(
+      TextStyle(
+        fontSize: 12,
+        color: colors.onSurfaceVariant,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    );
+    final countMeasure = TextPainter(
+      text: TextSpan(
+        text: '$maximum ${groups.isEmpty ? '次' : groups.first.unit}',
+        style: countStyle,
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    final countWidth = countMeasure.width.ceilToDouble() + 4;
+    countMeasure.dispose();
     return Column(
       children: [
         for (final (index, group) in groups.indexed)
           Semantics(
             label:
-                '${showRank ? '第${index + 1}名，' : ''}${group.label}，${group.count}次',
+                '${showRank ? '第${index + 1}名，' : ''}${group.label}，${group.count}${group.unit}',
             button: group.count > 0,
             excludeSemantics: true,
             onTap: group.count == 0 ? null : () => onSelected(group),
@@ -130,10 +150,11 @@ class DiningBarChart extends StatelessWidget {
                         highlighted: index < 3,
                         compact: true,
                       ),
+                    if (showRank) const SizedBox(width: 8),
                     Expanded(
-                      flex: 4,
+                      flex: 3,
                       child: Padding(
-                        padding: const EdgeInsets.only(right: 12),
+                        padding: const EdgeInsets.only(right: 8),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -158,7 +179,7 @@ class DiningBarChart extends StatelessWidget {
                       ),
                     ),
                     Expanded(
-                      flex: 6,
+                      flex: 7,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(3),
                         child: ColoredBox(
@@ -190,16 +211,15 @@ class DiningBarChart extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     SizedBox(
-                      width: 46,
+                      width: countWidth,
                       child: Text(
-                        '${group.count} 次',
+                        '${group.count} ${group.unit}',
                         textAlign: TextAlign.right,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colors.onSurfaceVariant,
-                        ),
+                        maxLines: 1,
+                        softWrap: false,
+                        style: countStyle,
                       ),
                     ),
                   ],

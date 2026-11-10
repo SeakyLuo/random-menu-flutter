@@ -1,6 +1,8 @@
+import '../restaurants/restaurant_cover_batch.dart';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../ui/widgets.dart';
+import '../../ui/menu_pill_tabs.dart';
 import '../../ui/library_widgets.dart';
 import '../../ui/library_layout.dart';
 import '../restaurants/restaurant_grid.dart';
@@ -61,40 +63,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
             constraints: const BoxConstraints(maxWidth: LibraryLayout.maxWidth),
             child: Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 6, 16, 10),
-                  child: TabBar(
-                    isScrollable: true,
-                    tabAlignment: TabAlignment.start,
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-                    padding: EdgeInsets.zero,
-                    indicatorSize: TabBarIndicatorSize.label,
-                    indicator: ShapeDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: .12),
-                      shape: const StadiumBorder(),
-                    ),
-                    automaticIndicatorColorAdjustment: false,
-                    splashBorderRadius: BorderRadius.circular(24),
-                    labelColor: Theme.of(context).colorScheme.primary,
-                    unselectedLabelColor: Theme.of(
-                      context,
-                    ).colorScheme.onSurfaceVariant,
-                    labelStyle: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    unselectedLabelStyle: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w400,
-                    ),
-                    dividerColor: Colors.transparent,
-                    tabs: [
-                      _FavoriteTab(label: '菜谱', count: recipes.length),
-                      _FavoriteTab(label: '餐厅', count: restaurants.length),
-                    ],
-                  ),
+                MenuPillTabs(
+                  tabs: [
+                    _FavoriteTab(label: '菜谱', count: recipes.length),
+                    _FavoriteTab(label: '餐厅', count: restaurants.length),
+                  ],
                 ),
                 Expanded(
                   child: TabBarView(
@@ -140,11 +113,13 @@ class _FavoritesPageState extends State<FavoritesPage> {
                                     16,
                                     24,
                                   ),
-                                  sliver: SliverRestaurantGrid(
-                                    itemCount: restaurants.length,
-                                    itemBuilder: (_, index) => RestaurantCard(
-                                      key: ValueKey(restaurants[index].id),
-                                      restaurant: restaurants[index],
+                                  sliver: RestaurantCoverBatch(
+                                    child: SliverRestaurantGrid(
+                                      itemCount: restaurants.length,
+                                      itemBuilder: (_, index) => RestaurantCard(
+                                        key: ValueKey(restaurants[index].id),
+                                        restaurant: restaurants[index],
+                                      ),
                                     ),
                                   ),
                                 ),

@@ -61,7 +61,9 @@ Future<MenuData> _read(
   }
   final restaurantTags = <String, List<String>>{};
   for (final row in rows['restaurant_category_links']!) {
-    (restaurantTags[row['restaurant_id'] as String] ??= []).add(categories[row['category_id']]!);
+    (restaurantTags[row['restaurant_id'] as String] ??= []).add(
+      categories[row['category_id']]!,
+    );
   }
   final recipes = [
     for (final row in rows['recipes']!)

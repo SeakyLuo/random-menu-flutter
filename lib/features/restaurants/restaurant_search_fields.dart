@@ -44,7 +44,7 @@ RestaurantSearchMatches searchRestaurantContents(
     RestaurantSort.recent,
   )) {
     final fields = [
-      restaurant.category,
+      ...restaurant.categories,
       ...restaurant.addressEntries.map((address) => address.fullAddress),
       ...restaurant.addresses,
       ...restaurant.records.map((visit) => visit.address),

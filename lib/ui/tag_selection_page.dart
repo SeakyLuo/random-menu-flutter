@@ -1,3 +1,4 @@
+import '../core/tag_path.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'library_widgets.dart';
@@ -11,11 +12,17 @@ class TagSelectionPage extends StatefulWidget {
     required this.selected,
     required this.choices,
     required this.limit,
+    this.allowCreate = true,
+    this.hierarchical = false,
+    this.label = '标签',
   });
 
   final List<String> selected;
   final List<String> choices;
   final int limit;
+  final bool allowCreate;
+  final bool hierarchical;
+  final String label;
 
   @override
   State<TagSelectionPage> createState() => _TagSelectionPageState();
@@ -33,26 +40,51 @@ class _TagSelectionPageState extends State<TagSelectionPage> {
   }
 
   void _select(String tag) {
+    final remaining = widget.hierarchical
+        ? _selected
+              .where(
+                (selected) =>
+                    !tagPathContains(selected, tag) &&
+                    !tagPathContains(tag, selected),
+              )
+              .toList()
+        : [..._selected];
     if (widget.limit == 1) {
       setState(() {
-        _selected.clear();
-        _selected.add(tag);
+        _selected
+          ..clear()
+          ..add(tag);
       });
-    } else if (_selected.length == widget.limit) {
-      showToast(context, '最多添加${widget.limit}个标签');
+    } else if (remaining.length == widget.limit) {
+      showToast(context, '最多添加${widget.limit}个${widget.label}');
     } else {
-      setState(() => _selected.add(tag));
+      setState(() {
+        _selected
+          ..clear()
+          ..addAll(remaining)
+          ..add(tag);
+      });
     }
   }
 
   Future<void> _create() async {
     if (widget.limit > 1 && _selected.length == widget.limit) {
-      showToast(context, '最多添加${widget.limit}个标签');
+      showToast(context, '最多添加${widget.limit}个${widget.label}');
       return;
     }
-    final tag = await showTagNameSheet(context, existing: _options);
+    final tag = await showTagNameSheet(
+      context,
+      existing: _options,
+      hierarchical: widget.hierarchical,
+      label: widget.label,
+    );
     if (!mounted || tag == null) return;
-    setState(() => _options.insert(0, tag));
+    setState(() {
+      final paths = widget.hierarchical ? tagPathPrefixes(tag) : [tag];
+      for (final path in paths) {
+        if (!_options.contains(path)) _options.insert(0, path);
+      }
+    });
     _select(tag);
   }
 
@@ -66,7 +98,8 @@ class _TagSelectionPageState extends State<TagSelectionPage> {
     }
 
     return Semantics(
-      label: '${selected ? '移除' : '选择'}标签$tag',
+      label:
+          '${selected ? '移除' : '选择'}${widget.label}${widget.hierarchical ? tagPathLabel(tag) : tag}',
       button: true,
       excludeSemantics: true,
       child: GestureDetector(
@@ -77,7 +110,11 @@ class _TagSelectionPageState extends State<TagSelectionPage> {
           child: Center(
             widthFactor: 1,
             heightFactor: 1,
-            child: MenuTag(tag, removable: selected, onRemove: activate),
+            child: MenuTag(
+              widget.hierarchical ? tagPathLabel(tag) : tag,
+              removable: selected,
+              onRemove: activate,
+            ),
           ),
         ),
       ),
@@ -98,9 +135,17 @@ class _TagSelectionPageState extends State<TagSelectionPage> {
       appBar: AppBar(
         titleSpacing: 0,
         backgroundColor: scheme.surface,
-        title: MenuScrollTitle(controller: _scroll, child: const Text('选择标签')),
+        title: MenuScrollTitle(
+          controller: _scroll,
+          child: Text('选择${widget.label}'),
+        ),
         actions: [
-          PageActionButton(icon: Icons.add, label: '新建标签', onPressed: _create),
+          if (widget.allowCreate)
+            PageActionButton(
+              icon: Icons.add,
+              label: '新建${widget.label}',
+              onPressed: _create,
+            ),
           const SizedBox(width: 12),
         ],
       ),
@@ -151,7 +196,7 @@ class _TagSelectionPageState extends State<TagSelectionPage> {
                 ],
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                  child: Text('可选标签', style: sectionStyle),
+                  child: Text('可选${widget.label}', style: sectionStyle),
                 ),
                 Expanded(
                   child: ListView(
@@ -171,7 +216,11 @@ class _TagSelectionPageState extends State<TagSelectionPage> {
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           child: Text(
-                            _options.isEmpty ? '还没有标签，点击右上角＋新建' : '所有标签都已选中',
+                            _options.isEmpty
+                                ? (widget.allowCreate
+                                      ? '还没有${widget.label}，点击右上角＋新建'
+                                      : '还没有可选${widget.label}')
+                                : '所有${widget.label}都已选中',
                             style: TextStyle(
                               fontSize: 14,
                               color: scheme.onSurfaceVariant,

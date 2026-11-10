@@ -58,6 +58,7 @@ enum _Glyph {
   back,
   next,
   chevronDown,
+  chevronUp,
   close,
   check,
   checkCircle,
@@ -141,6 +142,7 @@ _Glyph _glyphFor(IconData icon) => switch (icon) {
   Icons.arrow_forward ||
   Icons.arrow_forward_rounded => _Glyph.next,
   Icons.expand_more => _Glyph.chevronDown,
+  Icons.expand_less => _Glyph.chevronUp,
   Icons.close || Icons.close_rounded => _Glyph.close,
   Icons.check || Icons.done => _Glyph.check,
   Icons.check_circle_outline_rounded ||
@@ -442,6 +444,13 @@ class _MenuIconPainter extends CustomPainter {
             ..moveTo(6, 9)
             ..lineTo(12, 15)
             ..lineTo(18, 9),
+        );
+      case _Glyph.chevronUp:
+        path(
+          Path()
+            ..moveTo(6, 15)
+            ..lineTo(12, 9)
+            ..lineTo(18, 15),
         );
       case _Glyph.close:
         line(6, 6, 18, 18);

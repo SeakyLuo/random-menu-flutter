@@ -12,6 +12,7 @@ class RestaurantPhotoDeck extends StatefulWidget {
     required this.onChanged,
     required this.onTap,
     this.preloadIndex,
+    this.showBackCards = true,
   });
 
   final int itemCount;
@@ -20,6 +21,7 @@ class RestaurantPhotoDeck extends StatefulWidget {
   final ValueChanged<int> onChanged;
   final VoidCallback onTap;
   final int? preloadIndex;
+  final bool showBackCards;
 
   @override
   State<RestaurantPhotoDeck> createState() => _RestaurantPhotoDeckState();
@@ -127,6 +129,9 @@ class _RestaurantPhotoDeckState extends State<RestaurantPhotoDeck>
       }
 
       final currentOnTop = progress < .5;
+      // A deliberate swipe can reveal the adjacent card before the list batch
+      // completes; do not leave a blank slot under the moving front card.
+      final showBackCards = widget.showBackCards || _progress != 0;
       return Padding(
         padding: EdgeInsets.symmetric(
           horizontal: (constraints.maxWidth - width) / 2,
@@ -171,13 +176,15 @@ class _RestaurantPhotoDeckState extends State<RestaurantPhotoDeck>
                   ),
                 // This covered card keeps the next backing photo continuous
                 // when the outgoing card is tucked below the rest of the deck.
-                if (hasThird && (currentOnTop || !forward))
+                if (showBackCards && hasThird && (currentOnTop || !forward))
                   face(third, current: false, resting: true),
-                if (multiple && currentOnTop) face(other, current: false),
+                if (showBackCards && multiple && currentOnTop)
+                  face(other, current: false),
                 face(widget.index, current: true),
-                if (hasThird && !currentOnTop && forward)
+                if (showBackCards && hasThird && !currentOnTop && forward)
                   face(third, current: false, resting: true),
-                if (multiple && !currentOnTop) face(other, current: false),
+                if (showBackCards && multiple && !currentOnTop)
+                  face(other, current: false),
               ],
             ),
           ),

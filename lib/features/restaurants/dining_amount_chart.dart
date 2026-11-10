@@ -24,7 +24,7 @@ class DiningAmountChart extends StatelessWidget {
     final plotHeight = 120 + countHeight + 8;
     final minWidth = math.max(48.0, scaler.scale(11) * 4);
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       child: LayoutBuilder(
         builder: (context, constraints) => SingleChildScrollView(
           scrollDirection: Axis.horizontal,
