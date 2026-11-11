@@ -1,3 +1,5 @@
+import 'restaurant_filter.dart';
+import 'restaurants_page.dart';
 import '../../ui/name_management_sheet.dart';
 import '../../ui/menu_field_label.dart';
 import '../../core/tag_path.dart';
@@ -154,7 +156,11 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
     final data = MenuScope.of(context).data;
     final names = restaurantCategoryNames(data);
     final counts = {for (final name in names) name: 0};
+    final directCounts = {for (final name in names) name: 0};
     for (final restaurant in data.restaurants) {
+      for (final tag in restaurant.categories.toSet()) {
+        directCounts[tag] = directCounts[tag]! + 1;
+      }
       for (final tag in {
         for (final selected in restaurant.categories)
           ...tagPathPrefixes(selected),
@@ -282,6 +288,12 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
                                 ),
                                 for (final child in descendants)
                                   _categoryRow(child, counts[child]!),
+                                if (directCounts[root]! > 0)
+                                  _categoryRow(
+                                    root,
+                                    directCounts[root]!,
+                                    other: true,
+                                  ),
                               ],
                             ],
                           ),
@@ -300,15 +312,29 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
     );
   }
 
-  Future<void> _manage(String name) async {
+  Future<void> _manage(String name, {bool other = false}) async {
     final action = await showNameManagementSheet(
       context,
-      name: tagPathLabel(name),
+      name: other ? '${tagPathLabel(name)} · 其他' : tagPathLabel(name),
       deleteLabel: '删除菜系',
-      addChildLabel: '添加细分菜系',
+      addChildLabel: other ? null : '添加细分菜系',
+      viewLabel: '查看餐厅',
+      allowEditing: !other,
     );
     if (!mounted) return;
     switch (action) {
+      case NameManagementAction.view:
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => RestaurantsPage.filtered(
+              query: RestaurantQuery(
+                categories: [name],
+                exactCategories: other,
+              ),
+            ),
+          ),
+        );
       case NameManagementAction.rename:
         await _rename(oldName: name);
       case NameManagementAction.delete:
@@ -324,6 +350,7 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
     String name,
     int count, {
     bool root = false,
+    bool other = false,
     bool expanded = false,
     bool hasChildren = false,
   }) {
@@ -331,16 +358,23 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        key: _rowKeys.putIfAbsent(name, GlobalKey.new),
+        key: _rowKeys.putIfAbsent(
+          other ? '$name\u0000other' : name,
+          GlobalKey.new,
+        ),
         children: [
           Expanded(
             child: InkWell(
-              onTap: _saving ? null : () => _manage(name),
+              onTap: _saving ? null : () => _manage(name, other: other),
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: root ? 52 : 44),
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
-                    root ? 16 : 28 + 12.0 * (name.split('/').length - 2),
+                    root
+                        ? 16
+                        : other
+                        ? 28
+                        : 28 + 12.0 * (name.split('/').length - 2),
                     root ? 10 : 6,
                     12,
                     root ? 10 : 6,
@@ -352,7 +386,7 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
                           TextSpan(
                             children: [
                               TextSpan(
-                                text: tagPathLabel(name),
+                                text: other ? '其他' : tagPathLabel(name),
                                 style: TextStyle(
                                   fontSize: root ? 16 : 14,
                                   height: 1.4,

@@ -1,3 +1,4 @@
+import 'recipe_tag_page.dart';
 import '../../ui/name_management_sheet.dart';
 import '../../ui/menu_popup.dart';
 import '../../ui/menu_dialog.dart';
@@ -58,6 +59,11 @@ class _RecipeTagsPageState extends State<RecipeTagsPage> {
       });
     }
   }
+
+  Future<void> _viewRecipes(String tag) => Navigator.push<void>(
+    context,
+    MaterialPageRoute<void>(builder: (_) => RecipeTagPage(tag: tag)),
+  );
 
   Future<void> _rename(BuildContext context, {String? oldName}) async {
     final store = MenuScope.of(context);
@@ -223,7 +229,7 @@ class _RecipeTagsPageState extends State<RecipeTagsPage> {
                                   child: InkWell(
                                     onTap: _saving
                                         ? null
-                                        : () => _rename(context, oldName: tag),
+                                        : () => _viewRecipes(tag),
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 16,
@@ -267,6 +273,9 @@ class _RecipeTagsPageState extends State<RecipeTagsPage> {
                                                     context,
                                                     name: tag,
                                                     deleteLabel: '删除标签',
+                                                    viewLabel: '查看菜谱',
+                                                    viewIcon: Icons
+                                                        .menu_book_outlined,
                                                   );
                                               if (!context.mounted) return;
                                               switch (action) {
@@ -279,6 +288,8 @@ class _RecipeTagsPageState extends State<RecipeTagsPage> {
                                                 case NameManagementAction
                                                     .delete:
                                                   await _delete(context, tag);
+                                                case NameManagementAction.view:
+                                                  await _viewRecipes(tag);
                                                 case NameManagementAction
                                                     .addChild:
                                                 case null:
