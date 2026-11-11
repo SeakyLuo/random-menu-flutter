@@ -28,6 +28,9 @@ class VisitFoodList extends StatelessWidget {
       : packages.firstWhere((p) => p.id == dish.packageId);
   final bool vertical;
 
+  bool get _showRows =>
+      vertical || items.every((dish) => dish.imagePaths.isEmpty);
+
   String _price(VisitDish dish) =>
       '${currency.symbol}${money(dish.price)}${dish.quantity > 1 ? ' × ${dish.quantity}' : ''}';
 
@@ -59,11 +62,11 @@ class VisitFoodList extends StatelessWidget {
       package: package,
     );
     final secondaryStyle = TextStyle(
-      fontSize: vertical ? 14 : 12,
+      fontSize: _showRows ? 14 : 12,
       height: 1.5,
       color: Theme.of(context).colorScheme.onSurfaceVariant,
     );
-    if (vertical) {
+    if (_showRows) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -80,10 +83,10 @@ class VisitFoodList extends StatelessWidget {
                   ),
                 ),
               ),
-              if (package == null) ...[
+              if (package == null && (dish.price > 0 || dish.quantity > 1)) ...[
                 const SizedBox(width: 8),
                 Text(
-                  _price(dish),
+                  dish.price > 0 ? _price(dish) : '× ${dish.quantity}',
                   textAlign: TextAlign.end,
                   style: const TextStyle(fontSize: 15, height: 1.4),
                 ),
@@ -135,12 +138,14 @@ class VisitFoodList extends StatelessWidget {
       visitId: visitId,
       itemIndex: items.indexOf(dish),
     ),
-    child: vertical
+    child: _showRows
         ? Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _image(context, dish, 104),
-              const SizedBox(width: 12),
+              if (dish.imagePaths.isNotEmpty) ...[
+                _image(context, dish, 104),
+                const SizedBox(width: 12),
+              ],
               Expanded(child: _fields(context, dish)),
             ],
           )
@@ -156,7 +161,7 @@ class VisitFoodList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (vertical) {
+    if (_showRows) {
       return Column(
         children: [
           for (var i = 0; i < items.length; i++) ...[

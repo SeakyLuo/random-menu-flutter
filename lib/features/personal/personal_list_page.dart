@@ -1,3 +1,4 @@
+import '../../ui/menu_action_sheet.dart';
 import '../../ui/menu_bottom_sheet.dart';
 import 'dart:math' show min;
 import 'package:flutter/material.dart';
@@ -326,25 +327,6 @@ class _RecordEditorState extends State<_RecordEditor> {
       '${widget.original == null ? '添加' : '编辑'}${_title(widget.kind)}记录',
   };
 
-  Widget _option(IconData icon, String label, VoidCallback action) => Column(
-    children: [
-      InkWell(
-        onTap: action,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 18),
-          child: Row(
-            spacing: 14,
-            children: [
-              MenuIcon(icon),
-              Text(label, style: const TextStyle(fontSize: 16)),
-            ],
-          ),
-        ),
-      ),
-      const Divider(),
-    ],
-  );
-
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: _leaving,
@@ -381,26 +363,34 @@ class _RecordEditorState extends State<_RecordEditor> {
                     IconButton(
                       tooltip: '关闭',
                       onPressed: _saving ? null : _leave,
-                      icon: const MenuIcon(Icons.close),
+                      icon: MenuIcon(
+                        Icons.close,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: _view == _RecordView.manage ? 2 : 4),
                 Flexible(
                   child: SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         if (_view == _RecordView.manage) ...[
-                          _option(
-                            Icons.edit_outlined,
-                            '修改名称',
-                            () => _changeView(_RecordView.edit),
-                          ),
-                          _option(
-                            Icons.delete_outline,
-                            '移除这条记录',
-                            () => _changeView(_RecordView.remove),
+                          MenuSheetActions(
+                            actions: [
+                              MenuSheetAction(
+                                icon: Icons.edit_outlined,
+                                label: '修改名称',
+                                onTap: () => _changeView(_RecordView.edit),
+                              ),
+                              MenuSheetAction(
+                                icon: Icons.delete_outline,
+                                label: '移除这条记录',
+                                destructive: true,
+                                onTap: () => _changeView(_RecordView.remove),
+                              ),
+                            ],
                           ),
                         ] else if (_view == _RecordView.edit) ...[
                           TextField(

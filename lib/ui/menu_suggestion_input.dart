@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'glass_surface.dart';
 import 'search_match.dart';
 import 'menu_icon.dart';
 
@@ -310,66 +311,59 @@ class _MenuSuggestionInputState extends State<MenuSuggestionInput>
         padding: _direction == OptionsViewOpenDirection.up
             ? const EdgeInsets.only(bottom: 4)
             : const EdgeInsets.only(top: 4),
-        child: Material(
-          color: Theme.of(context).colorScheme.surface,
-          surfaceTintColor: Colors.transparent,
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: Theme.of(context).brightness == Brightness.dark
-                ? BorderSide(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurfaceVariant.withValues(alpha: .35),
-                  )
-                : BorderSide.none,
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: SizedBox(
-            width: width,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: widget.commaSeparated && widget.adaptToAvailableSpace
-                    ? _availableHeight
-                    : 240,
-              ),
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                shrinkWrap: true,
-                itemCount: options.length,
-                itemBuilder: (context, index) {
-                  final option = options.elementAt(index);
-                  final colors = Theme.of(context).colorScheme;
-                  final highlighted =
-                      autocomplete &&
-                      AutocompleteHighlightedOption.of(context) == index;
-                  return InkWell(
-                    onTap: () => onSelected(option),
-                    child: ColoredBox(
-                      color: highlighted
-                          ? colors.primary.withValues(alpha: .08)
-                          : Colors.transparent,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        child: Text.rich(
-                          highlightSearchText(
-                            option.label,
-                            query,
-                            colors.primary,
+        child: GlassSurface(
+          radius: 12,
+          blurSigma: 24,
+          tintOpacity: .85,
+          child: Material(
+            type: MaterialType.transparency,
+            child: SizedBox(
+              width: width,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight:
+                      widget.commaSeparated && widget.adaptToAvailableSpace
+                      ? _availableHeight
+                      : 240,
+                ),
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (context, index) {
+                    final option = options.elementAt(index);
+                    final colors = Theme.of(context).colorScheme;
+                    final highlighted =
+                        autocomplete &&
+                        AutocompleteHighlightedOption.of(context) == index;
+                    return InkWell(
+                      onTap: () => onSelected(option),
+                      child: ColoredBox(
+                        color: highlighted
+                            ? colors.primary.withValues(alpha: .08)
+                            : Colors.transparent,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
                           ),
-                          style: TextStyle(
-                            fontSize: 15,
-                            height: 1.4,
-                            color: colors.onSurface,
+                          child: Text.rich(
+                            highlightSearchText(
+                              option.label,
+                              query,
+                              colors.primary,
+                            ),
+                            style: TextStyle(
+                              fontSize: 15,
+                              height: 1.4,
+                              color: colors.onSurface,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
           ),

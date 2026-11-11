@@ -283,20 +283,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
     if (autoCost) total.text = money(bill.total);
   }
 
-  Future<void> changeAutoCost(bool selected) async {
-    if (selected &&
-        double.tryParse(total.text) != bill.total &&
-        !await confirmAction(
-          context,
-          title: '按菜品重新计算？',
-          message:
-              '菜品合计 ${currency.symbol}${money(bill.subtotal)}，用券抵扣 ${currency.symbol}${money(bill.discount)}，实付将改为 ${currency.symbol}${money(bill.total)}。',
-          confirmLabel: '使用自动计算',
-          destructive: false,
-        )) {
-      return;
-    }
-    if (!mounted) return;
+  void changeAutoCost(bool selected) {
     setState(() {
       autoCost = selected;
       recalculate();

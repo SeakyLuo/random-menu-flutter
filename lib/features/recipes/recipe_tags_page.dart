@@ -1,3 +1,4 @@
+import '../../ui/name_management_sheet.dart';
 import '../../ui/menu_popup.dart';
 import '../../ui/menu_dialog.dart';
 import '../../ui/menu_icon.dart';
@@ -155,7 +156,21 @@ class _RecipeTagsPageState extends State<RecipeTagsPage> {
       appBar: AppBar(
         title: MenuScrollTitle(
           onTap: () => _scrollTo(0),
-          child: const Text('标签管理'),
+          child: MenuTitleLine(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Flexible(child: Text('标签管理')),
+              const SizedBox(width: 10),
+              Text(
+                '${tags.length} 个',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           MenuPopupButton<String>(
@@ -200,58 +215,92 @@ class _RecipeTagsPageState extends State<RecipeTagsPage> {
                           color: colors.surface,
                           borderRadius: BorderRadius.circular(2),
                           clipBehavior: Clip.antiAlias,
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.only(
-                              left: 16,
-                              right: 4,
-                            ),
-                            onTap: _saving
-                                ? null
-                                : () => _rename(context, oldName: tag),
-                            title: Text.rich(
-                              TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: tag,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      height: 1.5,
-                                      fontWeight: FontWeight.w500,
+                          child: IntrinsicHeight(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: _saving
+                                        ? null
+                                        : () => _rename(context, oldName: tag),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                      child: Text.rich(
+                                        TextSpan(
+                                          children: [
+                                            TextSpan(
+                                              text: tag,
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                height: 1.5,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            TextSpan(
+                                              text: '  ${counts[tag]} 道',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w400,
+                                                color: colors.onSurfaceVariant,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  TextSpan(
-                                    text: '  ${counts[tag]} 道',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w400,
-                                      color: colors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            trailing: MenuPopupButton<String>(
-                              icon: MenuIcon(
-                                Icons.more_horiz,
-                                size: 18,
-                                color: colors.onSurfaceVariant,
-                              ),
-                              tooltip: '管理“$tag”',
-                              enabled: !_saving,
-                              onSelected: (action) => action == 'rename'
-                                  ? _rename(context, oldName: tag)
-                                  : _delete(context, tag),
-                              itemBuilder: (_) => const [
-                                MenuPopupItem(
-                                  icon: Icons.edit_outlined,
-                                  value: 'rename',
-                                  child: Text('重命名'),
                                 ),
-                                MenuPopupItem(
-                                  icon: Icons.delete_outline,
-                                  destructive: true,
-                                  value: 'delete',
-                                  child: Text('删除标签'),
+                                SizedBox(
+                                  width: 44,
+                                  child: Tooltip(
+                                    message: '管理$tag',
+                                    child: InkWell(
+                                      onTap: _saving
+                                          ? null
+                                          : () async {
+                                              final action =
+                                                  await showNameManagementSheet(
+                                                    context,
+                                                    name: tag,
+                                                    deleteLabel: '删除标签',
+                                                  );
+                                              if (!context.mounted) return;
+                                              switch (action) {
+                                                case NameManagementAction
+                                                    .rename:
+                                                  await _rename(
+                                                    context,
+                                                    oldName: tag,
+                                                  );
+                                                case NameManagementAction
+                                                    .delete:
+                                                  await _delete(context, tag);
+                                                case NameManagementAction
+                                                    .addChild:
+                                                case null:
+                                                  break;
+                                              }
+                                            },
+                                      splashFactory: NoSplash.splashFactory,
+                                      highlightColor: colors.primary.withValues(
+                                        alpha: .1,
+                                      ),
+                                      hoverColor: colors.primary.withValues(
+                                        alpha: .05,
+                                      ),
+                                      child: Center(
+                                        child: MenuIcon(
+                                          Icons.more_horiz,
+                                          size: 18,
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),

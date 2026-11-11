@@ -104,7 +104,9 @@ class RandomRecipeCard extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.all(dark ? 1 : 2),
         decoration: BoxDecoration(
-          color: dark ? const Color(0x1fffffff) : scheme.surface,
+          color: dark
+              ? Color.alphaBlend(const Color(0x1fffffff), scheme.surface)
+              : scheme.surface,
           borderRadius: BorderRadius.circular(22),
         ),
         child: ClipRRect(
@@ -188,38 +190,42 @@ class RecipeCover extends StatelessWidget {
     required this.recipe,
     this.path,
     this.fullResolution = false,
+    this.placeholderIconSize = 54,
   });
   final Recipe recipe;
   final String? path;
   final bool fullResolution;
+  final double placeholderIconSize;
   @override
-  Widget build(BuildContext context) =>
-      path != null || recipe.imagePaths.isNotEmpty
-      ? RetainedLocalPhoto(
-          path: path ?? recipe.imagePaths.first,
-          fullResolution: fullResolution,
-        )
-      : DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Theme.of(
+  Widget build(BuildContext context) => ColoredBox(
+    color: Theme.of(context).colorScheme.surface,
+    child: path != null || recipe.imagePaths.isNotEmpty
+        ? RetainedLocalPhoto(
+            path: path ?? recipe.imagePaths.first,
+            fullResolution: fullResolution,
+          )
+        : DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer.withValues(alpha: .4),
+                  Theme.of(context).colorScheme.surface,
+                ],
+              ),
+            ),
+            child: Center(
+              child: MenuIcon(
+                Icons.ramen_dining_outlined,
+                size: placeholderIconSize,
+                color: Theme.of(
                   context,
-                ).colorScheme.primaryContainer.withValues(alpha: .4),
-                Theme.of(context).colorScheme.surface,
-              ],
+                ).colorScheme.primary.withValues(alpha: .5),
+              ),
             ),
           ),
-          child: Center(
-            child: MenuIcon(
-              Icons.ramen_dining_outlined,
-              size: 54,
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: .5),
-            ),
-          ),
-        );
+  );
 }

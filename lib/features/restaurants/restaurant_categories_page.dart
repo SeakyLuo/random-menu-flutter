@@ -1,3 +1,5 @@
+import '../../ui/name_management_sheet.dart';
+import '../../ui/menu_field_label.dart';
 import '../../core/tag_path.dart';
 import 'package:flutter/material.dart';
 import 'package:lpinyin/lpinyin.dart';
@@ -28,6 +30,8 @@ class RestaurantCategoriesPage extends StatefulWidget {
 class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
   bool _saving = false;
   bool _alphabetical = true;
+  final _expanded = <String>{};
+  final _rowKeys = <String, GlobalKey>{};
   final _scroll = ItemScrollController();
   List<String> _displayedNames = [];
 
@@ -46,18 +50,32 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
   }
 
   void _reveal(String name) {
+    final root = name.split('/').first;
+    setState(() => _expanded.add(root));
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      await _scrollTo(_displayedNames.indexOf(name), alignment: .25);
+      await _scrollTo(_displayedNames.indexOf(root), alignment: .15);
+      if (!mounted) return;
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      await Scrollable.ensureVisible(
+        _rowKeys[name]!.currentContext!,
+        alignment: .25,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+      );
     });
   }
 
-  Future<void> _rename({String? oldName}) async {
+  Future<void> _rename({String? oldName, String? parent}) async {
     final store = MenuScope.of(context);
     final result = await showDialog<String>(
       context: context,
       builder: (_) => _CategoryNameDialog(
         initialName: oldName,
+        parent: parent,
         existing: restaurantCategoryNames(store.data),
       ),
     );
@@ -165,13 +183,32 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
       }
       return left.length.compareTo(right.length);
     });
-    _displayedNames = names;
+    final roots = names.where((name) => !name.contains('/')).toList();
+    final children = {
+      for (final root in roots)
+        root: names.where((name) => name.startsWith('$root/')).toList(),
+    };
+    _displayedNames = roots;
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: MenuScrollTitle(
           onTap: () => _scrollTo(0),
-          child: const Text('菜系管理'),
+          child: MenuTitleLine(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Flexible(child: Text('菜系管理')),
+              const SizedBox(width: 10),
+              Text(
+                '${names.length} 个',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           MenuPopupButton<bool>(
@@ -212,70 +249,41 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
                   : ScrollablePositionedList.separated(
                       itemScrollController: _scroll,
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
-                      itemCount: names.length,
+                      itemCount: roots.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 6),
                       itemBuilder: (context, index) {
-                        final name = names[index];
+                        final root = roots[index];
+                        final descendants = children[root]!;
+                        final expanded = _expanded.contains(root);
                         return Material(
-                          key: ValueKey(name),
+                          key: ValueKey(root),
                           color: colors.surface,
                           borderRadius: BorderRadius.circular(2),
                           clipBehavior: Clip.antiAlias,
-                          child: ListTile(
-                            contentPadding: EdgeInsets.only(
-                              left: 16 + 12.0 * (name.split('/').length - 1),
-                              right: 4,
-                            ),
-                            onTap: _saving
-                                ? null
-                                : () => _rename(oldName: name),
-                            title: Text.rich(
-                              TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: tagPathLabel(name),
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      height: 1.5,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  TextSpan(
-                                    text: '  ${counts[name]} 家',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w400,
-                                      color: colors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _categoryRow(
+                                root,
+                                counts[root]!,
+                                root: true,
+                                expanded: expanded,
+                                hasChildren: descendants.isNotEmpty,
                               ),
-                            ),
-                            trailing: MenuPopupButton<String>(
-                              icon: MenuIcon(
-                                Icons.more_horiz,
-                                size: 18,
-                                color: colors.onSurfaceVariant,
-                              ),
-                              tooltip: '管理$name',
-                              enabled: !_saving,
-                              onSelected: (action) => action == 'rename'
-                                  ? _rename(oldName: name)
-                                  : _delete(name),
-                              itemBuilder: (_) => const [
-                                MenuPopupItem(
-                                  value: 'rename',
-                                  icon: Icons.edit_outlined,
-                                  child: Text('重命名'),
+                              if (expanded && descendants.isNotEmpty) ...[
+                                Divider(
+                                  height: 1,
+                                  thickness: .5,
+                                  indent: 16,
+                                  endIndent: 16,
+                                  color: colors.outlineVariant.withValues(
+                                    alpha: .45,
+                                  ),
                                 ),
-                                MenuPopupItem(
-                                  value: 'delete',
-                                  icon: Icons.delete_outline,
-                                  destructive: true,
-                                  child: Text('删除菜系'),
-                                ),
+                                for (final child in descendants)
+                                  _categoryRow(child, counts[child]!),
                               ],
-                            ),
+                            ],
                           ),
                         );
                       },
@@ -291,14 +299,131 @@ class _RestaurantCategoriesPageState extends State<RestaurantCategoriesPage> {
       ),
     );
   }
+
+  Future<void> _manage(String name) async {
+    final action = await showNameManagementSheet(
+      context,
+      name: tagPathLabel(name),
+      deleteLabel: '删除菜系',
+      addChildLabel: '添加细分菜系',
+    );
+    if (!mounted) return;
+    switch (action) {
+      case NameManagementAction.rename:
+        await _rename(oldName: name);
+      case NameManagementAction.delete:
+        await _delete(name);
+      case NameManagementAction.addChild:
+        await _rename(parent: name);
+      case null:
+        break;
+    }
+  }
+
+  Widget _categoryRow(
+    String name,
+    int count, {
+    bool root = false,
+    bool expanded = false,
+    bool hasChildren = false,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        key: _rowKeys.putIfAbsent(name, GlobalKey.new),
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: _saving ? null : () => _manage(name),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: root ? 52 : 44),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    root ? 16 : 28 + 12.0 * (name.split('/').length - 2),
+                    root ? 10 : 6,
+                    12,
+                    root ? 10 : 6,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: tagPathLabel(name),
+                                style: TextStyle(
+                                  fontSize: root ? 16 : 14,
+                                  height: 1.4,
+                                  fontWeight: root
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
+                              ),
+                              TextSpan(
+                                text: '  $count 家',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (root && hasChildren)
+            SizedBox(
+              width: 44,
+              child: Tooltip(
+                message: '${expanded ? '收起' : '展开'}${tagPathLabel(name)}',
+                child: InkWell(
+                  onTap: _saving
+                      ? null
+                      : () => setState(() {
+                          if (!_expanded.add(name)) _expanded.remove(name);
+                        }),
+                  splashFactory: NoSplash.splashFactory,
+                  highlightColor: colors.primary.withValues(alpha: .1),
+                  hoverColor: colors.primary.withValues(alpha: .05),
+                  child: Center(
+                    child: AnimatedRotation(
+                      turns: expanded ? .5 : 0,
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 200),
+                      curve: Curves.easeInOutCubic,
+                      child: MenuIcon(
+                        Icons.expand_more,
+                        size: 18,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _CategoryNameDialog extends StatefulWidget {
   const _CategoryNameDialog({
     required this.initialName,
     required this.existing,
+    this.parent,
   });
   final String? initialName;
+  final String? parent;
   final List<String> existing;
   @override
   State<_CategoryNameDialog> createState() => _CategoryNameDialogState();
@@ -306,6 +431,7 @@ class _CategoryNameDialog extends StatefulWidget {
 
 class _CategoryNameDialogState extends State<_CategoryNameDialog> {
   late final _name = TextEditingController(text: widget.initialName);
+  late String _parent = widget.parent ?? '';
   @override
   void dispose() {
     _name.dispose();
@@ -322,8 +448,12 @@ class _CategoryNameDialogState extends State<_CategoryNameDialog> {
       showToast(context, '请填写完整的菜系名称，例如：烤肉/日本烤肉');
       return;
     }
-    final value = widget.initialName == null
-        ? inferredTagPath(name, widget.existing)
+    if (widget.initialName == null && name.contains('/')) {
+      showToast(context, '名称只需填写当前菜系，所属菜系请在下拉框选择');
+      return;
+    }
+    final value = widget.initialName == null && _parent.isNotEmpty
+        ? '$_parent/$name'
         : name;
     if (value != widget.initialName && widget.existing.contains(value)) {
       showToast(context, '该菜系已存在');
@@ -334,14 +464,68 @@ class _CategoryNameDialogState extends State<_CategoryNameDialog> {
 
   @override
   Widget build(BuildContext context) => MenuDialog(
-    title: widget.initialName == null ? '新增菜系' : '重命名菜系',
-    content: TextField(
-      controller: _name,
-      autofocus: true,
-      maxLength: 30,
-      textInputAction: TextInputAction.done,
-      onSubmitted: (_) => _submit(),
-      decoration: const InputDecoration(hintText: '例如：烤肉/日本烤肉'),
+    title: widget.parent != null
+        ? '添加${tagPathLabel(widget.parent!)}细分菜系'
+        : widget.initialName == null
+        ? '新增菜系'
+        : '重命名菜系',
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.initialName == null) ...[
+          const MenuFieldLabel('所属菜系', bottomSpacing: 6),
+          MenuPopupButton<String>(
+            tooltip: '选择所属菜系',
+            matchAnchorWidth: true,
+            borderRadius: BorderRadius.circular(12),
+            itemBuilder: (_) => [
+              MenuPopupItem(
+                value: '',
+                icon: Icons.restaurant,
+                selected: _parent.isEmpty,
+                child: const Text('无'),
+              ),
+              for (final parent in widget.existing)
+                MenuPopupItem(
+                  value: parent,
+                  icon: Icons.restaurant,
+                  selected: _parent == parent,
+                  child: Text(parent.replaceAll('/', ' · ')),
+                ),
+            ],
+            onSelected: (value) => setState(() => _parent = value),
+            child: InputDecorator(
+              decoration: const InputDecoration(),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _parent.isEmpty ? '无' : _parent.replaceAll('/', ' · '),
+                      style: const TextStyle(fontSize: 15),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const MenuIcon(Icons.expand_more, size: 18),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const MenuFieldLabel('菜系名称', bottomSpacing: 6),
+        ],
+        TextField(
+          controller: _name,
+          autofocus: true,
+          maxLength: 30,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _submit(),
+          decoration: InputDecoration(
+            hintText: widget.initialName == null ? '例如：广式点心' : '例如：烤肉/日本烤肉',
+          ),
+        ),
+      ],
     ),
     actions: Row(
       children: [

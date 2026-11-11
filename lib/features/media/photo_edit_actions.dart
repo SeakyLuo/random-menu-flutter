@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../ui/menu_bottom_sheet.dart';
-import '../../ui/menu_icon.dart';
+import '../../ui/menu_action_sheet.dart';
 
 class PhotoEditResult {
   const PhotoEditResult({required this.path, required this.coverPath});
@@ -14,26 +13,21 @@ typedef PhotoEditCallback =
 
 Future<bool?> choosePhotoSource(BuildContext context) async {
   if (!Platform.isAndroid && !Platform.isIOS) return false;
-  return showMenuBottomSheet<bool>(
+  return showMenuActionSheet<bool>(
     context: context,
-    showDragHandle: true,
-    builder: (context) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const MenuIcon(Icons.photo_library_outlined),
-            title: const Text('从相册选择'),
-            onTap: () => Navigator.pop(context, false),
-          ),
-          ListTile(
-            leading: const MenuIcon(Icons.camera_alt_outlined),
-            title: const Text('拍照'),
-            onTap: () => Navigator.pop(context, true),
-          ),
-        ],
+    title: '添加照片',
+    actions: (context) => [
+      MenuSheetAction(
+        icon: Icons.photo_library_outlined,
+        label: '从相册选择',
+        onTap: () => Navigator.pop(context, false),
       ),
-    ),
+      MenuSheetAction(
+        icon: Icons.camera_alt_outlined,
+        label: '拍照',
+        onTap: () => Navigator.pop(context, true),
+      ),
+    ],
   );
 }
 
@@ -42,36 +36,32 @@ Future<String?> showPhotoEditMenu(
   required bool isCover,
   bool allowCover = true,
   bool hasOriginal = false,
-}) => showMenuBottomSheet<String>(
+}) => showMenuActionSheet<String>(
   context: context,
-  showDragHandle: true,
-  builder: (context) => SafeArea(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (hasOriginal)
-          ListTile(
-            leading: const MenuIcon(Icons.photo_outlined),
-            title: const Text('查看原图'),
-            onTap: () => Navigator.pop(context, 'original'),
-          ),
-        ListTile(
-          leading: const MenuIcon(Icons.crop),
-          title: const Text('编辑图片'),
-          onTap: () => Navigator.pop(context, 'crop'),
-        ),
-        if (allowCover && !isCover)
-          ListTile(
-            leading: const MenuIcon(Icons.photo_outlined),
-            title: const Text('设为封面'),
-            onTap: () => Navigator.pop(context, 'cover'),
-          ),
-        ListTile(
-          leading: const MenuIcon(Icons.delete_outline),
-          title: const Text('删除图片'),
-          onTap: () => Navigator.pop(context, 'remove'),
-        ),
-      ],
+  title: '图片操作',
+  actions: (context) => [
+    if (hasOriginal)
+      MenuSheetAction(
+        icon: Icons.photo_outlined,
+        label: '查看原图',
+        onTap: () => Navigator.pop(context, 'original'),
+      ),
+    MenuSheetAction(
+      icon: Icons.crop,
+      label: '编辑图片',
+      onTap: () => Navigator.pop(context, 'crop'),
     ),
-  ),
+    if (allowCover && !isCover)
+      MenuSheetAction(
+        icon: Icons.photo_outlined,
+        label: '设为封面',
+        onTap: () => Navigator.pop(context, 'cover'),
+      ),
+    MenuSheetAction(
+      icon: Icons.delete_outline,
+      label: '删除图片',
+      destructive: true,
+      onTap: () => Navigator.pop(context, 'remove'),
+    ),
+  ],
 );

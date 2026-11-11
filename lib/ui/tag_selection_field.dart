@@ -17,6 +17,7 @@ class TagSelectionField extends StatelessWidget {
     this.allowCreate = true,
     this.hierarchical = false,
     this.trailing,
+    this.icon,
   });
   final List<String> selected;
   final List<String> choices;
@@ -27,6 +28,7 @@ class TagSelectionField extends StatelessWidget {
   final bool allowCreate;
   final bool hierarchical;
   final Widget? trailing;
+  final IconData? icon;
 
   Future<void> _open(BuildContext context) async {
     FocusScope.of(context).unfocus();
@@ -56,12 +58,17 @@ class TagSelectionField extends StatelessWidget {
           allowCreate: allowCreate,
           busy: busy,
           trailing: trailing,
+          icon: icon,
         )
       : Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
+                if (icon case final glyph?) ...[
+                  MenuIcon(glyph, size: 18),
+                  const SizedBox(width: 8),
+                ],
                 Expanded(
                   child: Text(
                     label,

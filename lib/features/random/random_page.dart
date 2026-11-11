@@ -364,158 +364,188 @@ class _RandomPageState extends State<RandomPage> {
     );
   }
 
-  Widget _overview(BuildContext context, List<Recipe> menu) => GestureDetector(
-    behavior: HitTestBehavior.opaque,
-    onTap: _busy ? null : _openMenu,
-    child: Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .04),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _busy ? null : _openMenu,
-                    child: SizedBox(
-                      height: 32,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            menu.isEmpty ? '菜单' : '菜单 · ',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Visibility(
-                            visible: menu.isNotEmpty,
-                            maintainState: true,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                RollingCount(
-                                  value: menu.length,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  ),
-                                ),
-                                Text(
-                                  '道',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                const MenuIcon(Icons.chevron_right, size: 14),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              TextButton(
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.only(left: 16),
-                  minimumSize: const Size(44, 32),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  foregroundColor: Theme.of(
-                    context,
-                  ).colorScheme.onSurfaceVariant,
-                  disabledForegroundColor: Theme.of(
-                    context,
-                  ).colorScheme.onSurfaceVariant,
-                ),
-                onPressed: _busy || MenuScope.of(context).data.recipes.isEmpty
-                    ? null
-                    : _reset,
-                child: const Text('重置', style: TextStyle(fontSize: 12)),
-              ),
-            ],
+  Widget _overview(BuildContext context, List<Recipe> menu) {
+    final colors = Theme.of(context).colorScheme;
+    final labelHeight = (MediaQuery.textScalerOf(context).scale(11) * 1.4)
+        .ceilToDouble();
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _busy ? null : _openMenu,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: colors.surface,
+          border: Border.all(
+            color: colors.outlineVariant.withValues(alpha: .45),
           ),
-          const SizedBox(height: 7),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final size = min(64.0, (constraints.maxWidth - 32) / 5);
-              return SizedBox(
-                height: size,
-                child: Stack(
-                  children: [
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      child: SizedBox(key: _target, width: size, height: size),
-                    ),
-                    if (menu.isEmpty)
-                      Positioned.fill(
-                        child: Align(
-                          alignment: Alignment.center,
-                          child: Text(
-                            '把想吃的菜拖到这里',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const Text(
+                  '菜单',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(width: 8),
+                Visibility(
+                  visible: menu.isNotEmpty,
+                  maintainState: true,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: colors.primary.withValues(alpha: .1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              RollingCount(
+                                value: menu.length,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: colors.primary,
+                                ),
+                              ),
+                              Text(
+                                ' 道',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colors.primary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      )
-                    else
-                      Positioned.fill(
-                        child: ClipRect(
-                          child: ValueListenableBuilder<double>(
-                            valueListenable: _arrival,
-                            builder: (context, progress, child) =>
-                                Transform.translate(
-                                  offset: Offset((size + 8) * progress, 0),
-                                  child: child,
-                                ),
-                            child: ListView.separated(
-                              controller: _rail,
-                              scrollDirection: Axis.horizontal,
-                              physics: _busy
-                                  ? const NeverScrollableScrollPhysics()
-                                  : null,
-                              itemCount: menu.length,
-                              findItemIndexCallback: (key) {
-                                final id = (key as ValueKey<String>).value;
-                                final index = menu.indexWhere(
-                                  (recipe) => recipe.id == id,
-                                );
-                                return index == -1 ? null : index;
-                              },
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(width: 8),
-                              itemBuilder: (context, index) => SizedBox(
-                                key: ValueKey(menu[index].id),
-                                width: size,
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(11),
+                      ),
+                      const SizedBox(width: 3),
+                      MenuIcon(
+                        Icons.chevron_right,
+                        size: 14,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(44, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    foregroundColor: colors.onSurfaceVariant,
+                    disabledForegroundColor: colors.onSurfaceVariant,
+                  ),
+                  onPressed: _busy || MenuScope.of(context).data.recipes.isEmpty
+                      ? null
+                      : _reset,
+                  child: const Text('重置', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final size = min(48.0, (constraints.maxWidth - 32) / 5);
+                return SizedBox(
+                  height: size + 5 + labelHeight,
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        child: SizedBox(
+                          key: _target,
+                          width: size,
+                          height: size,
+                        ),
+                      ),
+                      if (menu.isEmpty)
+                        Positioned.fill(
+                          child: Center(
+                            child: Text(
+                              '把想吃的菜拖到这里',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        Positioned.fill(
+                          child: ClipRect(
+                            child: ValueListenableBuilder<double>(
+                              valueListenable: _arrival,
+                              builder: (context, progress, child) =>
+                                  Transform.translate(
+                                    offset: Offset((size + 8) * progress, 0),
+                                    child: child,
+                                  ),
+                              child: ListView.separated(
+                                controller: _rail,
+                                scrollDirection: Axis.horizontal,
+                                physics: _busy
+                                    ? const NeverScrollableScrollPhysics()
+                                    : null,
+                                itemCount: menu.length,
+                                findItemIndexCallback: (key) {
+                                  final id = (key as ValueKey<String>).value;
+                                  final index = menu.indexWhere(
+                                    (recipe) => recipe.id == id,
+                                  );
+                                  return index == -1 ? null : index;
+                                },
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(width: 8),
+                                itemBuilder: (context, index) => SizedBox(
+                                  key: ValueKey(menu[index].id),
+                                  width: size,
                                   child: Semantics(
                                     button: true,
                                     label: '打开菜单，${menu[index].name}',
+                                    excludeSemantics: true,
                                     child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
                                       onTap: _busy ? null : _openMenu,
-                                      child: RecipeCover(recipe: menu[index]),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          SizedBox(
+                                            height: size,
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(9),
+                                              child: RecipeCover(
+                                                recipe: menu[index],
+                                                placeholderIconSize: 24,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 5),
+                                          Text(
+                                            menu[index].name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              height: 1.4,
+                                              color: colors.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -523,16 +553,16 @@ class _RandomPageState extends State<RandomPage> {
                             ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _empty(BuildContext context, MenuData data) {
     final matching = _matching(data);

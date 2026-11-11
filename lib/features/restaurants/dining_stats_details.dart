@@ -131,7 +131,7 @@ class _DiningStatsDetailsState extends State<DiningStatsDetails>
                         _showRatio
                             ? '按占比'
                             : widget.kind == DiningBreakdown.cuisines
-                            ? '按家数'
+                            ? '按数量'
                             : '按次数',
                         style: TextStyle(
                           fontSize: 14,

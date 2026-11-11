@@ -121,7 +121,7 @@ class _DiningStatsPageState extends State<DiningStatsPage> {
                       ],
                     ),
                     DiningChartCard(
-                      title: '消费时间',
+                      title: '消费次数',
                       badge: '最近6个季度',
                       onDetails: () => _details(DiningBreakdown.quarters),
                       children: [

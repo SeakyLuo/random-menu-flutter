@@ -75,45 +75,45 @@ class _TagRulesPageState extends State<TagRulesPage> {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        actions: [
-          PageAddButton(label: '添加标签规则', onPressed: _add),
-          const SizedBox(width: 8),
-        ],
       ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
-          child: rules.isEmpty
-              ? EmptyState(
-                  icon: Icons.auto_awesome_outlined,
-                  title: '还没有标签规则',
-                  message: '添加一条菜名匹配规则，让整理菜谱更轻松。',
-                  actionLabel: '添加规则',
-                  onAction: _add,
-                )
-              : ListView.separated(
-                  controller: _scroll,
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    8,
-                    16,
-                    16 + MediaQuery.viewPaddingOf(context).bottom,
-                  ),
-                  itemCount: visible,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final rule = rules[index];
-                    return _RuleRow(
-                      keywords: rule.keywords,
-                      tags: rule.tags,
-                      onTap: () => showTagRuleEditor(
-                        context,
-                        mode: rule.mode,
-                        existingKey: rule.key,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              rules.isEmpty
+                  ? const EmptyState(
+                      icon: Icons.auto_awesome_outlined,
+                      title: '还没有标签规则',
+                      message: '添加一条菜名匹配规则，让整理菜谱更轻松。',
+                    )
+                  : ListView.separated(
+                      controller: _scroll,
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        8,
+                        16,
+                        100 + MediaQuery.viewPaddingOf(context).bottom,
                       ),
-                    );
-                  },
-                ),
+                      itemCount: visible,
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final rule = rules[index];
+                        return _RuleRow(
+                          keywords: rule.keywords,
+                          tags: rule.tags,
+                          onTap: () => showTagRuleEditor(
+                            context,
+                            mode: rule.mode,
+                            existingKey: rule.key,
+                          ),
+                        );
+                      },
+                    ),
+              LibraryFab(label: '添加标签规则', bottom: 20, onPressed: _add),
+            ],
+          ),
         ),
       ),
     );

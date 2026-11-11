@@ -1,4 +1,4 @@
-import '../../ui/menu_bottom_sheet.dart';
+import '../../ui/menu_action_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../ui/menu_icon.dart';
@@ -100,32 +100,27 @@ class _PhotoViewerState extends State<PhotoViewer> {
       }
       return;
     }
-    final action = await showMenuBottomSheet<String>(
+    final action = await showMenuActionSheet<String>(
       context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (hasOriginal)
-              ListTile(
-                leading: const MenuIcon(Icons.photo_outlined),
-                title: const Text('查看原图'),
-                onTap: () => Navigator.pop(context, 'original'),
-              ),
-            ListTile(
-              leading: const MenuIcon(Icons.file_download_outlined),
-              title: const Text('保存照片'),
-              onTap: () => Navigator.pop(context, 'save'),
-            ),
-            ListTile(
-              leading: const MenuIcon(Icons.ios_share_rounded),
-              title: const Text('分享照片'),
-              onTap: () => Navigator.pop(context, 'share'),
-            ),
-          ],
+      title: '照片操作',
+      actions: (context) => [
+        if (hasOriginal)
+          MenuSheetAction(
+            icon: Icons.photo_outlined,
+            label: '查看原图',
+            onTap: () => Navigator.pop(context, 'original'),
+          ),
+        MenuSheetAction(
+          icon: Icons.file_download_outlined,
+          label: '保存照片',
+          onTap: () => Navigator.pop(context, 'save'),
         ),
-      ),
+        MenuSheetAction(
+          icon: Icons.ios_share_rounded,
+          label: '分享照片',
+          onTap: () => Navigator.pop(context, 'share'),
+        ),
+      ],
     );
     if (action == null || !mounted) return;
     setState(() => _busy = true);

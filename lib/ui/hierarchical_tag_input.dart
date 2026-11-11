@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'glass_surface.dart';
 import '../core/tag_path.dart';
 import 'menu_field_label.dart';
 import 'menu_tag.dart';
@@ -16,6 +17,7 @@ class HierarchicalTagInput extends StatefulWidget {
     required this.allowCreate,
     required this.busy,
     this.trailing,
+    this.icon,
   });
 
   final List<String> selected, choices;
@@ -24,6 +26,7 @@ class HierarchicalTagInput extends StatefulWidget {
   final int limit;
   final bool allowCreate, busy;
   final Widget? trailing;
+  final IconData? icon;
 
   @override
   State<HierarchicalTagInput> createState() => _HierarchicalTagInputState();
@@ -139,7 +142,12 @@ class _HierarchicalTagInputState extends State<HierarchicalTagInput>
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      MenuFieldLabel(widget.label, trailing: widget.trailing, bottomSpacing: 6),
+      MenuFieldLabel(
+        widget.label,
+        icon: widget.icon,
+        trailing: widget.trailing,
+        bottomSpacing: 6,
+      ),
       LayoutBuilder(
         builder: (context, constraints) => RawAutocomplete<String>(
           textEditingController: _text,
@@ -238,36 +246,34 @@ class _HierarchicalTagInputState extends State<HierarchicalTagInput>
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: TextFieldTapRegion(
-                child: Material(
-                  color: Theme.of(context).colorScheme.surface,
-                  surfaceTintColor: Colors.transparent,
-                  elevation: 4,
-                  borderRadius: BorderRadius.circular(12),
-                  clipBehavior: Clip.antiAlias,
-                  child: SizedBox(
-                    width: constraints.maxWidth,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxHeight: _availableHeight),
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        shrinkWrap: true,
-                        itemCount: options.length,
-                        itemBuilder: (context, index) {
-                          final tag = options.elementAt(index);
-                          final slash = tag.lastIndexOf('/');
-                          return ListTile(
-                            dense: true,
-                            title: Text(tagPathLabel(tag)),
-                            subtitle: slash < 0
-                                ? null
-                                : Text(
-                                    tag
-                                        .substring(0, slash)
-                                        .replaceAll('/', ' · '),
-                                  ),
-                            onTap: () => select(tag),
-                          );
-                        },
+                child: GlassSurface(
+                  radius: 12,
+                  blurSigma: 24,
+                  tintOpacity: .85,
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: SizedBox(
+                      width: constraints.maxWidth,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: _availableHeight,
+                        ),
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          shrinkWrap: true,
+                          itemCount: options.length,
+                          itemBuilder: (context, index) {
+                            final tag = options.elementAt(index);
+                            return ListTile(
+                              dense: true,
+                              textColor: Theme.of(
+                                context,
+                              ).colorScheme.onSurface,
+                              title: Text(tagPathLabel(tag)),
+                              onTap: () => select(tag),
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),

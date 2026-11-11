@@ -1,3 +1,4 @@
+import '../../ui/menu_field_label.dart';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../ui/menu_icon.dart';
@@ -70,22 +71,16 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
   );
 
   String _dateLabel(DateTime date) =>
-      '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
+      '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
-  Widget _heading(String text, {Widget? action}) => ConstrainedBox(
-    constraints: const BoxConstraints(minHeight: 32),
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-        ),
-        ?action,
-      ],
-    ),
-  );
+  Widget _heading(String text, IconData icon, {Widget? action}) =>
+      MenuFieldLabel(
+        text,
+        icon: icon,
+        minHeight: 32,
+        bottomSpacing: 0,
+        trailing: action,
+      );
 
   Widget _region(String label, String value, int level) => GestureDetector(
     behavior: HitTestBehavior.opaque,
@@ -121,14 +116,7 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
             minHeight: 24,
           ),
           suffixIcon: date == null
-              ? Padding(
-                  padding: const EdgeInsets.only(right: 10),
-                  child: MenuIcon(
-                    Icons.date_range_outlined,
-                    size: 18,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                )
+              ? null
               : IconButton(
                   tooltip: start ? '清除开始日期' : '清除结束日期',
                   onPressed: () => setState(() {
@@ -218,6 +206,7 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                   children: [
                     _heading(
                       '城市',
+                      Icons.place_outlined,
                       action: query.hasLocation
                           ? TextButton(
                               onPressed: () => setState(() {
@@ -282,7 +271,7 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                       ),
                     ],
                     const SizedBox(height: 12),
-                    _heading('地址'),
+                    _heading('地址', Icons.storefront_outlined),
                     const SizedBox(height: 6),
                     MenuSuggestionInput(
                       controller: _address,
@@ -292,7 +281,7 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                       adaptToAvailableSpace: true,
                     ),
                     const SizedBox(height: 18),
-                    _heading('消费日期'),
+                    _heading('消费日期', Icons.date_range_outlined),
                     const SizedBox(height: 6),
                     Row(
                       spacing: 8,
@@ -304,6 +293,7 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                     const SizedBox(height: 18),
                     TagSelectionField(
                       label: '菜系',
+                      icon: Icons.restaurant_outlined,
                       selected: query.categories,
                       hierarchical: true,
                       choices: categories,
@@ -340,7 +330,7 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                       ),
                     ],
                     const SizedBox(height: 18),
-                    _heading('人均价格'),
+                    _heading('人均价格', Icons.receipt_long_outlined),
                     const SizedBox(height: 6),
                     Row(
                       spacing: 8,
@@ -370,7 +360,7 @@ class _RestaurantFilterSheetState extends State<RestaurantFilterSheet> {
                       ],
                     ),
                     const SizedBox(height: 18),
-                    _heading('饭搭子'),
+                    _heading('饭搭子', Icons.people_outline),
                     const SizedBox(height: 6),
                     MenuSuggestionInput(
                       controller: _companion,

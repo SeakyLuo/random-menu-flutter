@@ -100,14 +100,14 @@ class _PersonalPageState extends State<PersonalPage> {
               context,
               Icons.label_outline,
               '菜谱标签',
-              value: '${data.recipeTags.length} 个',
+              value: '${data.recipeTags.length}',
               onTap: () => _open(context, const RecipeTagsPage()),
             ),
             _entry(
               context,
               Icons.restaurant_outlined,
               '餐厅菜系',
-              value: '${restaurantCategoryNames(data).length} 个',
+              value: '${restaurantCategoryNames(data).length}',
               onTap: () => _open(context, const RestaurantCategoriesPage()),
             ),
             _entry(
@@ -115,7 +115,7 @@ class _PersonalPageState extends State<PersonalPage> {
               Icons.auto_awesome_outlined,
               '自动标签',
               value: data.autoTag
-                  ? '${data.tagRules.length + data.patternTagRules.length} 条规则'
+                  ? '${data.tagRules.length + data.patternTagRules.length}'
                   : '已关闭',
               onTap: () => _open(context, const TagRulesPage()),
             ),

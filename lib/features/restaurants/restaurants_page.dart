@@ -2,7 +2,7 @@ import 'restaurant_cover_batch.dart';
 import '../../ui/search_page_route.dart';
 import 'restaurant_grid.dart';
 import '../../ui/library_layout.dart';
-import '../../ui/menu_bottom_sheet.dart';
+import '../../ui/menu_action_sheet.dart';
 import 'package:flutter/material.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
@@ -118,56 +118,23 @@ class RestaurantsPageState extends State<RestaurantsPage> {
 
   Future<void> _sort() async {
     if (_locating) return;
-    final sort = await showMenuBottomSheet<RestaurantSort>(
+    final sort = await showMenuActionSheet<RestaurantSort>(
       context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '餐厅排序',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              for (final sort in RestaurantSort.values)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: MenuIcon(
-                    switch (sort) {
-                      RestaurantSort.recent => Icons.schedule,
-                      RestaurantSort.visits => Icons.bar_chart_outlined,
-                      RestaurantSort.price => Icons.receipt_long_outlined,
-                      RestaurantSort.nearest => Icons.location_on_outlined,
-                    },
-                    color: sort == _query.sort
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  title: Text(
-                    RestaurantQuery(sort: sort).sortLabel,
-                    style: sort == _query.sort
-                        ? TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                          )
-                        : null,
-                  ),
-                  trailing: sort == _query.sort
-                      ? MenuIcon(
-                          Icons.check,
-                          size: 28,
-                          color: Theme.of(context).colorScheme.primary,
-                        )
-                      : null,
-                  onTap: () => Navigator.pop(context, sort),
-                ),
-            ],
+      title: '餐厅排序',
+      actions: (context) => [
+        for (final sort in RestaurantSort.values)
+          MenuSheetAction(
+            icon: switch (sort) {
+              RestaurantSort.recent => Icons.schedule,
+              RestaurantSort.visits => Icons.bar_chart_outlined,
+              RestaurantSort.price => Icons.receipt_long_outlined,
+              RestaurantSort.nearest => Icons.location_on_outlined,
+            },
+            label: RestaurantQuery(sort: sort).sortLabel,
+            selected: sort == _query.sort,
+            onTap: () => Navigator.pop(context, sort),
           ),
-        ),
-      ),
+      ],
     );
     if (sort == null || !mounted) return;
     if (sort == RestaurantSort.nearest) {

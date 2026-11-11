@@ -1,3 +1,4 @@
+import 'visit_food_list.dart';
 import '../../ui/menu_popup.dart';
 import '../../ui/menu_icon.dart';
 import 'package:flutter/material.dart';
@@ -278,36 +279,46 @@ class VisitDetailPage extends StatelessWidget {
               ],
               if (visit.items.isNotEmpty) ...[
                 _VisitSectionTitle('本次菜品', count: '${visit.items.length} 道'),
-                LayoutBuilder(
-                  builder: (context, constraints) => MasonryGridView.count(
-                    shrinkWrap: true,
-                    primary: false,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: EdgeInsets.zero,
-                    crossAxisCount: constraints.maxWidth >= 600 ? 2 : 1,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 24,
-                    itemCount: visit.items.length,
-                    itemBuilder: (context, index) {
-                      final dish = visit.items[index];
-                      return RestaurantDishCard(
-                        name: dish.name,
-                        currency: visit.currency,
-                        paths: dish.imagePaths,
-                        price: dish.price,
-                        note: dish.note,
-                        quantity: dish.quantity,
-                        package: visit.packageFor(dish),
-                        onTap: () => showVisitDishDetail(
-                          context,
-                          restaurantId: restaurantId,
-                          visitId: visit.id,
-                          itemIndex: index,
-                        ),
-                      );
-                    },
+                if (visit.items.every((dish) => dish.imagePaths.isEmpty))
+                  VisitFoodList(
+                    restaurantId: restaurantId,
+                    visitId: visitId,
+                    currency: visit.currency,
+                    items: visit.items,
+                    packages: visit.packages,
+                    vertical: true,
+                  )
+                else
+                  LayoutBuilder(
+                    builder: (context, constraints) => MasonryGridView.count(
+                      shrinkWrap: true,
+                      primary: false,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: EdgeInsets.zero,
+                      crossAxisCount: constraints.maxWidth >= 600 ? 2 : 1,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 24,
+                      itemCount: visit.items.length,
+                      itemBuilder: (context, index) {
+                        final dish = visit.items[index];
+                        return RestaurantDishCard(
+                          name: dish.name,
+                          currency: visit.currency,
+                          paths: dish.imagePaths,
+                          price: dish.price,
+                          note: dish.note,
+                          quantity: dish.quantity,
+                          package: visit.packageFor(dish),
+                          onTap: () => showVisitDishDetail(
+                            context,
+                            restaurantId: restaurantId,
+                            visitId: visit.id,
+                            itemIndex: index,
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
               ] else if (visit.dishes.isNotEmpty) ...[
                 _VisitSectionTitle('本次菜品', count: '${visit.dishes.length} 道'),
                 Text(visit.dishes.join('、')),
