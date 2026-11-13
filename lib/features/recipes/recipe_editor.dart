@@ -164,6 +164,7 @@ class _RecipeEditorState extends State<_RecipeEditor> {
               MenuDialogButton(
                 label: '放弃修改',
                 role: MenuDialogRole.destructive,
+                backgroundRole: MenuDialogRole.secondary,
                 onPressed: () => Navigator.pop(context, 'discard'),
               ),
               const SizedBox(height: 10),

@@ -30,7 +30,31 @@ class PersonalListPage extends StatefulWidget {
 }
 
 class _PersonalListPageState extends State<PersonalListPage> {
-  int _page = 0;
+  static const _batchSize = 100;
+  final _scroll = ScrollController();
+  int _visibleCount = _batchSize;
+  int _itemCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_loadMore);
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _loadMore() {
+    if (_scroll.hasClients &&
+        _scroll.position.extentAfter < 320 &&
+        _visibleCount < _itemCount) {
+      setState(() => _visibleCount += _batchSize);
+    }
+  }
+
   String get _label => _title(widget.kind);
   Future<void> _edit([String? original, bool managing = false]) async {
     final saved = await showMenuBottomSheet<bool>(
@@ -52,7 +76,9 @@ class _PersonalListPageState extends State<PersonalListPage> {
         managing: managing,
       ),
     );
-    if (saved == true && mounted) setState(() => _page = 0);
+    if (saved == true && mounted && _scroll.hasClients) {
+      scrollMenuToTop(context, _scroll);
+    }
   }
 
   Future<void> _makeRecipe(String name) async {
@@ -62,14 +88,17 @@ class _PersonalListPageState extends State<PersonalListPage> {
   @override
   Widget build(BuildContext context) {
     final items = _items(MenuScope.of(context).data, widget.kind);
-    final last = items.isEmpty ? 0 : (items.length - 1) ~/ 12;
-    final page = min(_page, last);
-    final displayed = items.skip(page * 12).take(12).toList();
+    _itemCount = items.length;
+    final visible = min(_visibleCount, items.length);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadMore();
+    });
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
         toolbarHeight: 48,
         title: MenuScrollTitle(
+          controller: _scroll,
           child: MenuTitleLine(
             children: [
               Text(_label),
@@ -105,113 +134,77 @@ class _PersonalListPageState extends State<PersonalListPage> {
                       actionLabel: '添加记录',
                       onAction: _edit,
                     )
-                  : ListView(
-                      primary: true,
+                  : ListView.builder(
+                      controller: _scroll,
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
-                      children: [
-                        for (final item in displayed)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Material(
-                              color: Theme.of(context).colorScheme.surface,
-                              borderRadius: BorderRadius.circular(2),
-                              clipBehavior: Clip.antiAlias,
-                              child: IntrinsicHeight(
-                                child: Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    Expanded(
+                      itemCount: visible,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Material(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(2),
+                            clipBehavior: Clip.antiAlias,
+                            child: IntrinsicHeight(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    child: InkWell(
+                                      onTap: () =>
+                                          widget.kind == PersonalListKind.toCook
+                                          ? _makeRecipe(item)
+                                          : _edit(item),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 12,
+                                        ),
+                                        child: Text(
+                                          item,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            height: 1.5,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 44,
+                                    child: Tooltip(
+                                      message: '管理$_label记录：$item',
                                       child: InkWell(
-                                        onTap: () =>
-                                            widget.kind ==
-                                                PersonalListKind.toCook
-                                            ? _makeRecipe(item)
-                                            : _edit(item),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 12,
-                                          ),
-                                          child: Text(
-                                            item,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              height: 1.5,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: 44,
-                                      child: Tooltip(
-                                        message: '管理$_label记录：$item',
-                                        child: InkWell(
-                                          onTap: () => _edit(item, true),
-                                          splashFactory: NoSplash.splashFactory,
-                                          highlightColor: Theme.of(context)
-                                              .colorScheme
-                                              .primary
-                                              .withValues(alpha: .1),
-                                          hoverColor: Theme.of(context)
-                                              .colorScheme
-                                              .primary
-                                              .withValues(alpha: .05),
-                                          child: Center(
-                                            child: MenuIcon(
-                                              Icons.more_horiz,
-                                              size: 18,
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.onSurfaceVariant,
-                                            ),
+                                        onTap: () => _edit(item, true),
+                                        splashFactory: NoSplash.splashFactory,
+                                        highlightColor: Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withValues(alpha: .1),
+                                        hoverColor: Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withValues(alpha: .05),
+                                        child: Center(
+                                          child: MenuIcon(
+                                            Icons.more_horiz,
+                                            size: 18,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-                        if (last > 0)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 20),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                TextButton(
-                                  onPressed: page == 0
-                                      ? null
-                                      : () => setState(() => _page = page - 1),
-                                  child: const Text('上一页'),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                  ),
-                                  child: Text(
-                                    '${page + 1} / ${last + 1}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: page == last
-                                      ? null
-                                      : () => setState(() => _page = page + 1),
-                                  child: const Text('下一页'),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
+                        );
+                      },
                     ),
               if (items.isNotEmpty)
                 LibraryFab(

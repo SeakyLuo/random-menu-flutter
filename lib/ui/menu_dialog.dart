@@ -90,12 +90,14 @@ class MenuDialogButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.role = MenuDialogRole.primary,
+    this.backgroundRole,
     this.busy = false,
   });
 
   final String label;
   final VoidCallback onPressed;
   final MenuDialogRole role;
+  final MenuDialogRole? backgroundRole;
   final bool busy;
 
   @override
@@ -107,7 +109,7 @@ class MenuDialogButton extends StatelessWidget {
       MenuDialogRole.secondary => colors.onSurface,
       MenuDialogRole.destructive => colors.error,
     };
-    final background = switch (role) {
+    final background = switch (backgroundRole ?? role) {
       MenuDialogRole.primary => colors.primary,
       MenuDialogRole.secondary => Color.alphaBlend(
         colors.onSurface.withValues(alpha: dark ? .14 : .08),
