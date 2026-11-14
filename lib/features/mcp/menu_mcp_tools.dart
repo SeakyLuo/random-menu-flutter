@@ -3,6 +3,7 @@ import 'package:crypto/crypto.dart';
 import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import 'menu_mcp_sql_tools.dart';
+import 'menu_mcp_backup_tools.dart';
 
 /// The MCP adapter edits the same atomic store used by the Flutter editors.
 class MenuMcpTools {
@@ -142,6 +143,7 @@ class MenuMcpTools {
 
   List<Map<String, Object?>> get definitions => [
     ...MenuMcpSqlTools.definitions,
+    ...MenuMcpBackupTools.definitions,
     for (final kind in ['recipe', 'restaurant', 'visit'])
       for (final action in ['list', 'get', 'create', 'update', 'delete'])
         _definition(kind, action),
@@ -213,6 +215,9 @@ class MenuMcpTools {
     _validate(args, schema);
     if (MenuMcpSqlTools.names.contains(name)) {
       return MenuMcpSqlTools(store).call(name, args);
+    }
+    if (MenuMcpBackupTools.names.contains(name)) {
+      return MenuMcpBackupTools(store).call(name, args);
     }
     final split = name.indexOf('_');
     final action = name.substring(0, split), kind = name.substring(split + 1);

@@ -245,7 +245,7 @@ class RestaurantsPageState extends State<RestaurantsPage> {
             child: EmptyState(
               icon: _query.active
                   ? Icons.search_off
-                  : Icons.storefront_outlined,
+                  : Icons.restaurant,
               title: _standalone || _query.active ? '没有符合条件的餐厅' : '收好值得再去的地方',
               message: _standalone || _query.active
                   ? '换个筛选条件，继续找找。'

@@ -360,7 +360,7 @@ class _RecipeSearchPageState extends State<RecipeSearchPage> {
       children: [
         Center(
           child: MenuIcon(
-            libraryEmpty ? Icons.menu_book : Icons.search_off,
+            libraryEmpty ? Icons.edit_note : Icons.search_off,
             size: 40,
             color: scheme.onSurfaceVariant.withValues(alpha: .65),
           ),

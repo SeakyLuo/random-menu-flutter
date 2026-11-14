@@ -24,6 +24,19 @@ flutter run
 
 不预装原仓库个人数据。所有数据保存在应用私有目录，卸载前请导出备份。照片导出和分享使用系统界面，实际可用目标由设备决定。
 
+## 手机数据备份
+
+IDEA 运行配置选择 **备份手机数据到桌面**（Shell Script），运行后生成桌面的 `RandomMenu备份-时间戳` 文件夹。
+需连接一台已授权 USB 调试、且已安装可用 `run-as` 的调试版 App 的 Android 手机；不会安装或重启 App。备份期间不要编辑数据。
+
+也可在项目根目录运行：
+
+```sh
+./scripts/backup-android-data.sh
+```
+
+支持 `--serial 设备序列号` 和 `--output 输出父目录`。包含应用私有数据、设置及应用外部照片目录，校验数据库完整性和照片引用；原始系统相册不包含在内。这是原始目录备份，不是 App 内 ZIP 导入文件。
+
 ## 构建验证
 
 ```sh
@@ -43,3 +56,15 @@ xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner \
 ```
 
 相机、系统照片选择器、分享目标及联网地址识别需要在授权的实际设备上进一步验证。构建成功不代表这些系统交互已经完成真机验收。
+
+## MCP 数据导入导出
+
+开启「我的 → MCP 连接」后，通过原有带 Bearer Token 的 `/mcp` JSON-RPC 接口调用以下工具。ZIP 格式与 App 内「资料导入与备份」一致，包含照片及设置；导入会覆盖全部数据，不是合并。
+
+- 导出：`export_backup({})` 返回 `transferId`、`bytes`、`sha256`。从 `offset: 0` 开始调用 `read_backup_chunk({transferId, offset})`，把返回的 `base64` 解码追加到本地 ZIP，以 `nextOffset` 继续直到 `eof: true`。核对文件大小及 SHA-256 后调用 `delete_backup_transfer({transferId})` 清理手机临时文件。
+- 上传：先计算本地 ZIP 的大小及 SHA-256，调用 `begin_backup_import({bytes, sha256})`；每块最多 512 KiB，调用 `write_backup_chunk({transferId, offset, base64})` 顺序上传。连接中断后调用 `preview_backup_import({transferId})` 查询 `receivedBytes`，不要盲目重传已写入的块。
+- 预览：上传完成后调用 `preview_backup_import({transferId})`。工具检查校验和及备份格式，返回数量、覆盖范围及 `previewToken`；此时不修改当前资料。让用户审阅并明确授权覆盖。
+- 恢复：调用 `import_backup({transferId, previewToken, confirmOverwrite: true})`。恢复前自动创建当前数据的安全备份，返回 `safetyBackup` 的下载信息。预览后当前数据有变化会拒绝覆盖，需重新预览。恢复响应丢失时先查询预览状态并核对当前资料，不要重复恢复。
+- 完成后下载安全备份，再清理对应传输文件。未主动清理的传输文件会保留；MCP 配置和 Token 不随备份导出。
+
+导入导出会执行 ZIP 打包、照片读取和完整性校验，大备份可能需要较长时间；客户端超时应按上述进度和状态查询处理。

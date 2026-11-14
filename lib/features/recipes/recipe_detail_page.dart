@@ -118,7 +118,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
           title: MenuScrollTitle(controller: _scroll, child: const Text('菜谱')),
         ),
         body: EmptyState(
-          icon: Icons.menu_book_outlined,
+          icon: Icons.edit_note,
           title: '这道菜谱已移除',
           message: '返回菜谱库，看看其他拿手菜。',
           actionLabel: '返回菜谱库',

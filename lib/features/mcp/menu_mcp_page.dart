@@ -88,7 +88,7 @@ class _MenuMcpPageState extends State<MenuMcpPage> {
     }
   }
 
-  Future<void> _copy(String value) async {
+  Future<void> _copy(String value, String title) async {
     if (_dirty) {
       showToast(context, '请先保存连接设置');
       return;
@@ -96,7 +96,7 @@ class _MenuMcpPageState extends State<MenuMcpPage> {
     await performAction(
       context,
       () => Clipboard.setData(ClipboardData(text: value)),
-      success: '已复制',
+      success: '$title已复制',
     );
   }
 
@@ -129,7 +129,7 @@ class _MenuMcpPageState extends State<MenuMcpPage> {
             IconButton(
               tooltip: '复制$title',
               constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-              onPressed: _saving ? null : () => _copy(copiedValue),
+              onPressed: _saving ? null : () => _copy(copiedValue, title),
               icon: MenuIcon(
                 Icons.copy,
                 size: 20,

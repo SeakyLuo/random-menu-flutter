@@ -158,7 +158,7 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         appBar: AppBar(title: const Text('餐厅')),
         body: EmptyState(
-          icon: Icons.storefront_outlined,
+          icon: Icons.restaurant,
           title: '餐厅已被移除',
           message: '回到列表，继续收集喜欢的地方。',
           actionLabel: '返回列表',

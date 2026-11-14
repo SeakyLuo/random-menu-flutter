@@ -52,7 +52,7 @@ class _RecipeTagPageState extends State<RecipeTagPage> {
           constraints: const BoxConstraints(maxWidth: LibraryLayout.maxWidth),
           child: recipes.isEmpty
               ? EmptyState(
-                  icon: Icons.menu_book_outlined,
+                  icon: Icons.edit_note,
                   title: '这个标签下还没有菜谱',
                   message: '给菜谱添加这个标签后，就会显示在这里。',
                   actionLabel: '返回标签管理',

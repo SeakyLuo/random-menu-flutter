@@ -132,7 +132,11 @@ class BackupService {
     return backup;
   }
 
-  static Future<void> restore(MenuStore store, PreparedBackup backup) async {
+  static Future<void> restore(
+    MenuStore store,
+    PreparedBackup backup, {
+    void Function()? checkCurrent,
+  }) async {
     final directory = Directory('${store.directory.path}/restore_${newId()}');
     await directory.create();
     var committed = false;
@@ -155,7 +159,7 @@ class BackupService {
           list[i] = paths[list[i]]!;
         }
       }
-      await store.replace(backup.data);
+      await store.replace(backup.data, checkCurrent: checkCurrent);
       committed = true;
     } finally {
       if (!committed) await directory.delete(recursive: true);

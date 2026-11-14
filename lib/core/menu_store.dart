@@ -57,31 +57,33 @@ class MenuStore extends ChangeNotifier {
     return result;
   }
 
-  Future<void> replace(MenuData source) => update(MenuWriteScope.all, (draft) {
-    draft.recipePositions = {};
-    draft.restaurantPositions = {};
-    draft.recipeTagIds = {};
-    draft.restaurantCategoryIds = {};
-    draft.recipes = source.recipes;
-    draft.restaurants = source.restaurants;
-    draft.toCook = source.toCook;
-    draft.toEat = source.toEat;
-    draft.dislikes = source.dislikes;
-    draft.note = source.note;
-    draft.themeMode = source.themeMode;
-    draft.autoTag = source.autoTag;
-    draft.tagRules = source.tagRules;
-    draft.selectedMenu = source.selectedMenu;
-    draft.recipeDraft = source.recipeDraft;
-    draft.recipeDraftSourceId = source.recipeDraftSourceId;
-    draft.legacyImagePaths = source.legacyImagePaths;
-    draft.recipeTags = source.recipeTags;
-    draft.restaurantCategories = source.restaurantCategories;
-    draft.recipeSearchHistory = source.recipeSearchHistory;
-    draft.restaurantSearchHistory = source.restaurantSearchHistory;
-    draft.recipeTagSort = source.recipeTagSort;
-    draft.patternTagRules = source.patternTagRules;
-  });
+  Future<void> replace(MenuData source, {void Function()? checkCurrent}) =>
+      update(MenuWriteScope.all, (draft) {
+        checkCurrent?.call();
+        draft.recipePositions = {};
+        draft.restaurantPositions = {};
+        draft.recipeTagIds = {};
+        draft.restaurantCategoryIds = {};
+        draft.recipes = source.recipes;
+        draft.restaurants = source.restaurants;
+        draft.toCook = source.toCook;
+        draft.toEat = source.toEat;
+        draft.dislikes = source.dislikes;
+        draft.note = source.note;
+        draft.themeMode = source.themeMode;
+        draft.autoTag = source.autoTag;
+        draft.tagRules = source.tagRules;
+        draft.selectedMenu = source.selectedMenu;
+        draft.recipeDraft = source.recipeDraft;
+        draft.recipeDraftSourceId = source.recipeDraftSourceId;
+        draft.legacyImagePaths = source.legacyImagePaths;
+        draft.recipeTags = source.recipeTags;
+        draft.restaurantCategories = source.restaurantCategories;
+        draft.recipeSearchHistory = source.recipeSearchHistory;
+        draft.restaurantSearchHistory = source.restaurantSearchHistory;
+        draft.recipeTagSort = source.recipeTagSort;
+        draft.patternTagRules = source.patternTagRules;
+      });
 
   Future<void> updateRestaurantDetails({
     required Map<String, dynamic> before,

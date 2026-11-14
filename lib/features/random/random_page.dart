@@ -584,7 +584,7 @@ class _RandomPageState extends State<RandomPage> {
               ).colorScheme.primary.withValues(alpha: .12),
               child: MenuIcon(
                 noRecipes
-                    ? Icons.menu_book_outlined
+                    ? Icons.edit_note
                     : noMatch
                     ? Icons.filter_alt_outlined
                     : Icons.check,

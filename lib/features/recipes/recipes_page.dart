@@ -144,7 +144,7 @@ class RecipesPageState extends State<RecipesPage>
                             .toList();
                         return recipes.isEmpty
                             ? EmptyState(
-                                icon: Icons.menu_book_outlined,
+                                icon: Icons.edit_note,
                                 title: tag == null ? '从一道拿手菜开始' : '这个标签下还没有菜谱',
                                 message: '点击右上角的＋添加菜谱，记下喜欢的味道。',
                                 actionLabel: '添加菜谱',
