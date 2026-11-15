@@ -14,14 +14,12 @@ class VisitCouponCard extends StatelessWidget {
     required this.onEdit,
     required this.onRemove,
     required this.reorderIndex,
-    this.savedAmount,
   });
   final VisitCoupon coupon;
   final MenuCurrency currency;
   final bool notApplied;
   final VoidCallback onEdit, onRemove;
   final int reorderIndex;
-  final double? savedAmount;
 
   @override
   Widget build(BuildContext context) {
@@ -143,14 +141,6 @@ class VisitCouponCard extends StatelessWidget {
                             if (notApplied) ...[
                               const SizedBox(height: 4),
                               Text('未达门槛，本次不抵扣', style: secondary),
-                            ] else if (savedAmount != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                '本步优惠 ${currency.symbol}${money(savedAmount!)}',
-                                style: secondary.copyWith(
-                                  color: colors.primary,
-                                ),
-                              ),
                             ],
                           ],
                         ),

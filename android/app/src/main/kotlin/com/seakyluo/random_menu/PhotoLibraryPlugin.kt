@@ -134,12 +134,13 @@ class PhotoLibraryPlugin : FlutterPlugin, ActivityAware, ActivityResultListener,
             "无法识别图片格式"
         }
         val destination = File.createTempFile("original_", ".$extension", context.cacheDir)
-        val source = if (includeLocation && Build.VERSION.SDK_INT >= 29) {
-            val mediaUri = if (uri.authority == MediaStore.AUTHORITY) uri
-                else MediaStore.getMediaUri(context, uri)
+        val source = if (includeLocation && Build.VERSION.SDK_INT >= 29 &&
+            uri.authority == MediaStore.AUTHORITY) {
+            MediaStore.setRequireOriginal(uri)
+        } else {
             // Other document providers supply their own file bytes, outside MediaStore.
-            if (mediaUri != null) MediaStore.setRequireOriginal(mediaUri) else uri
-        } else uri
+            uri
+        }
         resolver.openInputStream(source)!!.use { input -> destination.outputStream().use { input.copyTo(it) } }
         return destination.path
     }

@@ -108,7 +108,6 @@ class VisitCouponSliver extends StatelessWidget {
                 coupon: coupon,
                 currency: currency,
                 notApplied: autoCost && !application.applied,
-                savedAmount: autoCost ? application.discountCents / 100 : null,
                 reorderIndex: index,
                 onEdit: () => edit(context, index),
                 onRemove: () => onChanged([...coupons]..removeAt(index)),
