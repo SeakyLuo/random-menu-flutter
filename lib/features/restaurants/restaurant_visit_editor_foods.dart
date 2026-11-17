@@ -168,6 +168,7 @@ extension _RestaurantVisitEditorFoods on _RestaurantVisitEditorState {
     updateForm(() => picking = true);
     await performAction(context, () async {
       final paths = await MenuScope.of(context).photos.pick();
+      widget.onPhotosSelected?.call(paths);
       final photos = <ImportPhoto>[];
       for (var offset = 0; offset < paths.length; offset += 8) {
         photos.addAll(

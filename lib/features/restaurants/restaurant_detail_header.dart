@@ -5,6 +5,8 @@ import '../../ui/menu_icon.dart';
 import '../../ui/menu_tag.dart';
 import 'restaurant_gallery_data.dart';
 import 'restaurant_price.dart';
+import 'restaurant_filter.dart';
+import 'restaurants_page.dart';
 import '../../ui/menu_bottom_sheet.dart';
 
 class RestaurantDetailInfo extends StatefulWidget {
@@ -21,6 +23,15 @@ class RestaurantDetailInfo extends StatefulWidget {
 
 class _RestaurantDetailInfoState extends State<RestaurantDetailInfo> {
   bool _reviewOpen = false;
+
+  void _openCategory(String category) => Navigator.push<void>(
+    context,
+    MaterialPageRoute<void>(
+      builder: (_) => RestaurantsPage.filtered(
+        query: RestaurantQuery(categories: [category]),
+      ),
+    ),
+  );
   Future<void> _showAddresses(List<String> addresses) =>
       showMenuBottomSheet<void>(
         context: context,
@@ -117,10 +128,18 @@ class _RestaurantDetailInfoState extends State<RestaurantDetailInfo> {
                                 runSpacing: 6,
                                 children: [
                                   for (final tag in restaurant.categories)
-                                    MenuTag(
-                                      tagPathLabel(tag),
-                                      selected: true,
-                                      compact: true,
+                                    GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: () => _openCategory(tag),
+                                      child: Semantics(
+                                        button: true,
+                                        label: '查看${tagPathLabel(tag)}餐厅',
+                                        child: MenuTag(
+                                          tagPathLabel(tag),
+                                          selected: true,
+                                          compact: true,
+                                        ),
+                                      ),
                                     ),
                                 ],
                               )

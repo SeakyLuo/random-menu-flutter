@@ -29,10 +29,12 @@ class RestaurantVisitEditor extends StatefulWidget {
     required this.restaurant,
     this.visit,
     this.draftOnly = false,
+    this.onPhotosSelected,
   });
   final Restaurant restaurant;
   final Visit? visit;
   final bool draftOnly;
+  final ValueChanged<List<String>>? onPhotosSelected;
   @override
   State<RestaurantVisitEditor> createState() => _RestaurantVisitEditorState();
 }

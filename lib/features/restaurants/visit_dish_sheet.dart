@@ -7,6 +7,7 @@ import '../../core/models.dart';
 import '../../core/record_conflicts.dart';
 import '../../ui/hero_sheet_route.dart';
 import '../../ui/menu_icon.dart';
+import '../../ui/photo_page_indicator.dart';
 import '../../ui/widgets.dart';
 import '../media/media_actions.dart';
 import 'restaurant_food_summary.dart';
@@ -255,45 +256,47 @@ class _VisitDishSheetState extends State<_VisitDishSheet> {
                                   ),
                                 ),
                               )
-                            : PageView.builder(
-                                controller: _photos,
-                                itemCount: paths.length,
-                                onPageChanged: (index) =>
-                                    setState(() => _photo = index),
-                                itemBuilder: (_, index) => GestureDetector(
-                                  onTap: () => showPhotoViewer(
-                                    context,
-                                    paths,
-                                    index,
-                                    title: _item.name,
-                                    heroTagForIndex: (i) => (this, i),
-                                    onReturnIndex: (next) {
-                                      if (!mounted) return;
-                                      setState(() => _photo = next);
-                                      _photos.jumpToPage(next);
-                                    },
+                            : Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  PageView.builder(
+                                    controller: _photos,
+                                    itemCount: paths.length,
+                                    onPageChanged: (index) =>
+                                        setState(() => _photo = index),
+                                    itemBuilder: (_, index) => GestureDetector(
+                                      onTap: () => showPhotoViewer(
+                                        context,
+                                        paths,
+                                        index,
+                                        title: _item.name,
+                                        heroTagForIndex: (i) => (this, i),
+                                        onReturnIndex: (next) {
+                                          if (!mounted) return;
+                                          setState(() => _photo = next);
+                                          _photos.jumpToPage(next);
+                                        },
+                                      ),
+                                      child: Hero(
+                                        tag: (this, index),
+                                        child: LocalPhoto(path: paths[index]),
+                                      ),
+                                    ),
                                   ),
-                                  child: Hero(
-                                    tag: (this, index),
-                                    child: LocalPhoto(path: paths[index]),
-                                  ),
-                                ),
+                                  if (paths.length > 1)
+                                    Positioned(
+                                      right: 12,
+                                      bottom: 12,
+                                      child: PhotoPageIndicator(
+                                        index: _photo,
+                                        count: paths.length,
+                                      ),
+                                    ),
+                                ],
                               ),
                       ),
                     ),
                   ),
-                  if (paths.length > 1)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        '${_photo + 1} / ${paths.length}',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
                   const SizedBox(height: 12),
                   GestureDetector(
                     onLongPress: _item.name.isEmpty

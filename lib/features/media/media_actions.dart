@@ -63,6 +63,11 @@ Future<void> showPhotoViewer(
 
 Future<void> savePhoto(BuildContext context, String path) async {
   await performAction(context, () async {
+    if (Platform.isAndroid) {
+      await MenuScope.of(context).photos.saveToPictures(path);
+      if (context.mounted) showToast(context, '已保存到 Pictures/随机菜单');
+      return;
+    }
     final fileName = path.split('/').last;
     final bytes = await File(path).readAsBytes();
     final result = await FilePicker.saveFile(

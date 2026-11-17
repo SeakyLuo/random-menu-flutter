@@ -61,13 +61,21 @@ def main():
         return device('shell', 'run-as', PACKAGE, 'sha256sum', *files)
 
     before = database_state()
+    external_root = '/sdcard/Android/data/' + PACKAGE
+    external_exists = device('shell', 'sh', '-c',
+                             "'[ -d " + external_root + " ] && echo present || echo absent'") == 'present'
     archives = [
         ('应用数据.tar', ['exec-out', 'run-as', PACKAGE, 'tar', '-cf', '-',
                         'files', 'shared_prefs', 'app_flutter']),
-        ('外部照片.tar', ['exec-out', 'tar', '-C',
-                        '/sdcard/Android/data/' + PACKAGE, '-cf', '-', 'files']),
     ]
-    members = {}
+    if external_exists:
+        archives.append(('外部照片.tar', ['exec-out', 'tar', '-C', external_root,
+                                         '-cf', '-', 'files']))
+    else:
+        # Android does not create external app storage until the app uses it.
+        with tarfile.open(output / '外部照片.tar', 'w'):
+            pass
+    members = {'外部照片.tar': set()}
     for name, parts in archives:
         print('正在备份：' + name, flush=True)
         with (output / name).open('wb') as stream:
@@ -110,6 +118,7 @@ def main():
             missing.append(path)
     manifest = dict(createdAt=stamp, device=serial, package=PACKAGE,
                     databaseIntegrity='ok', databaseStableDuringBackup=True,
+                    externalAppDirectoryPresent=external_exists,
                     counts=counts, missingPhotoReferences=missing,
                     outsideAppPhotoReferences=outside,
                     files={name: dict(bytes=(output / name).stat().st_size,

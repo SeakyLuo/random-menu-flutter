@@ -82,11 +82,11 @@ class PhotoLibraryPlugin : FlutterPlugin, ActivityAware, ActivityResultListener,
                     openPicker()
                 }
             }
-            "retainCapture" -> execute(result) {
+            "retainCapture", "saveToPictures" -> execute(result) {
                 val file = File(call.argument<String>("path")!!)
                 val values = ContentValues().apply {
                     put(MediaStore.Images.Media.DISPLAY_NAME, file.name)
-                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    put(MediaStore.Images.Media.MIME_TYPE, MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase())!!)
                     put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/随机菜单")
                     put(MediaStore.Images.Media.IS_PENDING, 1)
                 }

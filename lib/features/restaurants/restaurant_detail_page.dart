@@ -11,7 +11,7 @@ import '../../ui/widgets.dart';
 import 'restaurant_detail_gallery.dart';
 import 'restaurant_detail_header.dart';
 import 'restaurant_gallery_data.dart';
-import '../photo_import/photo_import_page.dart';
+import 'restaurant_photo_records.dart';
 import 'restaurant_dish_browser.dart';
 import 'restaurant_dish_summary.dart';
 import 'restaurant_editor.dart';
@@ -131,12 +131,7 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
       case 'visit':
         editRestaurantVisit(context, restaurant);
       case 'import':
-        Navigator.push(
-          context,
-          MaterialPageRoute<void>(
-            builder: (_) => PhotoImportPage(restaurantId: restaurant.id),
-          ),
-        );
+        addRestaurantRecordsFromPhotos(context, restaurant);
       case 'link':
         performAction(
           context,

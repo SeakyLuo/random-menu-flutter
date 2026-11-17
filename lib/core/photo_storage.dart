@@ -26,6 +26,10 @@ class PhotoStorage {
 
   static File sourceFile(String path) => File('$path.source.json');
 
+  Future<void> saveToPictures(String path) async {
+    await _channel.invokeMethod<String>('saveToPictures', {'path': path});
+  }
+
   Future<List<String>> pick({
     bool camera = false,
     bool single = false,

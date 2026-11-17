@@ -13,7 +13,7 @@ import 'restaurant_record_draft.dart';
 import 'restaurant_record_section.dart';
 import 'restaurant_entries.dart';
 import 'visit_detail_page.dart';
-import '../photo_import/photo_import_page.dart';
+import 'restaurant_photo_records.dart';
 import 'restaurant_visit_editor.dart';
 import 'visit_dish_editor.dart';
 import 'restaurant_quick_create.dart';
@@ -193,12 +193,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
   Future<void> addRecordPhotos() async {
     if (widget.restaurant != null) {
       await _openSavedRecord(
-        (restaurant) => Navigator.push<void>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PhotoImportPage(restaurantId: restaurant.id),
-          ),
-        ),
+        (restaurant) => addRestaurantRecordsFromPhotos(context, restaurant),
       );
       return;
     }
