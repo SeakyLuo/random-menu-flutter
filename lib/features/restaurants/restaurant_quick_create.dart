@@ -17,14 +17,33 @@ Future<RestaurantQuickDraft> buildRestaurantFromPhotos(
       await Future.wait(paths.skip(offset).take(8).map(readImportPhoto)),
     );
   }
-  final coordinates = photos
-      .where((photo) => photo.latitude != null && photo.longitude != null)
-      .map((photo) => (photo.latitude!, photo.longitude!))
-      .toSet()
-      .toList();
+  final draft = RestaurantQuickDraft();
+  final now = DateTime.now();
+  photos.sort((a, b) => (a.date ?? now).compareTo(b.date ?? now));
+  final groups = <List<ImportPhoto>>[];
+  for (final photo in photos) {
+    if (photo.date == null) draft.missingDates = true;
+    final date = photo.date ?? now;
+    if (groups.isEmpty ||
+        date.difference(groups.last.first.date ?? now) >
+            const Duration(hours: 3)) {
+      groups.add([photo]);
+    } else {
+      groups.last.add(photo);
+    }
+  }
+
+  final coordinates = [
+    for (final group in groups)
+      group
+          .where((photo) => photo.latitude != null && photo.longitude != null)
+          .map((photo) => (photo.latitude!, photo.longitude!))
+          .firstOrNull,
+  ];
+  final points = coordinates.whereType<(double, double)>().toSet().toList();
   final locations = <(double, double), RestaurantAddress?>{};
-  for (var offset = 0; offset < coordinates.length; offset += 4) {
-    final batch = coordinates.skip(offset).take(4).toList();
+  for (var offset = 0; offset < points.length; offset += 4) {
+    final batch = points.skip(offset).take(4).toList();
     final resolved = await Future.wait(
       batch.map((point) => resolvePhotoAddress(point.$1, point.$2)),
     );
@@ -32,43 +51,27 @@ Future<RestaurantQuickDraft> buildRestaurantFromPhotos(
       locations[batch[i]] = resolved[i];
     }
   }
-  final draft = RestaurantQuickDraft();
+
   final addresses = <String, RestaurantAddress>{};
-  final now = DateTime.now();
-  photos.sort((a, b) => (a.date ?? now).compareTo(b.date ?? now));
-  for (final photo in photos) {
-    final resolved = locations[(photo.latitude, photo.longitude)];
-    RestaurantAddress? address;
-    if (resolved != null) {
-      address = addresses.putIfAbsent(resolved.fullAddress, () => resolved);
-    }
-    final date = photo.date ?? now;
-    if (photo.date == null) draft.missingDates = true;
-    final record = draft.records.reversed.where((record) {
-      if (record.addressId != (address?.id ?? '')) return false;
-      final sameDay =
-          record.date.year == date.year &&
-          record.date.month == date.month &&
-          record.date.day == date.day;
-      return sameDay ||
-          record.date.difference(date).abs() <= const Duration(hours: 3);
-    }).firstOrNull;
-    final dish = VisitDish(dishId: newId(), name: '', imagePaths: [photo.path]);
-    if (record == null) {
-      draft.records.add(
-        Visit(
-          id: newId(),
-          date: date,
-          addressId: address?.id ?? '',
-          address: address?.fullAddress ?? '',
-          autoCost: true,
-          items: [dish],
-        ),
-      );
-    } else {
-      record.items.add(dish);
-      if (date.isBefore(record.date)) record.date = date;
-    }
+  for (var i = 0; i < groups.length; i++) {
+    final group = groups[i];
+    final resolved = locations[coordinates[i]];
+    final address = resolved == null
+        ? null
+        : addresses.putIfAbsent(resolved.fullAddress, () => resolved);
+    draft.records.add(
+      Visit(
+        id: newId(),
+        date: group.first.date ?? now,
+        addressId: address?.id ?? '',
+        address: address?.fullAddress ?? '',
+        autoCost: true,
+        items: [
+          for (final photo in group)
+            VisitDish(dishId: newId(), name: '', imagePaths: [photo.path]),
+        ],
+      ),
+    );
   }
   draft.addresses.addAll(addresses.values);
   return draft;
