@@ -15,12 +15,14 @@ class RestaurantVisitCard extends StatelessWidget {
     required this.verticalFoods,
     required this.showAddress,
     required this.currentCity,
+    this.showRestaurant = false,
   });
   final Restaurant restaurant;
   final Visit visit;
   final bool verticalFoods;
   final bool showAddress;
   final String? currentCity;
+  final bool showRestaurant;
 
   @override
   Widget build(BuildContext context) {
@@ -38,29 +40,39 @@ class RestaurantVisitCard extends StatelessWidget {
     final companionLabel = companions.length < 15
         ? companions
         : '${visit.companions.take(4).join('、')}等${visit.companions.length}人';
-    Widget detailLine(IconData icon, String text) => Padding(
-      padding: const EdgeInsets.only(top: 7),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: MenuIcon(icon, size: 15, color: colors.onSurfaceVariant),
-          ),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.5,
-                color: colors.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ),
+    final detailStyle = TextStyle(
+      fontSize: 12,
+      height: 1.5,
+      color: colors.onSurfaceVariant,
     );
+    Widget detailLine(IconData icon, String text, {Widget? trailing}) =>
+        Padding(
+          padding: const EdgeInsets.only(top: 7),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text.rich(
+                TextSpan(
+                  children: [
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: MenuIcon(
+                        icon,
+                        size: 15,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+                style: detailStyle,
+              ),
+              const SizedBox(width: 7),
+              Expanded(child: Text(text, style: detailStyle)),
+              if (trailing != null) ...[const SizedBox(width: 8), trailing],
+            ],
+          ),
+        );
     return Material(
       color: colors.surface,
       borderRadius: BorderRadius.circular(14),
@@ -74,7 +86,7 @@ class RestaurantVisitCard extends StatelessWidget {
             builder: (_) => VisitDetailPage(
               restaurantId: restaurant.id,
               visitId: visit.id,
-              fromRestaurantDetail: true,
+              fromRestaurantDetail: !showRestaurant,
             ),
           ),
         ),
@@ -83,6 +95,16 @@ class RestaurantVisitCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (showRestaurant) ...[
+                Text(
+                  restaurant.name,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
               LayoutBuilder(
                 builder: (context, constraints) => Wrap(
                   alignment: WrapAlignment.spaceBetween,
@@ -114,10 +136,22 @@ class RestaurantVisitCard extends StatelessWidget {
                   ],
                 ),
               ),
+              if (showAddress && visit.address.isNotEmpty)
+                detailLine(
+                  Icons.place_outlined,
+                  addressText,
+                  trailing: visit.isTakeaway && !showRestaurant
+                      ? Text(
+                          '外卖',
+                          style: detailStyle.copyWith(
+                            color: colors.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        )
+                      : null,
+                ),
               if (visit.companions.isNotEmpty)
                 detailLine(Icons.people_outline, companionLabel),
-              if (showAddress && visit.address.isNotEmpty)
-                detailLine(Icons.place_outlined, addressText),
               if (visit.note.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 10),

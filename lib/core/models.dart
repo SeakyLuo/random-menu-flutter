@@ -147,6 +147,7 @@ class Visit {
     this.addressId = '',
     this.address = '',
     this.autoCost = false,
+    this.isTakeaway = false,
     this.items = const [],
     this.coupons = const [],
     this.packages = const [],
@@ -162,6 +163,7 @@ class Visit {
   String addressId;
   String address;
   bool autoCost;
+  bool isTakeaway;
   List<VisitDish> items;
   List<VisitCoupon> coupons;
   List<VisitPackage> packages;
@@ -189,6 +191,7 @@ class Visit {
     addressId: j['addressId'] as String,
     address: j['address'] as String,
     autoCost: j['autoCost'] as bool,
+    isTakeaway: j['isTakeaway'] as bool,
     packages: (j['packages'] as List)
         .map((e) => VisitPackage.fromJson(e as Map<String, dynamic>))
         .toList(),
@@ -211,6 +214,7 @@ class Visit {
     'addressId': addressId,
     'address': address,
     'autoCost': autoCost,
+    'isTakeaway': isTakeaway,
     if (includeFoods) 'packages': packages.map((p) => p.toJson()).toList(),
     'coupons': coupons.map((coupon) => coupon.toJson()).toList(),
     if (includeFoods) 'items': items.map((e) => e.toJson()).toList(),
@@ -376,7 +380,8 @@ class MenuData {
     if (j['version'] == 8) j = upgradeMenuV8(j);
     if (j['version'] == 9) j = upgradeMenuV9(j);
     if (j['version'] == 10) j = upgradeMenuV10(j);
-    if (j['version'] != 11) {
+    if (j['version'] == 11) j = upgradeMenuV11(j);
+    if (j['version'] != 12) {
       throw const FormatException('Unsupported menu format');
     }
     return MenuData(
@@ -416,7 +421,7 @@ class MenuData {
     );
   }
   Map<String, dynamic> toJson() => {
-    'version': 11,
+    'version': 12,
     'recipes': recipes.map((e) => e.toJson()).toList(),
     'restaurants': restaurants.map((e) => e.toJson()).toList(),
     'toCook': toCook,

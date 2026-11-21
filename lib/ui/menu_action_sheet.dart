@@ -2,6 +2,32 @@ import 'package:flutter/material.dart';
 import 'menu_bottom_sheet.dart';
 import 'menu_icon.dart';
 
+class MenuSheetHeader extends StatelessWidget {
+  const MenuSheetHeader(this.title, {super.key});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: Text(
+          title,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        ),
+      ),
+      IconButton(
+        tooltip: '关闭',
+        onPressed: () => Navigator.pop(context),
+        icon: MenuIcon(
+          Icons.close,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    ],
+  );
+}
+
 class MenuSheetAction {
   const MenuSheetAction({
     required this.icon,
@@ -118,27 +144,7 @@ Future<T?> showMenuActionSheet<T>({
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: '关闭',
-                  onPressed: () => Navigator.pop(context),
-                  icon: MenuIcon(
-                    Icons.close,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
+            MenuSheetHeader(title),
             const SizedBox(height: 2),
             MenuSheetActions(actions: actions(context)),
           ],

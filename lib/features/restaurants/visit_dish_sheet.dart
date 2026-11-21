@@ -12,6 +12,7 @@ import '../../ui/widgets.dart';
 import '../media/media_actions.dart';
 import 'restaurant_food_summary.dart';
 import 'visit_dish_editor.dart';
+import 'visit_photo_picker.dart';
 import 'restaurant_dish_cover_menu.dart';
 
 Future<void> showVisitDishDetail(
@@ -114,16 +115,21 @@ class _VisitDishSheetState extends State<_VisitDishSheet> {
       if (index < 0) {
         throw StateError('这条明细已被修改，请重新打开后编辑');
       }
+      final visitPhotos = visitPhotoPaths(visit.items, visit.imagePaths);
+      final existingPhotoPaths = visitPhotos.toSet();
       await editVisitDish(
         context,
         VisitDish.fromJson(_item.toJson()),
         packages: visit.packages,
         currency: visit.currency,
+        visitPhotos: visitPhotos,
         restaurantId: widget.restaurantId,
         onSave: (edited, currency) => performAction(context, () async {
           edited.imagePaths = await Future.wait(
             edited.imagePaths.map(
-              (path) => path.startsWith('${store.directory.path}/images/')
+              (path) =>
+                  existingPhotoPaths.contains(path) ||
+                      path.startsWith('${store.directory.path}/images/')
                   ? Future.value(path)
                   : store.keepImage(path),
             ),

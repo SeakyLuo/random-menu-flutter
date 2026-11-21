@@ -49,27 +49,34 @@ class _RestaurantDetailInfoState extends State<RestaurantDetailInfo> {
                   '分店地址',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 ConstrainedBox(
                   constraints: BoxConstraints(
                     maxHeight: MediaQuery.sizeOf(sheetContext).height * .6,
                   ),
-                  child: ListView.separated(
+                  child: ListView.builder(
                     shrinkWrap: true,
+                    padding: EdgeInsets.zero,
                     itemCount: addresses.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (_, index) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: MenuIcon(
-                        Icons.place_outlined,
-                        size: 18,
-                        color: Theme.of(
-                          sheetContext,
-                        ).colorScheme.onSurfaceVariant,
-                      ),
-                      title: Text(
-                        addresses[index],
-                        style: const TextStyle(fontSize: 14, height: 1.5),
+                    itemBuilder: (context, index) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          MenuIcon(
+                            Icons.place_outlined,
+                            size: 18,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              addresses[index],
+                              style: const TextStyle(fontSize: 14, height: 1.5),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

@@ -9,6 +9,7 @@ import '../../core/geo_point.dart';
 import '../../ui/widgets.dart';
 import '../restaurants/restaurant_images.dart';
 import '../restaurants/visit_dish_editor.dart';
+import '../restaurants/visit_photo_picker.dart';
 import 'import_models.dart';
 import 'split_visit_page.dart';
 
@@ -56,6 +57,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
       context,
       group.items[index],
       currency: group.currency,
+      visitPhotos: visitPhotoPaths(group.items, group.environments),
       onCurrencyChanged: (value) => group.currency = value,
     );
     if (result != null && mounted) {
@@ -96,6 +98,7 @@ class _PhotoImportPreviewState extends State<PhotoImportPreview> {
       ),
       requirePrice: prices.length > 1,
       currency: group.currency,
+      visitPhotos: visitPhotoPaths(group.items, group.environments),
       onCurrencyChanged: (value) => group.currency = value,
     );
     if (result == null || !mounted) return;

@@ -108,6 +108,7 @@ class MenuStore extends ChangeNotifier {
               addressId: visit.addressId,
               address: saved.changedAddresses[visit.addressId]!,
               autoCost: visit.autoCost,
+              isTakeaway: visit.isTakeaway,
               items: visit.items,
               coupons: visit.coupons,
               packages: visit.packages,

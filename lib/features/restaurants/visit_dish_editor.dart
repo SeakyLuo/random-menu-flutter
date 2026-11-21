@@ -17,6 +17,7 @@ Future<VisitDish?> editVisitDish(
   MenuCurrency currency = MenuCurrency.cny,
   ValueChanged<MenuCurrency>? onCurrencyChanged,
   List<VisitPackage> packages = const [],
+  List<String> visitPhotos = const [],
   String? restaurantId,
   Future<bool> Function(VisitDish item, MenuCurrency currency)? onSave,
 }) => Navigator.push<VisitDish>(
@@ -28,6 +29,7 @@ Future<VisitDish?> editVisitDish(
       onCurrencyChanged: onCurrencyChanged,
       requirePrice: requirePrice,
       packages: packages,
+      visitPhotos: visitPhotos,
       restaurantId: restaurantId,
       onSave: onSave,
     ),
@@ -41,11 +43,13 @@ class _VisitDishEditor extends StatefulWidget {
     this.onCurrencyChanged,
     this.requirePrice = false,
     required this.packages,
+    required this.visitPhotos,
     required this.restaurantId,
     this.onSave,
   });
   final bool requirePrice;
   final List<VisitPackage> packages;
+  final List<String> visitPhotos;
   final VisitDish item;
   final MenuCurrency currency;
   final ValueChanged<MenuCurrency>? onCurrencyChanged;
@@ -268,6 +272,7 @@ class _VisitDishEditorState extends State<_VisitDishEditor> {
                   const SizedBox(height: 24),
                   RestaurantImages(
                     paths: images,
+                    visitPhotos: widget.visitPhotos,
                     cover: true,
                     editorStyle: true,
                     onBusyChanged: (value) => setState(() => picking = value),

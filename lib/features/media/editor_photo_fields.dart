@@ -16,8 +16,10 @@ class EditorPhotoFields extends StatelessWidget {
     required this.onOpen,
     required this.onReorder,
     this.label = '照片',
+    this.headerTrailing,
     this.showCover = true,
     this.heroTagForIndex,
+    this.onPickFromVisit,
   });
   final List<String> paths;
   final bool busy;
@@ -26,12 +28,22 @@ class EditorPhotoFields extends StatelessWidget {
   final ValueChanged<int> onOpen;
   final void Function(int from, int to) onReorder;
   final String label;
+  final Widget? headerTrailing;
   final bool showCover;
   final Object Function(int)? heroTagForIndex;
+  final Future<void> Function()? onPickFromVisit;
 
   Future<void> _choose(BuildContext context) async {
-    final camera = await choosePhotoSource(context);
-    if (camera != null) onPick(camera);
+    final source = await choosePhotoSource(
+      context,
+      hasVisitPhotos: onPickFromVisit != null,
+    );
+    if (!context.mounted || source == null) return;
+    if (source == PhotoSource.visit) {
+      await onPickFromVisit!();
+    } else {
+      onPick(source == PhotoSource.camera);
+    }
   }
 
   Future<void> _manage(BuildContext context, int index) async {
@@ -60,15 +72,21 @@ class EditorPhotoFields extends StatelessWidget {
       children: [
         MenuFieldLabel(
           label,
-          trailing: paths.length > 1
-              ? Text(
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 8,
+            children: [
+              if (paths.length > 1)
+                Text(
                   '长按拖动排序',
                   style: TextStyle(
                     fontSize: 12,
                     color: scheme.onSurfaceVariant,
                   ),
-                )
-              : null,
+                ),
+              ?headerTrailing,
+            ],
+          ),
         ),
         LayoutBuilder(
           builder: (context, constraints) {

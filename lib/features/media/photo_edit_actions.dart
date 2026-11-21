@@ -11,22 +11,35 @@ class PhotoEditResult {
 typedef PhotoEditCallback =
     Future<PhotoEditResult> Function(String path, String action);
 
-Future<bool?> choosePhotoSource(BuildContext context) async {
-  if (!Platform.isAndroid && !Platform.isIOS) return false;
-  return showMenuActionSheet<bool>(
+enum PhotoSource { album, camera, visit }
+
+Future<PhotoSource?> choosePhotoSource(
+  BuildContext context, {
+  bool hasVisitPhotos = false,
+}) async {
+  final canTakePhoto = Platform.isAndroid || Platform.isIOS;
+  if (!canTakePhoto && !hasVisitPhotos) return PhotoSource.album;
+  return showMenuActionSheet<PhotoSource>(
     context: context,
     title: '添加照片',
     actions: (context) => [
       MenuSheetAction(
         icon: Icons.photo_library_outlined,
         label: '从相册选择',
-        onTap: () => Navigator.pop(context, false),
+        onTap: () => Navigator.pop(context, PhotoSource.album),
       ),
-      MenuSheetAction(
-        icon: Icons.camera_alt_outlined,
-        label: '拍照',
-        onTap: () => Navigator.pop(context, true),
-      ),
+      if (canTakePhoto)
+        MenuSheetAction(
+          icon: Icons.camera_alt_outlined,
+          label: '拍照',
+          onTap: () => Navigator.pop(context, PhotoSource.camera),
+        ),
+      if (hasVisitPhotos)
+        MenuSheetAction(
+          icon: Icons.photo_library_outlined,
+          label: '从本次消费记录中选择',
+          onTap: () => Navigator.pop(context, PhotoSource.visit),
+        ),
     ],
   );
 }

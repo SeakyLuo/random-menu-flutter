@@ -4,6 +4,15 @@ import 'visit_coupon_migration.dart';
 import 'dish_identity_upgrade.dart';
 import 'restaurant_tag_upgrade.dart';
 
+Map<String, dynamic> upgradeMenuV11(Map<String, dynamic> source) {
+  for (final restaurant in source['restaurants'] as List) {
+    for (final visit in restaurant['records'] as List) {
+      visit['isTakeaway'] = false;
+    }
+  }
+  return {...source, 'version': 12};
+}
+
 Map<String, dynamic> upgradeMenuV10(Map<String, dynamic> source) {
   for (final restaurant in source['restaurants'] as List) {
     final category = restaurant.remove('category') as String;

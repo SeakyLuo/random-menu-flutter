@@ -32,7 +32,7 @@ class MenuDatabase {
   static Future<MenuDatabase> open(Directory directory) async {
     final database = await openDatabase(
       '${directory.path}/menu.db',
-      version: 11,
+      version: 12,
       onCreate: (db, _) async {
         for (final statement in _schema) {
           await db.execute(statement);
@@ -85,6 +85,18 @@ class MenuDatabase {
           }, where: 'id = 1');
         }
         if (oldVersion < 11) await _upgradeRestaurantTags(db);
+        if (oldVersion < 12) {
+          await db.execute(
+            'ALTER TABLE restaurant_visits ADD COLUMN is_takeaway INTEGER NOT NULL DEFAULT 0 CHECK (is_takeaway IN (0,1))',
+          );
+          final row = (await db.query('menu_settings')).single;
+          final payload =
+              jsonDecode(row['payload'] as String) as Map<String, dynamic>;
+          payload['version'] = 12;
+          await db.update('menu_settings', {
+            'payload': jsonEncode(payload),
+          }, where: 'id = 1');
+        }
       },
     );
     final result = MenuDatabase._(database);

@@ -74,6 +74,7 @@ class MenuMcpTools {
     'visit' => {
       'addressId': {..._text, 'description': '已有餐厅地址的 id，可由 get_restaurant 查询'},
       'autoCost': _flag,
+      'isTakeaway': {..._flag, 'description': '是否外卖，仅用于统计，不限制其他字段'},
       'date': {..._text, 'description': 'ISO 8601 到店日期'},
       'totalCost': _number,
       'currency': {
@@ -444,6 +445,9 @@ class MenuMcpTools {
               }).toList();
             }
             visit.validatePackages();
+            if (args.containsKey('isTakeaway')) {
+              visit.isTakeaway = args['isTakeaway'] as bool;
+            }
             if (args.containsKey('autoCost')) {
               visit.autoCost = args['autoCost'] as bool;
             }

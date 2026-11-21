@@ -7,6 +7,7 @@ import '../../core/models.dart';
 import '../../ui/widgets.dart';
 import '../../ui/menu_field_label.dart';
 import 'restaurant_address_fields.dart';
+import 'restaurant_gps_editor.dart';
 import 'restaurant_categories_page.dart';
 import '../../ui/tag_selection_field.dart';
 import 'restaurant_record_draft.dart';
@@ -16,6 +17,7 @@ import 'visit_detail_page.dart';
 import 'restaurant_photo_records.dart';
 import 'restaurant_visit_editor.dart';
 import 'visit_dish_editor.dart';
+import 'visit_photo_picker.dart';
 import 'restaurant_quick_create.dart';
 
 Future<bool> editRestaurant(
@@ -53,7 +55,6 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
   late final name = TextEditingController(text: widget.restaurant?.name ?? '');
   late List<String> categories = [...?widget.restaurant?.categories];
   late final note = TextEditingController(text: widget.restaurant?.note ?? '');
-  late final link = TextEditingController(text: widget.restaurant?.link ?? '');
   late List<RestaurantAddress> addresses =
       (widget.restaurant?.addressEntries ?? widget.initialAddresses)
           .map((entry) => RestaurantAddress.fromJson(entry.toJson()))
@@ -124,13 +125,12 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
       name.text != (widget.restaurant?.name ?? '') ||
       jsonEncode(categories) != jsonEncode(_storedCategories) ||
       note.text != (widget.restaurant?.note ?? '') ||
-      link.text != (widget.restaurant?.link ?? '') ||
       favorite != (widget.restaurant?.favorite ?? false) ||
       _addressesChanged;
   @override
   void initState() {
     super.initState();
-    for (final controller in [name, note, link]) {
+    for (final controller in [name, note]) {
       controller.addListener(changed);
     }
   }
@@ -138,7 +138,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
   void changed() => setState(() {});
   @override
   void dispose() {
-    for (final controller in [name, note, link]) {
+    for (final controller in [name, note]) {
       controller.dispose();
     }
     super.dispose();
@@ -161,10 +161,14 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
   }
 
   String? _newAddressId;
+  bool _addressesExpanded = false;
+  int get _visibleAddressCount =>
+      addresses.length <= 2 || _addressesExpanded ? addresses.length : 1;
 
   void addAddress() => setState(() {
     final address = RestaurantAddress(id: newId());
     addresses.add(address);
+    _addressesExpanded = true;
     _newAddressId = address.id;
   });
 
@@ -300,6 +304,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
       context,
       edited.items[index],
       packages: edited.packages,
+      visitPhotos: visitPhotoPaths(edited.items, edited.imagePaths),
       currency: edited.currency,
       onCurrencyChanged: (value) => edited.currency = value,
       restaurantId: widget.restaurant?.id,
@@ -342,16 +347,21 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
     }
   }
 
-  void moveAddress(int from, int to) => setState(() {
-    final address = addresses.removeAt(from);
-    addresses.insert(to, address);
-  });
+  Future<void> editAddressGps(RestaurantAddress address) async {
+    final location = await editRestaurantGps(context, address.location);
+    if (location == null || !mounted) return;
+    setState(() => address.location = location);
+  }
+
   Future<void> save() async {
     if (name.text.trim().isEmpty) {
       showToast(context, '请填写餐厅名称');
       return;
     }
-    if (!validateRestaurantAddresses(context, addresses)) return;
+    if (!validateRestaurantAddresses(context, addresses)) {
+      setState(() => _addressesExpanded = true);
+      return;
+    }
     final recordsChanged = recordDraft.dirty;
     if (recordsChanged) {
       for (final visit in recordDraft.records) {
@@ -375,7 +385,7 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
             name: name.text.trim(),
             categories: [...categories],
             note: note.text.trim(),
-            link: link.text.trim(),
+            link: widget.restaurant!.link,
             favorite: favorite,
             addressEntries: addresses,
           ),
@@ -406,7 +416,6 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
           ...categories,
         }.toList();
         restaurant.note = note.text.trim();
-        restaurant.link = link.text.trim();
         restaurant.favorite = favorite;
         restaurant.addressEntries = addresses;
         restaurant.addresses = addresses.map((a) => a.fullAddress).toList();
@@ -547,11 +556,11 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                       icon: const MenuIcon(Icons.add, size: 20),
                     ),
                   ),
-                  for (var i = 0; i < addresses.length; i++)
+                  for (var i = 0; i < _visibleAddressCount; i++)
                     Padding(
                       key: ValueKey(addresses[i].id),
                       padding: EdgeInsets.only(
-                        bottom: i == addresses.length - 1 ? 0 : 12,
+                        bottom: i == _visibleAddressCount - 1 ? 0 : 12,
                       ),
                       child: RestaurantAddressFields(
                         address: addresses[i],
@@ -569,32 +578,57 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                           tooltip: '地址操作',
                           onSelected: (value) {
                             switch (value) {
-                              case 'up':
-                                moveAddress(i, i - 1);
-                              case 'down':
-                                moveAddress(i, i + 1);
+                              case 'gps':
+                                editAddressGps(addresses[i]);
                               case 'delete':
                                 removeAddress(i);
                             }
                           },
                           itemBuilder: (_) => [
-                            if (i > 0)
-                              const MenuPopupItem(
-                                icon: Icons.arrow_upward,
-                                value: 'up',
-                                child: Text('上移'),
-                              ),
-                            if (i < addresses.length - 1)
-                              const MenuPopupItem(
-                                icon: Icons.arrow_downward,
-                                value: 'down',
-                                child: Text('下移'),
-                              ),
+                            const MenuPopupItem(
+                              icon: Icons.place_outlined,
+                              value: 'gps',
+                              child: Text('修改 GPS'),
+                            ),
                             const MenuPopupItem(
                               icon: Icons.delete_outline,
                               destructive: true,
                               value: 'delete',
                               child: Text('移除地址'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (addresses.length > 2)
+                    Align(
+                      alignment: Alignment.center,
+                      child: TextButton(
+                        onPressed: () {
+                          FocusScope.of(context).unfocus();
+                          setState(
+                            () => _addressesExpanded = !_addressesExpanded,
+                          );
+                        },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _addressesExpanded
+                                  ? '收起地址'
+                                  : '查看剩余 ${addresses.length - 1} 个地址',
+                            ),
+                            const SizedBox(width: 6),
+                            AnimatedRotation(
+                              turns: _addressesExpanded ? .5 : 0,
+                              duration: MediaQuery.disableAnimationsOf(context)
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 200),
+                              curve: Curves.easeInOutCubic,
+                              child: const MenuIcon(
+                                Icons.expand_more,
+                                size: 18,
+                              ),
                             ),
                           ],
                         ),
@@ -615,19 +649,6 @@ class _RestaurantEditorState extends State<_RestaurantEditor> {
                     decoration: const InputDecoration(
                       hintText: '口味、推荐理由或需要注意的事',
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  const MenuFieldLabel(
-                    '相关链接',
-                    icon: Icons.link,
-                    minHeight: 44,
-                    bottomSpacing: 4,
-                  ),
-                  TextField(
-                    controller: link,
-                    style: const TextStyle(fontSize: 15),
-                    keyboardType: TextInputType.url,
-                    decoration: const InputDecoration(hintText: '店铺或地图链接'),
                   ),
                   const SizedBox(height: 16),
                   RestaurantRecordSection(

@@ -100,12 +100,48 @@ extension _RestaurantVisitEditorFoods on _RestaurantVisitEditorState {
     return success;
   }
 
-  Future<void> addItem({String? packageId}) async {
+  List<HistoricalDish> get historyDishes => historicalDishes(
+    widget.draftOnly
+        ? widget.restaurant
+        : MenuScope.of(context).data.restaurants.firstWhere(
+            (restaurant) => restaurant.id == widget.restaurant.id,
+          ),
+    date,
+    widget.visit?.id,
+  );
+
+  Future<void> addHistoricalDish() async {
+    final selected = await selectHistoricalDish(
+      context,
+      dishes: historyDishes,
+      addedNames: items.map((item) => item.name).toSet(),
+      currency: currency,
+    );
+    if (selected == null || !mounted) return;
+    final needsPrice =
+        selected.dish.packageId != null || selected.visit.currency != currency;
+    await addItem(
+      initial: VisitDish(
+        dishId: newId(),
+        name: selected.dish.name,
+        price: needsPrice ? 0 : selected.dish.price,
+      ),
+      requirePrice: needsPrice,
+    );
+  }
+
+  Future<void> addItem({
+    String? packageId,
+    VisitDish? initial,
+    bool requirePrice = false,
+  }) async {
     var selectedCurrency = currency;
     final item = await editVisitDish(
       context,
-      VisitDish(dishId: newId(), name: '', packageId: packageId),
+      initial ?? VisitDish(dishId: newId(), name: '', packageId: packageId),
+      requirePrice: requirePrice,
       packages: packages,
+      visitPhotos: visitPhotoPaths(items, images),
       currency: currency,
       onCurrencyChanged: (value) => selectedCurrency = value,
       restaurantId: widget.draftOnly ? null : widget.restaurant.id,
@@ -134,6 +170,7 @@ extension _RestaurantVisitEditorFoods on _RestaurantVisitEditorState {
       context,
       original,
       packages: packages,
+      visitPhotos: visitPhotoPaths(items, images),
       currency: currency,
       onCurrencyChanged: (value) => selectedCurrency = value,
       restaurantId: widget.draftOnly ? null : widget.restaurant.id,

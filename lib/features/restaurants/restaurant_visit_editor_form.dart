@@ -1,5 +1,7 @@
 part of 'restaurant_visit_editor.dart';
 
+enum _VisitFoodAction { single, package, sharedPhoto, history }
+
 extension _RestaurantVisitEditorForm on _RestaurantVisitEditorState {
   Widget _selectionField(
     BuildContext context, {
@@ -36,6 +38,7 @@ extension _RestaurantVisitEditorForm on _RestaurantVisitEditorState {
   );
 
   Widget _buildEditor(BuildContext context) {
+    final canSharePhoto = items.where((item) => item.isDish).skip(1).isNotEmpty;
     final allPeople =
         MenuScope.of(context).data.restaurants
             .expand((r) => r.records)
@@ -244,6 +247,41 @@ extension _RestaurantVisitEditorForm on _RestaurantVisitEditorState {
                               paths: images,
                               editorStyle: true,
                               label: '环境照片',
+                              headerTrailing: MergeSemantics(
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () => updateForm(
+                                    () => isTakeaway = !isTakeaway,
+                                  ),
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minHeight: 44,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Checkbox(
+                                          value: isTakeaway,
+                                          onChanged: (value) => updateForm(
+                                            () => isTakeaway = value!,
+                                          ),
+                                          activeColor: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                          materialTapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                        const Text(
+                                          '外卖',
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                        const SizedBox(width: 4),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
                               onBusyChanged: (value) =>
                                   updateForm(() => picking = value),
                               onChanged: (v) {
@@ -252,11 +290,11 @@ extension _RestaurantVisitEditorForm on _RestaurantVisitEditorState {
                             ),
                             const SizedBox(height: 16),
                             MenuFieldLabel(
-                              '本次菜品 · ${items.length}',
+                              '消费明细 · ${items.length}',
                               minHeight: 44,
                               bottomSpacing: 4,
-                              trailing: MenuPopupButton<String>(
-                                tooltip: '添加本次菜品',
+                              trailing: MenuPopupButton<_VisitFoodAction>(
+                                tooltip: '添加消费明细',
                                 buttonBuilder: (open) => Tooltip(
                                   message: '添加菜品，长按从照片快速添加',
                                   triggerMode: TooltipTriggerMode.manual,
@@ -272,20 +310,37 @@ extension _RestaurantVisitEditorForm on _RestaurantVisitEditorState {
                                     ),
                                   ),
                                 ),
-                                onSelected: (action) => action == 'single'
-                                    ? addItem()
-                                    : editPackage(),
-                                itemBuilder: (_) => const [
-                                  MenuPopupItem(
-                                    value: 'single',
+                                onSelected: (action) => switch (action) {
+                                  _VisitFoodAction.single => addItem(),
+                                  _VisitFoodAction.history =>
+                                    addHistoricalDish(),
+                                  _VisitFoodAction.package => editPackage(),
+                                  _VisitFoodAction.sharedPhoto =>
+                                    addSharedPhoto(),
+                                },
+                                itemBuilder: (_) => [
+                                  const MenuPopupItem(
+                                    value: _VisitFoodAction.single,
                                     icon: Icons.add,
                                     child: Text('添加单点'),
                                   ),
-                                  MenuPopupItem(
-                                    value: 'package',
+                                  const MenuPopupItem(
+                                    value: _VisitFoodAction.package,
                                     icon: Icons.receipt_long_outlined,
                                     child: Text('添加套餐'),
                                   ),
+                                  if (historyDishes.isNotEmpty)
+                                    const MenuPopupItem(
+                                      value: _VisitFoodAction.history,
+                                      icon: Icons.history,
+                                      child: Text('从历史消费添加'),
+                                    ),
+                                  if (canSharePhoto)
+                                    const MenuPopupItem(
+                                      value: _VisitFoodAction.sharedPhoto,
+                                      icon: Icons.add_photo_alternate_outlined,
+                                      child: Text('多道菜共用照片'),
+                                    ),
                                 ],
                               ),
                             ),

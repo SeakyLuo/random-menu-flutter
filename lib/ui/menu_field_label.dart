@@ -9,6 +9,7 @@ class MenuFieldLabel extends StatelessWidget {
     this.isRequired = false,
     this.icon,
     this.trailing,
+    this.labelTrailing,
     this.bottomSpacing = 10,
     this.minHeight = 0,
   });
@@ -17,6 +18,7 @@ class MenuFieldLabel extends StatelessWidget {
   final bool isRequired;
   final IconData? icon;
   final Widget? trailing;
+  final Widget? labelTrailing;
   final double bottomSpacing;
   final double minHeight;
   @override
@@ -57,6 +59,11 @@ class MenuFieldLabel extends StatelessWidget {
                         fontSize: 12,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
+                    ),
+                  if (labelTrailing != null)
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: labelTrailing!,
                     ),
                 ],
               ),

@@ -3,6 +3,7 @@ import '../../core/menu_store.dart';
 import '../../core/models.dart';
 import '../../ui/widgets.dart';
 import 'dining_statistics.dart';
+import 'takeaway_records_page.dart';
 import 'dining_stats_details.dart';
 import 'dining_stats_widgets.dart';
 import 'dining_amount_chart.dart';
@@ -184,6 +185,12 @@ class _Overview extends StatelessWidget {
     final metrics = [
       ('用餐总数', '', '${stats.entries.length}', '次'),
       (
+        '外卖次数',
+        '',
+        '${stats.entries.where((entry) => entry.visit.isTakeaway).length}',
+        '次',
+      ),
+      (
         '月均用餐',
         '',
         stats.averageVisitsPerPeriod(DiningTimeUnit.month).toStringAsFixed(1),
@@ -211,46 +218,57 @@ class _Overview extends StatelessWidget {
                 children: [
                   for (final (label, prefix, value, unit) in metrics)
                     Expanded(
-                      child: Column(
-                        children: [
-                          Text.rich(
-                            TextSpan(
-                              children: [
-                                if (prefix.isNotEmpty)
-                                  TextSpan(
-                                    text: prefix,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: label == '外卖次数'
+                            ? () => Navigator.push<void>(
+                                context,
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const TakeawayRecordsPage(),
+                                ),
+                              )
+                            : null,
+                        child: Column(
+                          children: [
+                            Text.rich(
+                              TextSpan(
+                                children: [
+                                  if (prefix.isNotEmpty)
+                                    TextSpan(
+                                      text: prefix,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
-                                  ),
-                                TextSpan(text: value),
-                                if (unit.isNotEmpty)
-                                  TextSpan(
-                                    text: ' $unit',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w400,
+                                  TextSpan(text: value),
+                                  if (unit.isNotEmpty)
+                                    TextSpan(
+                                      text: ' $unit',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w400,
+                                      ),
                                     ),
-                                  ),
-                              ],
+                                ],
+                              ),
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w600,
+                                color: colors.primary,
+                              ),
                             ),
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w600,
-                              color: colors.primary,
+                            const SizedBox(height: 6),
+                            Text(
+                              label,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: colors.onSurfaceVariant,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            label,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: colors.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                 ],

@@ -9,11 +9,45 @@ from pathlib import Path
 import shutil
 import sqlite3
 import subprocess
+import sys
 import tarfile
 import tempfile
+import time
 
 PACKAGE = 'com.seakyluo.random_menu'
 DB = 'files/random_menu/menu.db'
+MIB = 1024 * 1024
+
+
+def copy_archive(command, path):
+    started = last_report = time.monotonic()
+    transferred = 0
+    terminal = sys.stderr.isatty()
+
+    def report(now, *, done=False):
+        elapsed = now - started
+        message = f'{path.name}：已传输 {transferred / MIB:.1f} MiB'
+        if done:
+            message += f'，用时 {elapsed:.1f} 秒'
+        else:
+            message += f'，平均 {transferred / MIB / elapsed:.1f} MiB/s'
+        print(('\r\x1b[2K' if terminal else '') + message,
+              file=sys.stderr, end='\n' if done or not terminal else '', flush=True)
+
+    with path.open('wb') as stream, subprocess.Popen(command, stdout=subprocess.PIPE) as process:
+        while chunk := process.stdout.read1(MIB):
+            stream.write(chunk)
+            transferred += len(chunk)
+            now = time.monotonic()
+            if now - last_report >= (1 if terminal else 3):
+                report(now)
+                last_report = now
+        return_code = process.wait()
+        if return_code:
+            if terminal and last_report != started:
+                print(file=sys.stderr, flush=True)
+            raise subprocess.CalledProcessError(return_code, command)
+    report(time.monotonic(), done=True)
 
 
 def sha256(path):
@@ -78,13 +112,14 @@ def main():
     members = {'外部照片.tar': set()}
     for name, parts in archives:
         print('正在备份：' + name, flush=True)
-        with (output / name).open('wb') as stream:
-            subprocess.run([*command, *parts], stdout=stream, check=True)
+        copy_archive([*command, *parts], output / name)
+        print('正在检查归档：' + name, flush=True)
         with tarfile.open(output / name) as archive:
             members[name] = set(archive.getnames())
     if before != database_state():
         raise RuntimeError('备份期间数据库发生变化，本次未通过校验。请停止编辑后重新运行。')
 
+    print('正在校验数据库和照片引用…', flush=True)
     # Read the copied WAL with its database, then produce a standalone SQLite file.
     with tempfile.TemporaryDirectory(prefix='random-menu-backup-') as temporary:
         snapshot = Path(temporary)
@@ -116,14 +151,17 @@ def main():
             outside.append(path)
         elif path[len(match[0]):] not in members[match[1]]:
             missing.append(path)
+    files = {}
+    for name in ['应用数据.tar', '外部照片.tar', 'menu.db']:
+        print('正在计算 SHA-256：' + name, flush=True)
+        path = output / name
+        files[name] = dict(bytes=path.stat().st_size, sha256=sha256(path))
     manifest = dict(createdAt=stamp, device=serial, package=PACKAGE,
                     databaseIntegrity='ok', databaseStableDuringBackup=True,
                     externalAppDirectoryPresent=external_exists,
                     counts=counts, missingPhotoReferences=missing,
                     outsideAppPhotoReferences=outside,
-                    files={name: dict(bytes=(output / name).stat().st_size,
-                                      sha256=sha256(output / name))
-                           for name in ['应用数据.tar', '外部照片.tar', 'menu.db']})
+                    files=files)
     (output / '校验信息.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
     (output / '说明.txt').write_text(
         'RandomMenu 手机原始数据备份\n\n'

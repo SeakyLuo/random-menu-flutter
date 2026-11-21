@@ -52,6 +52,7 @@ const _schema = [
   '''CREATE TABLE restaurant_visits (restaurant_id TEXT NOT NULL, id TEXT NOT NULL,
  position INTEGER NOT NULL, date TEXT NOT NULL, total_cost REAL NOT NULL, currency TEXT NOT NULL DEFAULT 'CNY', address_id TEXT NOT NULL,
  address TEXT NOT NULL, auto_cost INTEGER NOT NULL CHECK (auto_cost IN (0,1)),
+ is_takeaway INTEGER NOT NULL DEFAULT 0 CHECK (is_takeaway IN (0,1)),
  note TEXT NOT NULL, dishes TEXT NOT NULL, PRIMARY KEY (restaurant_id,id))''',
   '''CREATE TABLE restaurant_visit_items (restaurant_id TEXT NOT NULL,
  visit_id TEXT NOT NULL, position INTEGER NOT NULL, dish_id TEXT NOT NULL, name TEXT NOT NULL,

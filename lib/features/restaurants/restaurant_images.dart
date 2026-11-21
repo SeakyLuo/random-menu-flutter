@@ -6,6 +6,7 @@ import '../../ui/widgets.dart';
 import '../media/media_actions.dart';
 import '../media/editor_photo_fields.dart';
 import '../media/reorderable_photo_grid.dart';
+import 'visit_photo_picker.dart';
 
 class RestaurantImages extends StatefulWidget {
   const RestaurantImages({
@@ -16,6 +17,8 @@ class RestaurantImages extends StatefulWidget {
     this.cover = false,
     this.editorStyle = false,
     this.label = '照片',
+    this.headerTrailing,
+    this.visitPhotos = const [],
   });
   final List<String> paths;
   final ValueChanged<List<String>>? onChanged;
@@ -23,6 +26,8 @@ class RestaurantImages extends StatefulWidget {
   final bool cover;
   final bool editorStyle;
   final String label;
+  final Widget? headerTrailing;
+  final List<String> visitPhotos;
   @override
   State<RestaurantImages> createState() => _RestaurantImagesState();
 }
@@ -43,6 +48,13 @@ class _RestaurantImagesState extends State<RestaurantImages> {
       }
     });
     if (mounted) setBusy(false);
+  }
+
+  Future<void> pickFromVisit() async {
+    final paths = widget.visitPhotos.toSet().difference(widget.paths.toSet());
+    final selection = await showVisitPhotoPicker(context, paths.toList());
+    if (!mounted || selection == null) return;
+    widget.onChanged!([...widget.paths, selection.path!]);
   }
 
   void reorder(int from, int to) {
@@ -87,9 +99,14 @@ class _RestaurantImagesState extends State<RestaurantImages> {
       ? EditorPhotoFields(
           paths: widget.paths,
           label: widget.label,
+          headerTrailing: widget.headerTrailing,
           showCover: widget.cover,
           busy: busy,
           onPick: pick,
+          onPickFromVisit:
+              widget.visitPhotos.any((path) => !widget.paths.contains(path))
+              ? pickFromVisit
+              : null,
           onAction: edit,
           onReorder: reorder,
           heroTagForIndex: (index) => (this, index),

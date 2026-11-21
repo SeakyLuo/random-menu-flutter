@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../core/menu_store.dart';
 import '../../core/current_city.dart';
 import '../../core/models.dart';
@@ -132,12 +131,6 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
         editRestaurantVisit(context, restaurant);
       case 'import':
         addRestaurantRecordsFromPhotos(context, restaurant);
-      case 'link':
-        performAction(
-          context,
-          () => Clipboard.setData(ClipboardData(text: restaurant.link)),
-          success: '链接已复制',
-        );
       case 'delete':
         _delete(restaurant);
     }
@@ -259,12 +252,6 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
                               icon: Icons.add_photo_alternate_outlined,
                               child: Text('从照片新增消费记录'),
                             ),
-                            if (restaurant.link.isNotEmpty)
-                              const MenuPopupItem(
-                                value: 'link',
-                                icon: Icons.link,
-                                child: Text('复制餐厅链接'),
-                              ),
                             MenuPopupItem(
                               value: 'delete',
                               icon: Icons.delete_outline,

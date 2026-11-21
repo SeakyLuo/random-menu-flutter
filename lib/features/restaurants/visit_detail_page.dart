@@ -21,7 +21,7 @@ Future<bool> removeRestaurantVisit(
   if (!await confirmAction(
     context,
     title: '删除消费记录？',
-    message: '删除 ${dayLabel(visit.date)} 的记录及本次菜品明细和照片引用，记录无法恢复。',
+    message: '删除 ${dayLabel(visit.date)} 的记录及消费明细和照片引用，记录无法恢复。',
   )) {
     return false;
   }
@@ -61,6 +61,13 @@ class VisitDetailPage extends StatelessWidget {
         body: const SizedBox.shrink(),
       );
     }
+    final colors = Theme.of(context).colorScheme;
+    final takeawayStyle = TextStyle(
+      fontSize: 14,
+      height: 1.5,
+      fontWeight: FontWeight.w500,
+      color: colors.primary,
+    );
     return Scaffold(
       appBar: AppBar(
         title: MenuScrollTitle(child: const Text('消费记录')),
@@ -177,9 +184,7 @@ class VisitDetailPage extends StatelessWidget {
                               MenuIcon(
                                 Icons.place_outlined,
                                 size: 18,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
+                                color: colors.onSurfaceVariant,
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -188,13 +193,23 @@ class VisitDetailPage extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 14,
                                     height: 1.5,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
+                                    color: colors.onSurfaceVariant,
                                   ),
                                 ),
                               ),
+                              if (visit.isTakeaway) ...[
+                                const SizedBox(width: 8),
+                                Text('外卖', style: takeawayStyle),
+                              ],
                             ],
+                          ),
+                        )
+                      else if (visit.isTakeaway)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: Text('外卖', style: takeawayStyle),
                           ),
                         ),
                       if (visit.companions.isNotEmpty)
@@ -278,7 +293,7 @@ class VisitDetailPage extends StatelessWidget {
                   ),
               ],
               if (visit.items.isNotEmpty) ...[
-                _VisitSectionTitle('本次菜品', count: '${visit.items.length} 道'),
+                _VisitSectionTitle('消费明细', count: '${visit.items.length} 条'),
                 if (visit.items.every((dish) => dish.imagePaths.isEmpty))
                   VisitFoodList(
                     restaurantId: restaurantId,
@@ -320,7 +335,7 @@ class VisitDetailPage extends StatelessWidget {
                     ),
                   ),
               ] else if (visit.dishes.isNotEmpty) ...[
-                _VisitSectionTitle('本次菜品', count: '${visit.dishes.length} 道'),
+                _VisitSectionTitle('消费明细', count: '${visit.dishes.length} 条'),
                 Text(visit.dishes.join('、')),
               ],
               const SizedBox(height: 40),

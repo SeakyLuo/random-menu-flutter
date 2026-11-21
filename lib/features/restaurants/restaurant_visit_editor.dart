@@ -1,4 +1,5 @@
 import '../../ui/menu_bottom_sheet.dart';
+import '../../ui/menu_action_sheet.dart';
 import '../../ui/menu_currency_picker.dart';
 import '../../ui/menu_icon.dart';
 import '../../ui/menu_field_label.dart';
@@ -13,15 +14,19 @@ import 'restaurant_address_editor.dart';
 import 'restaurant_companion_field.dart';
 import 'restaurant_images.dart';
 import 'visit_dish_editor.dart';
+import 'visit_photo_picker.dart';
+import 'visit_history_dishes.dart';
 import 'visit_coupon_fields.dart';
 import 'visit_package_fields.dart';
 import 'visit_food_groups.dart';
 import '../../ui/menu_popup.dart';
 import 'restaurant_record_draft.dart';
+import '../media/media_actions.dart' show LocalPhoto, choosePhotos;
 import '../photo_import/import_models.dart';
 
 part 'restaurant_visit_editor_form.dart';
 part 'restaurant_visit_editor_foods.dart';
+part 'restaurant_visit_editor_shared_photo.dart';
 
 class RestaurantVisitEditor extends StatefulWidget {
   const RestaurantVisitEditor({
@@ -60,6 +65,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
   late List<VisitCoupon> coupons = [...?widget.visit?.coupons];
   late List<VisitPackage> packages = [...?widget.visit?.packages];
   late MenuCurrency currency = widget.visit?.currency ?? MenuCurrency.cny;
+  late bool isTakeaway = widget.visit?.isTakeaway ?? false;
   late bool autoCost = widget.visit?.autoCost ?? true;
   late String addressId =
       widget.visit?.addressId ??
@@ -98,6 +104,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
       companions.text != (_savedVisit?.companions.join('，') ?? '') ||
       note.text != (_savedVisit?.note ?? '') ||
       autoCost != (_savedVisit?.autoCost ?? true) ||
+      isTakeaway != (_savedVisit?.isTakeaway ?? false) ||
       jsonEncode(coupons.map((c) => c.toJson()).toList()) !=
           jsonEncode(
             _savedVisit?.coupons.map((c) => c.toJson()).toList() ?? [],
@@ -329,6 +336,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
         packages: packages,
         dishes: items.map((item) => item.name).toList(),
         autoCost: autoCost,
+        isTakeaway: isTakeaway,
         addressId: addressId,
         address: address,
         imagePaths: images,
@@ -406,6 +414,7 @@ class _RestaurantVisitEditorState extends State<RestaurantVisitEditor> {
             coupons: coupons,
             packages: actualPackages,
             autoCost: autoCost,
+            isTakeaway: isTakeaway,
             addressId: addressId,
             address: address,
             imagePaths: savedImages,

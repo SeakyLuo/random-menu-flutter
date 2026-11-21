@@ -262,7 +262,7 @@ List<Map<String, Object?>> _imageRows(
 ];
 
 Map<String, dynamic> _settings(MenuData data) => {
-  'version': 11,
+  'version': 12,
   'note': data.note,
   'themeMode': data.themeMode,
   'autoTag': data.autoTag,
